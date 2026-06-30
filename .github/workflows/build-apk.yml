@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: app/package-lock.json
 
@@ -47,7 +47,7 @@ jobs:
       - name: Install SDK platform & build-tools
         run: |
           yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools" || sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
 
       - name: Build Debug APK
         working-directory: app/android
