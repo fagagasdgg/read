@@ -17,6 +17,50 @@ function opfDirFromPath(opfPath: string): string {
   return idx >= 0 ? opfPath.slice(0, idx) : ''
 }
 
+function dirFromPath(filePath: string): string {
+  const idx = filePath.lastIndexOf('/')
+  return idx >= 0 ? filePath.slice(0, idx) : ''
+}
+
+export interface ChapterHtmlResult {
+  html: string
+  revoke: () => void
+}
+
+async function embedChapterImages(
+  book: EpubBook,
+  chapterHref: string,
+  html: string,
+): Promise<ChapterHtmlResult> {
+  const doc = new DOMParser().parseFromString(`<div id="embed-root">${html}</div>`, 'text/html')
+  const root = doc.getElementById('embed-root')
+  if (!root) return { html, revoke: () => {} }
+
+  const chapterDir = dirFromPath(chapterHref)
+  const blobUrls: string[] = []
+
+  for (const img of root.querySelectorAll('img')) {
+    const src = img.getAttribute('src')?.trim()
+    if (!src || src.startsWith('data:') || src.startsWith('blob:')) continue
+
+    const assetPath = resolvePath(chapterDir, decodeURIComponent(src))
+    const assetFile = book.zip.file(assetPath)
+    if (!assetFile) continue
+
+    const blob = await assetFile.async('blob')
+    const objectUrl = URL.createObjectURL(blob)
+    blobUrls.push(objectUrl)
+    img.setAttribute('src', objectUrl)
+  }
+
+  return {
+    html: root.innerHTML,
+    revoke: () => {
+      for (const url of blobUrls) URL.revokeObjectURL(url)
+    },
+  }
+}
+
 function parseContainerXml(xml: string): string {
   const doc = new DOMParser().parseFromString(xml, 'application/xml')
   const rootfile = doc.querySelector('rootfile')
@@ -126,7 +170,10 @@ export async function parseEpubFile(file: File): Promise<EpubBook> {
   return parseEpubBuffer(await file.arrayBuffer(), file.name)
 }
 
-export async function loadChapterHtml(book: EpubBook, chapterIndex: number): Promise<string> {
+export async function loadChapterHtml(
+  book: EpubBook,
+  chapterIndex: number,
+): Promise<ChapterHtmlResult> {
   const chapter = book.chapters[chapterIndex]
   if (!chapter) throw new Error('章节不存在')
 
@@ -139,7 +186,7 @@ export async function loadChapterHtml(book: EpubBook, chapterIndex: number): Pro
   doc.querySelectorAll('script, style, link[rel="stylesheet"]').forEach((el) => el.remove())
 
   const body = doc.body
-  if (!body) return raw
+  if (!body) return embedChapterImages(book, chapter.href, raw)
 
-  return body.innerHTML
+  return embedChapterImages(book, chapter.href, body.innerHTML)
 }

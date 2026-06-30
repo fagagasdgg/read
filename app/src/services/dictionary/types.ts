@@ -23,6 +23,7 @@ export interface WordEntry {
   phoneticUs: string
   phoneticUk: string
   usSpeechUrl: string
+  ukSpeechUrl: string
   examLevels: ExamLevel[]
   definitions: WordDefinition[]
   forms: WordForm[]

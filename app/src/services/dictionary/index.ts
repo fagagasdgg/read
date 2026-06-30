@@ -5,6 +5,7 @@ import type { LookupOptions, WordEntry } from './types'
 
 export type { LookupOptions, WordEntry, WordDefinition, WordForm, ExamLevel } from './types'
 export { exportCachedWordsJson, listCachedWords } from './cache'
+export { playSpeech } from './speech'
 
 export async function lookupWord(
   rawWord: string,

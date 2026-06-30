@@ -9,6 +9,7 @@ interface YoudaoEcWord {
   usphone?: string
   ukphone?: string
   usspeech?: string
+  ukspeech?: string
   trs?: Array<{ pos?: string; tran?: string }>
   wfs?: Array<{ wf?: { name?: string; value?: string } }>
 }
@@ -27,9 +28,9 @@ function buildLookupUrl(lemma: string): string {
   return `${base}?${params}`
 }
 
-function buildSpeechUrl(speech: string | undefined, lemma: string): string {
+function buildSpeechUrl(speech: string | undefined, lemma: string, type: 1 | 2): string {
   const audio = speech?.split('&')[0] ?? lemma
-  return `${VOICE_BASE}?audio=${encodeURIComponent(audio)}&type=2`
+  return `${VOICE_BASE}?audio=${encodeURIComponent(audio)}&type=${type}`
 }
 
 function parseDefinitions(trs: YoudaoEcWord['trs']): WordDefinition[] {
@@ -81,7 +82,8 @@ export async function fetchFromYoudao(lemma: string): Promise<WordEntry | null> 
     lemma,
     phoneticUs: word.usphone ?? '',
     phoneticUk: word.ukphone ?? '',
-    usSpeechUrl: buildSpeechUrl(word.usspeech, lemma),
+    usSpeechUrl: buildSpeechUrl(word.usspeech, lemma, 2),
+    ukSpeechUrl: buildSpeechUrl(word.ukspeech, lemma, 1),
     examLevels: data.ec?.exam_type ?? [],
     definitions,
     forms: parseForms(word.wfs),

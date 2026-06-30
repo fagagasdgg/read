@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react'
-import { lookupWord } from '../../services/dictionary'
+import { lookupWord, playSpeech } from '../../services/dictionary'
 import type { WordEntry } from '../../services/dictionary'
 
 interface WordDetailPopupProps {
   rawWord: string | null
   onClose: () => void
   onLookupVariant?: (word: string) => void
+}
+
+function ukSpeechFallback(entry: WordEntry): string {
+  if (entry.ukSpeechUrl) return entry.ukSpeechUrl
+  return `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(entry.lemma)}&type=1`
 }
 
 export function WordDetailPopup({ rawWord, onClose, onLookupVariant }: WordDetailPopupProps) {
@@ -60,10 +65,35 @@ export function WordDetailPopup({ rawWord, onClose, onLookupVariant }: WordDetai
           <>
             <div className="popup-word-title">
               <strong>{entry.lemma}</strong>
-              <span className="popup-phonetic">/{entry.phoneticUs || entry.phoneticUk}/</span>
-              <a className="popup-audio" href={entry.usSpeechUrl} target="_blank" rel="noreferrer">
-                🔊 美音
-              </a>
+            </div>
+
+            <div className="popup-phonetics">
+              {(entry.phoneticUs || entry.usSpeechUrl) && (
+                <div className="popup-phonetic-row">
+                  <span className="popup-phonetic-label">美</span>
+                  <span className="popup-phonetic">/{entry.phoneticUs}/</span>
+                  <button
+                    type="button"
+                    className="popup-audio-btn"
+                    aria-label="播放美音"
+                    onClick={() => playSpeech(entry.usSpeechUrl)}
+                  >
+                    🔊
+                  </button>
+                </div>
+              )}
+              <div className="popup-phonetic-row">
+                <span className="popup-phonetic-label">英</span>
+                <span className="popup-phonetic">/{entry.phoneticUk}/</span>
+                <button
+                  type="button"
+                  className="popup-audio-btn"
+                  aria-label="播放英音"
+                  onClick={() => playSpeech(ukSpeechFallback(entry))}
+                >
+                  🔊
+                </button>
+              </div>
             </div>
 
             {entry.examLevels.length > 0 && (

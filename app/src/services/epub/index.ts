@@ -1,4 +1,7 @@
 export type { EpubBook, EpubChapter, ReadingProgress } from './types'
 export { parseEpubFile, parseEpubBuffer, loadChapterHtml } from './parser'
+export type { ChapterHtmlResult } from './parser'
 export { loadProgress, saveProgress } from './progress'
 export { importEpub, loadEpubFromDevice, getLastBookId, isNativeApp } from './import'
+export { listSavedBooks, removeSavedBook, touchBookLastRead, registerBook } from './library'
+export type { SavedBookMeta } from './library'

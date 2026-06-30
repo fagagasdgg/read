@@ -53,8 +53,12 @@ function renderNode(node: ChildNode, key: string, onWordTap: (w: string) => void
 
   if (tag === 'BR') return <br key={key} />
   if (tag === 'IMG') {
-    const alt = el.getAttribute('alt') ?? '[图片]'
-    return <span key={key} className="reader-image-placeholder"> {alt} </span>
+    const src = el.getAttribute('src')
+    const alt = el.getAttribute('alt') ?? ''
+    if (src) {
+      return <img key={key} className="reader-image" src={src} alt={alt} />
+    }
+    return <span key={key} className="reader-image-placeholder"> {alt || '[图片]'} </span>
   }
 
   const Tag = tag.toLowerCase()

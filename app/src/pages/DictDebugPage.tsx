@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { lookupWord } from '../services/dictionary'
+import { lookupWord, playSpeech } from '../services/dictionary'
 import type { WordEntry } from '../services/dictionary'
 
 export function DictDebugPage() {
@@ -51,10 +51,22 @@ export function DictDebugPage() {
         <article className="word-card">
           <div className="word-title">
             <strong>{entry.lemma}</strong>
-            <span>/{entry.phoneticUs || entry.phoneticUk}/</span>
-            <a href={entry.usSpeechUrl} target="_blank" rel="noreferrer">
-              美音
-            </a>
+            <span>美 /{entry.phoneticUs}/</span>
+            <button type="button" onClick={() => playSpeech(entry.usSpeechUrl)}>
+              🔊 美音
+            </button>
+            <span>英 /{entry.phoneticUk}/</span>
+            <button
+              type="button"
+              onClick={() =>
+                playSpeech(
+                  entry.ukSpeechUrl ||
+                    `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(entry.lemma)}&type=1`,
+                )
+              }
+            >
+              🔊 英音
+            </button>
           </div>
           {entry.examLevels.length > 0 && (
             <p className="levels">等级: {entry.examLevels.join(' / ')}</p>
