@@ -80,19 +80,20 @@ function metaText(doc: Document, localName: string): string {
 function parseOpf(xml: string): {
   title: string
   author: string
-  manifest: Map<string, { href: string; mediaType: string }>
+  manifest: Map<string, { href: string; mediaType: string; properties: string }>
   spine: string[]
 } {
   const doc = new DOMParser().parseFromString(xml, 'application/xml')
   const title = metaText(doc, 'title') || '未命名书籍'
   const author = metaText(doc, 'creator') || '未知作者'
 
-  const manifest = new Map<string, { href: string; mediaType: string }>()
+  const manifest = new Map<string, { href: string; mediaType: string; properties: string }>()
   doc.querySelectorAll('manifest > item').forEach((item) => {
     const id = item.getAttribute('id')
     const href = item.getAttribute('href')
     const mediaType = item.getAttribute('media-type') ?? ''
-    if (id && href) manifest.set(id, { href, mediaType })
+    const properties = item.getAttribute('properties') ?? ''
+    if (id && href) manifest.set(id, { href, mediaType, properties })
   })
 
   const spine: string[] = []
@@ -104,10 +105,108 @@ function parseOpf(xml: string): {
   return { title, author, manifest, spine }
 }
 
-function chapterTitleFromHtml(html: string, fallback: string): string {
+function normalizeHref(href: string): string {
+  const noHash = href.split('#')[0]
+  try {
+    return decodeURIComponent(noHash).replace(/\\/g, '/')
+  } catch {
+    return noHash.replace(/\\/g, '/')
+  }
+}
+
+function hrefBasename(href: string): string {
+  const parts = normalizeHref(href).split('/')
+  return parts[parts.length - 1] ?? href
+}
+
+function parseNcxTitles(ncxXml: string): Map<string, string> {
+  const map = new Map<string, string>()
+  const doc = new DOMParser().parseFromString(ncxXml, 'application/xml')
+
+  function walkNavPoint(np: Element) {
+    const label = np.querySelector('navLabel > text')?.textContent?.trim()
+    const src = np.querySelector(':scope > content')?.getAttribute('src')
+    if (label && src) {
+      const key = normalizeHref(src)
+      if (!map.has(key)) map.set(key, label)
+      const base = hrefBasename(src)
+      if (!map.has(base)) map.set(base, label)
+    }
+    np.querySelectorAll(':scope > navPoint').forEach(walkNavPoint)
+  }
+
+  doc.querySelectorAll('navMap > navPoint').forEach(walkNavPoint)
+  return map
+}
+
+function parseNavDocumentTitles(navHtml: string): Map<string, string> {
+  const map = new Map<string, string>()
+  const doc = new DOMParser().parseFromString(navHtml, 'text/html')
+  doc.querySelectorAll('nav a[href]').forEach((anchor) => {
+    const href = anchor.getAttribute('href')
+    const label = anchor.textContent?.trim()
+    if (!href || !label) return
+    const key = normalizeHref(href)
+    if (!map.has(key)) map.set(key, label)
+    const base = hrefBasename(href)
+    if (!map.has(base)) map.set(base, label)
+  })
+  return map
+}
+
+async function loadTocTitleMap(
+  zip: JSZip,
+  opfDir: string,
+  manifest: Map<string, { href: string; mediaType: string; properties: string }>,
+): Promise<Map<string, string>> {
+  const titles = new Map<string, string>()
+
+  for (const item of manifest.values()) {
+    if (item.mediaType.includes('ncx') || item.href.endsWith('.ncx')) {
+      const file = zip.file(resolvePath(opfDir, item.href))
+      if (file) {
+        const xml = await file.async('string')
+        for (const [k, v] of parseNcxTitles(xml)) titles.set(k, v)
+      }
+    }
+    const isNav =
+      item.properties.includes('nav') ||
+      (item.mediaType.includes('html') && item.href.toLowerCase().includes('nav'))
+    if (isNav || item.href.endsWith('nav.xhtml')) {
+      const file = zip.file(resolvePath(opfDir, item.href))
+      if (file) {
+        const html = await file.async('string')
+        for (const [k, v] of parseNavDocumentTitles(html)) titles.set(k, v)
+      }
+    }
+  }
+
+  return titles
+}
+
+function resolveChapterTitle(
+  tocTitles: Map<string, string>,
+  chapterHref: string,
+  html: string,
+  bookTitle: string,
+  fallback: string,
+): string {
+  const normalized = normalizeHref(chapterHref)
+  const fromToc =
+    tocTitles.get(normalized) ??
+    tocTitles.get(hrefBasename(chapterHref)) ??
+    tocTitles.get(hrefBasename(normalized))
+
+  if (fromToc && fromToc !== bookTitle) return fromToc
+
   const doc = new DOMParser().parseFromString(html, 'text/html')
-  const heading = doc.querySelector('h1, h2, h3, title')
-  return heading?.textContent?.trim() || fallback
+  const heading = doc.body?.querySelector('h1, h2, h3, h4')
+  const headingText = heading?.textContent?.trim()
+  if (headingText && headingText !== bookTitle && headingText.length < 120) {
+    return headingText
+  }
+
+  return fallback
 }
 
 function bookIdFromName(name: string): string {
@@ -128,6 +227,7 @@ export async function parseEpubBuffer(buffer: ArrayBuffer, fileName: string): Pr
   const opfXml = await opfFile.async('string')
   const { title, author, manifest, spine } = parseOpf(opfXml)
   const opfDir = opfDirFromPath(opfPath)
+  const tocTitles = await loadTocTitleMap(zip, opfDir, manifest)
 
   const chapters: EpubChapter[] = []
   let index = 0
@@ -144,12 +244,12 @@ export async function parseEpubBuffer(buffer: ArrayBuffer, fileName: string): Pr
     if (!chapterFile) continue
 
     const html = await chapterFile.async('string')
-    const fallbackTitle = `第 ${index + 1} 章`
+    const fallbackTitle = `第 ${index + 1} 节`
     chapters.push({
       index,
       id: idref,
       href: fullPath,
-      title: chapterTitleFromHtml(html, fallbackTitle),
+      title: resolveChapterTitle(tocTitles, fullPath, html, title, fallbackTitle),
     })
     index += 1
   }

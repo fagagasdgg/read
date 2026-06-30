@@ -1,4 +1,4 @@
-import { toLemma } from '../../lib/lemmatize'
+import { normalizeWordToken, toLemma } from '../../lib/lemmatize'
 import { getCachedWord, setCachedWord } from './cache'
 import { fetchFromYoudao } from './youdao'
 import type { LookupOptions, WordEntry } from './types'
@@ -11,7 +11,7 @@ export async function lookupWord(
   rawWord: string,
   options: LookupOptions = {},
 ): Promise<WordEntry | null> {
-  const lemma = toLemma(rawWord)
+  const lemma = options.exactToken ? normalizeWordToken(rawWord) : toLemma(rawWord)
   if (!lemma) return null
 
   if (!options.forceRefresh) {

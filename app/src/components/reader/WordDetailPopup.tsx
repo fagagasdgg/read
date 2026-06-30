@@ -2,24 +2,25 @@ import { useEffect, useState } from 'react'
 import { lookupWord, playSpeech } from '../../services/dictionary'
 import type { WordEntry } from '../../services/dictionary'
 
+export interface WordLookupRequest {
+  word: string
+  exactToken: boolean
+  seq: number
+}
+
 interface WordDetailPopupProps {
-  rawWord: string | null
+  lookup: WordLookupRequest | null
   onClose: () => void
   onLookupVariant?: (word: string) => void
 }
 
-function ukSpeechFallback(entry: WordEntry): string {
-  if (entry.ukSpeechUrl) return entry.ukSpeechUrl
-  return `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(entry.lemma)}&type=1`
-}
-
-export function WordDetailPopup({ rawWord, onClose, onLookupVariant }: WordDetailPopupProps) {
+export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetailPopupProps) {
   const [loading, setLoading] = useState(false)
   const [entry, setEntry] = useState<WordEntry | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!rawWord) {
+    if (!lookup) {
       setEntry(null)
       setError('')
       return
@@ -28,8 +29,9 @@ export function WordDetailPopup({ rawWord, onClose, onLookupVariant }: WordDetai
     let cancelled = false
     setLoading(true)
     setError('')
+    setEntry(null)
 
-    lookupWord(rawWord)
+    lookupWord(lookup.word, { exactToken: lookup.exactToken })
       .then((result) => {
         if (cancelled) return
         setEntry(result)
@@ -47,9 +49,9 @@ export function WordDetailPopup({ rawWord, onClose, onLookupVariant }: WordDetai
     return () => {
       cancelled = true
     }
-  }, [rawWord])
+  }, [lookup])
 
-  if (!rawWord) return null
+  if (!lookup) return null
 
   return (
     <div className="popup-mask" onClick={onClose}>
@@ -61,7 +63,7 @@ export function WordDetailPopup({ rawWord, onClose, onLookupVariant }: WordDetai
         {loading && <p className="popup-loading">查询中…</p>}
         {error && <p className="popup-error">{error}</p>}
 
-        {entry && (
+        {entry && !loading && (
           <>
             <div className="popup-word-title">
               <strong>{entry.lemma}</strong>
@@ -89,7 +91,7 @@ export function WordDetailPopup({ rawWord, onClose, onLookupVariant }: WordDetai
                   type="button"
                   className="popup-audio-btn"
                   aria-label="播放英音"
-                  onClick={() => playSpeech(ukSpeechFallback(entry))}
+                  onClick={() => playSpeech(entry.ukSpeechUrl)}
                 >
                   🔊
                 </button>
@@ -117,7 +119,10 @@ export function WordDetailPopup({ rawWord, onClose, onLookupVariant }: WordDetai
                     key={`${form.label}-${form.value}`}
                     type="button"
                     className="form-chip"
-                    onClick={() => onLookupVariant?.(form.value)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onLookupVariant?.(form.value)
+                    }}
                   >
                     {form.label}: {form.value}
                   </button>

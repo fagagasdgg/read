@@ -28,6 +28,9 @@ read/
 │   │   ├── pages/
 │   │   │   └── DictDebugPage.tsx    # 词典联调页
 │   │   │
+│   │   ├── components/bookshelf/
+│   │   │   └── BookshelfScreen.tsx  # 应用首页书架（木质 UI）
+│   │   │
 │   │   ├── components/reader/
 │   │   │   ├── ReaderScreen.tsx     # 阅读器主屏（书架、翻页、点词、面板）
 │   │   │   ├── ChapterContent.tsx   # 章节 HTML 逐词渲染 + 插图
@@ -55,7 +58,7 @@ read/
 │   │       │   ├── types.ts
 │   │       │   └── index.ts
 │   │       └── settings/
-│   │           └── readingSettings.ts # 字号/行距/主题，持久化
+│   │           └── readingSettings.ts # 字号/行距/主题
 │   │
 │   ├── dist/                        # 构建产物
 │   └── android/                     # Android 工程
@@ -74,14 +77,15 @@ read/
 
 | 模块 | 路径 | 作用 |
 |------|------|------|
-| 阅读器 | `components/reader/ReaderScreen.tsx` | 书架、选 EPUB、翻页、控制面板 |
+| 书架首页 | `components/bookshelf/BookshelfScreen.tsx` | 木质书架、导入、打开书籍 |
+| 阅读器 | `components/reader/ReaderScreen.tsx` | 阅读页（由书架进入） |
 | 控制面板 | `components/reader/ReaderControlPanel.tsx` | 退出、目录、设置入口 |
 | 目录 | `components/reader/TocPanel.tsx` | 章节列表跳转 |
 | 阅读设置 | `components/reader/ReadingSettingsPanel.tsx` | 字号、行距、背景 |
 | 逐词渲染 | `components/reader/ChapterContent.tsx` | 不用 iframe，单词可点击 |
 | EPUB 解析 | `services/epub/parser.ts` | jszip + OPF/spine + 插图 |
 | 书架 | `services/epub/library.ts` | 已导入书籍元数据 |
-| 阅读进度 | `services/epub/progress.ts` | 按书名记住当前章节 |
+| 阅读进度 | `services/epub/progress.ts` | 章节索引 + 章内 scrollTop |
 | 阅读设置存储 | `services/settings/readingSettings.ts` | Preferences / localStorage |
 | 词典 | `services/dictionary/` | 联网查词 + 缓存 + 发音 |
 
@@ -90,5 +94,5 @@ read/
 | 路径 | 用途 |
 |------|------|
 | `components/reader/InlineTranslation.tsx` | 行间注释 |
-| `components/bookshelf/` | 独立书架页（分组、换肤） |
+| `components/bookshelf/` | 分组、换肤完整版 |
 | `services/notes/` | 笔记与划线 |

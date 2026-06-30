@@ -33,4 +33,6 @@ export interface WordEntry {
 
 export interface LookupOptions {
   forceRefresh?: boolean
+  /** 点击词形变体时按原词查询，不做词形还原 */
+  exactToken?: boolean
 }

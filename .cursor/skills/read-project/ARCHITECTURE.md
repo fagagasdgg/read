@@ -68,6 +68,24 @@ MasteredWord { lemma }
 UserSettings { englishLevel, inlineFontSize, inlineColor, maxMeanings, offsetX, offsetY, ... }
 ```
 
+## 阅读分页与行间翻译（规划）
+
+当前实现按 **spine 一项 = 一个阅读单元** 整章滚动展示。部分 EPUB（如哈利波特）spine 仅 3 项，单章 HTML 极大。
+
+**已知风险**（用户真机反馈 2026-06-30）：
+- 整章加载 + 未来行间翻译会对全章单词批量查词，耗时长、占内存
+- 仅记录章节序号时，章内阅读位置会丢失
+
+**短期已做**：
+- 阅读进度增加 `scrollTop`（章内滚动位置），退出/翻章时保存
+
+**中期方案（待实现）**：
+1. **视口分页**：按屏幕高度切分为「页」，底部上一页/下一页切换视口而非 spine 项
+2. **惰性行间翻译**：仅对当前视口内可见单词查词/缓存，滚动时再加载
+3. **目录与 spine 解耦**：目录用 NCX/nav；阅读可按子锚点或分页索引恢复
+
+**章节标题**：优先 NCX/nav 标签；禁止用 HTML `<title>`（常为书名）；正文标题需与书名去重。
+
 ## 词典 API（已确认）
 
 **主数据源：有道 `jsonapi_s`（免费，无需 API Key）**
@@ -81,7 +99,7 @@ GET https://dict.youdao.com/jsonapi_s?doctype=json&jsonversion=4&q={单词}
 - `exam_type` — 中考/高考/CET4/雅思…
 - `word.trs[]` — `{ pos, tran }` 中文释义
 - `word.wfs[]` — 词形变体
-- 美音：`https://dict.youdao.com/dictvoice?audio={word}&type=2`
+美音：`https://dict.youdao.com/dictvoice?audio={lemma}&type=2`（**必须用 lemma 原文**，不可用 API 返回的 `usspeech` 字段，否则长词发音截断）
 
 **本地缓存**：IndexedDB（库名 `read-dictionary`），`idb` 包。  
 **实现路径**：`app/src/services/dictionary/`
