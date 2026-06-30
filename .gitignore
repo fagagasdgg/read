@@ -1,0 +1,21 @@
+# Dependencies & build
+app/node_modules/
+app/dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.local
+xq/
+
+# Android local SDK path (each machine differs)
+app/android/local.properties
+
+# Cursor (optional local state)
+.cursor/projects/

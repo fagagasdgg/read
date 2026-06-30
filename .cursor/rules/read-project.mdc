@@ -1,0 +1,38 @@
+---
+description: Read 项目会话守则——每次对话自动读取需求、同步进度、维护项目文档
+alwaysApply: true
+---
+
+# Read 项目 — 会话守则
+
+本仓库每次对话开始时，**必须先执行**以下步骤（不可跳过）：
+
+1. 读取 `xq/需求.md`（含 §98 AI规范、§99 备注版本号）
+2. 读取 `.cursor/skills/read-project/PROGRESS.md`
+3. 读取 `.cursor/skills/read-project/PROJECT_STRUCTURE.md`
+4. 若需求文档有变更 → 执行 Requirement Sync（见 `.cursor/skills/read-project/SKILL.md`）
+5. 开发代码前读取 `KNOWN_ISSUES.md` 与 `ARCHITECTURE.md`
+
+## 需求同步（Requirement Sync）
+
+当 `xq/需求.md` 被用户修改后：
+
+- 通读全文，对比 PROGRESS.md 增删功能项
+- 更新 PROGRESS.md 的 Changelog 与状态
+- 更新 PROJECT_STRUCTURE.md 的文件树与说明
+- 若架构受影响，更新 ARCHITECTURE.md
+
+## 开发完成后
+
+- 更新 PROGRESS.md（功能状态、bug 分类）
+- 更新 PROJECT_STRUCTURE.md（新增/删除文件时）
+- 不向用户重复 skill 内部流程，直接执行
+
+## 文档语言
+
+`.cursor/skills/read-project/` 下所有文档 **必须使用中文**（代码路径、技术专有名词除外）。  
+新建或更新 PROGRESS、ARCHITECTURE、KNOWN_ISSUES、PROJECT_STRUCTURE、SKILL 时遵守此规则。
+
+## 用户触发方式
+
+用户可说：「同步需求」「按 read-project 开始」「@read-project」——均视为要求执行上述流程。
