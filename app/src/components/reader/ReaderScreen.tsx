@@ -16,7 +16,7 @@ import { ChapterContent } from './ChapterContent'
 import { ReaderControlPanel } from './ReaderControlPanel'
 import { ReadingSettingsPanel } from './ReadingSettingsPanel'
 import { TocPanel } from './TocPanel'
-import { useChapterPages } from './useChapterPages'
+import { useViewportPagination } from './useViewportPagination'
 import { WordDetailPopup, type WordLookupRequest } from './WordDetailPopup'
 
 type ReaderOverlay = 'control' | 'toc' | 'settings' | null
@@ -44,23 +44,29 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
   const [overlay, setOverlay] = useState<ReaderOverlay>(null)
   const [readingSettings, setReadingSettings] = useState<ReadingSettings | null>(null)
   const [viewportEl, setViewportEl] = useState<HTMLElement | null>(null)
+  const [contentEl, setContentEl] = useState<HTMLElement | null>(null)
   const chapterLandRef = useRef<{ mode: ChapterLandMode; page?: number }>({ mode: 'start' })
   const chapterLandAppliedRef = useRef(false)
   const progressSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const { pages, paginating } = useChapterPages(chapterHtml, viewportEl, readingSettings)
+  const remeasureKey = `${chapterHtml}:${readingSettings?.fontSize ?? ''}:${readingSettings?.lineHeight ?? ''}`
+  const { pageHeight, pageCount, measuring } = useViewportPagination(
+    contentEl,
+    viewportEl,
+    remeasureKey,
+  )
 
   const chapter = book?.chapters[chapterIndex]
   const theme = getThemeById(readingSettings?.themeId ?? 'parchment')
-  const chapterFraction = pages.length > 0 ? (pageIndex + 1) / pages.length : 0
+  const chapterFraction = pageCount > 0 ? (pageIndex + 1) / pageCount : 0
   const progressPercent = book
     ? Math.round(((chapterIndex + chapterFraction) / book.chapters.length) * 100)
     : 0
 
   const canGoPrev = pageIndex > 0 || chapterIndex > 0
   const canGoNext =
-    pages.length > 0
-      ? pageIndex < pages.length - 1 || chapterIndex < (book?.chapters.length ?? 1) - 1
+    pageCount > 0
+      ? pageIndex < pageCount - 1 || chapterIndex < (book?.chapters.length ?? 1) - 1
       : false
 
   const readerStyle = readingSettings
@@ -160,31 +166,31 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
   }, [chapterIndex])
 
   useEffect(() => {
-    if (!pages.length || paginating || chapterLandAppliedRef.current) return
+    if (!pageCount || measuring || chapterLandAppliedRef.current) return
 
     const land = chapterLandRef.current
     let nextPage = 0
 
     if (land.mode === 'end') {
-      nextPage = pages.length - 1
+      nextPage = pageCount - 1
     } else if (land.mode === 'restore') {
-      nextPage = Math.min(land.page ?? 0, pages.length - 1)
+      nextPage = Math.min(land.page ?? 0, pageCount - 1)
     }
 
     chapterLandRef.current = { mode: 'start' }
     chapterLandAppliedRef.current = true
     setPageIndex(nextPage)
     if (book) saveProgress(book.id, chapterIndex, nextPage)
-  }, [pages, paginating, book, chapterIndex])
+  }, [pageCount, measuring, book, chapterIndex])
 
   useEffect(() => {
-    if (!pages.length) return
-    if (pageIndex >= pages.length) {
-      const clamped = pages.length - 1
+    if (!pageCount) return
+    if (pageIndex >= pageCount) {
+      const clamped = pageCount - 1
       setPageIndex(clamped)
       persistPage(clamped)
     }
-  }, [pages, pageIndex, persistPage])
+  }, [pageCount, pageIndex, persistPage])
 
   const handleWordTap = useCallback((rawWord: string) => {
     setWordLookup({ word: rawWord, exactToken: false, seq: Date.now() })
@@ -209,7 +215,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     if (!book || !canGoNext) return
     setWordLookup(null)
 
-    if (pages.length > 0 && pageIndex < pages.length - 1) {
+    if (pageCount > 0 && pageIndex < pageCount - 1) {
       const next = pageIndex + 1
       setPageIndex(next)
       persistPage(next)
@@ -259,8 +265,8 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     )
   }
 
-  const pageLabel =
-    pages.length > 0 ? `${pageIndex + 1}/${pages.length}` : '—'
+  const pageLabel = pageCount > 0 ? `${pageIndex + 1}/${pageCount}` : '—'
+  const pageOffset = pageHeight > 0 ? pageIndex * pageHeight : 0
 
   return (
     <div className="reader-screen" style={readerStyle}>
@@ -272,11 +278,17 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
         <div ref={setViewportEl} className="reader-page-viewport">
           {loading && <p className="reader-status">加载章节中…</p>}
           {error && <p className="error">{error}</p>}
-          {!loading && !error && paginating && (
+          {!loading && !error && measuring && chapterHtml && (
             <p className="reader-status">排版分页中…</p>
           )}
-          {!loading && !error && !paginating && pages[pageIndex] && (
-            <ChapterContent html={pages[pageIndex]} onWordTap={handleWordTap} />
+          {!loading && !error && chapterHtml && (
+            <div
+              className="reader-page-content"
+              ref={setContentEl}
+              style={{ transform: `translateY(-${pageOffset}px)` }}
+            >
+              <ChapterContent html={chapterHtml} onWordTap={handleWordTap} />
+            </div>
           )}
         </div>
       </main>

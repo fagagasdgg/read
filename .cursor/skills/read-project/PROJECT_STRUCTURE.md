@@ -33,7 +33,7 @@ read/
 │   │   │
 │   │   ├── components/reader/
 │   │   │   ├── ReaderScreen.tsx     # 阅读器主屏（视口分页、翻页、点词、面板）
-│   │   │   ├── useChapterPages.ts   # 章节 HTML 视口分页 Hook
+│   │   │   ├── useViewportPagination.ts # 视口高度测量与页数计算
 │   │   │   ├── ChapterContent.tsx   # 章节 HTML 逐词渲染 + 插图
 │   │   │   ├── WordDetailPopup.tsx  # 点击单词弹出的释义浮窗
 │   │   │   ├── ReaderControlPanel.tsx # 底部房子唤出的控制面板
@@ -42,7 +42,6 @@ read/
 │   │   │   └── tokenize.ts          # 英文单词切分
 │   │   │
 │   │   ├── lib/
-│   │   │   ├── chapterPaginate.ts   # 按视口高度切分章节 HTML
 │   │   │   └── lemmatize.ts         # 词形还原
 │   │   │
 │   │   └── services/

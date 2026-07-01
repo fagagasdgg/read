@@ -202,6 +202,11 @@
   min-height: 0;
   overflow: hidden;
   padding: 12px 20px 8px;
+  position: relative;
+}
+
+.reader-page-content {
+  will-change: transform;
 }
 
 .chapter-content {

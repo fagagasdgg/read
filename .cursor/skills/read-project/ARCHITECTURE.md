@@ -77,7 +77,7 @@ UserSettings { englishLevel, inlineFontSize, inlineColor, maxMeanings, offsetX, 
 - 仅记录章节序号时，章内阅读位置会丢失
 
 **已实现（2026-06-30）**：
-1. **视口分页**：`chapterPaginate.ts` 按块级元素测量高度切页；`ReaderScreen` 固定视口 + 底部翻页；进度 `chapterIndex + pageIndex`
+1. **视口分页**：完整渲染章节后按 `scrollHeight / 视口高度` 计算页数，`translateY` 切换页；进度 `chapterIndex + pageIndex`
 2. **惰性行间翻译**（待实现）：仅对当前视口内可见单词查词/缓存
 
 **曾用过渡方案**：`scrollTop` 章内滚动（已废弃，旧数据 `pageIndex` 缺省为 0）
