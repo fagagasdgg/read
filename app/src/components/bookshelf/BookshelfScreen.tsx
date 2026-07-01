@@ -3,7 +3,8 @@ import {
   type SavedBookMeta,
   extractCoverFromBook,
   getBookCoverDataUrl,
-  importEpub,
+  importEpubBatch,
+  isImportCancelled,
   isNativeApp,
   listSavedBooks,
   loadEpubFromDevice,
@@ -82,6 +83,7 @@ interface BookshelfScreenProps {
 export function BookshelfScreen({ onOpenBook }: BookshelfScreenProps) {
   const [books, setBooks] = useState<SavedBookMeta[]>([])
   const [loading, setLoading] = useState(false)
+  const [statusText, setStatusText] = useState('')
   const [error, setError] = useState('')
   const native = isNativeApp()
 
@@ -97,19 +99,43 @@ export function BookshelfScreen({ onOpenBook }: BookshelfScreenProps) {
     void refresh()
   }, [refresh])
 
-  async function handleImport(file?: File) {
+  async function handleImport(files?: FileList | File[]) {
     setLoading(true)
     setError('')
+    setStatusText('正在打开文件选择器…')
+
     try {
-      await importEpub(file)
+      const fileList = files
+        ? Array.from(files)
+        : undefined
+
+      setStatusText('正在导入，请稍候…')
+      const result = await importEpubBatch(fileList)
       await refresh()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'EPUB 导入失败'
-      if (!message.includes('cancel') && !message.includes('Cancel')) {
-        setError(message)
+
+      if (result.imported > 0 && result.failed.length === 0) {
+        setStatusText(`成功导入 ${result.imported} 本`)
+      } else if (result.imported > 0 && result.failed.length > 0) {
+        setError(
+          `已导入 ${result.imported} 本；${result.failed.length} 本失败：\n${result.failed
+            .map((f) => `• ${f.fileName}：${f.message}`)
+            .join('\n')}`,
+        )
+        setStatusText('')
+      } else if (result.failed.length > 0) {
+        setError(
+          result.failed.map((f) => `• ${f.fileName}：${f.message}`).join('\n'),
+        )
+        setStatusText('')
       }
+    } catch (err) {
+      if (!isImportCancelled(err)) {
+        setError(err instanceof Error ? err.message : '导入失败')
+      }
+      setStatusText('')
     } finally {
       setLoading(false)
+      setTimeout(() => setStatusText(''), 2500)
     }
   }
 
@@ -138,16 +164,18 @@ export function BookshelfScreen({ onOpenBook }: BookshelfScreenProps) {
         {books.length === 0 ? (
           <div className="bookshelf-empty">
             <p>还没有书籍</p>
-            <p className="bookshelf-empty-hint">点击右上角 + 从手机导入 EPUB</p>
+            <p className="bookshelf-empty-hint">点击右上角 + 导入 EPUB（可多选）</p>
+            <p className="bookshelf-empty-hint">仅支持 .epub，单本不超过 50MB</p>
             {!native && (
               <label className="bookshelf-file-label">
                 或选择本地文件（开发）
                 <input
                   type="file"
                   accept=".epub,application/epub+zip"
+                  multiple
                   onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) void handleImport(file)
+                    const list = e.target.files
+                    if (list?.length) void handleImport(list)
                     e.target.value = ''
                   }}
                 />
@@ -177,8 +205,9 @@ export function BookshelfScreen({ onOpenBook }: BookshelfScreenProps) {
         )}
       </div>
 
-      {loading && <p className="bookshelf-toast">处理中…</p>}
-      {error && <p className="bookshelf-error">{error}</p>}
+      {loading && <p className="bookshelf-toast">{statusText || '处理中…'}</p>}
+      {!loading && statusText && <p className="bookshelf-toast bookshelf-toast-ok">{statusText}</p>}
+      {error && <pre className="bookshelf-error">{error}</pre>}
     </div>
   )
 }

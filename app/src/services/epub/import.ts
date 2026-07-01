@@ -6,9 +6,35 @@ import { parseEpubBuffer } from './parser'
 import { extractCoverFromBook } from './cover'
 import { registerBook, saveBookCover } from './library'
 import type { EpubBook } from './types'
+import {
+  assertEpubFileName,
+  assertEpubSize,
+  assertZipMagic,
+  ImportCancelledError,
+  isImportCancelled,
+  toImportUserMessage,
+} from './importValidation'
 
 const LAST_BOOK_KEY = 'read-last-book-id'
 const BOOKS_DIR = 'books'
+
+interface PickedFile {
+  name?: string
+  path?: string
+  data?: string
+  blob?: Blob
+  size?: number
+}
+
+export interface ImportFailure {
+  fileName: string
+  message: string
+}
+
+export interface ImportBatchResult {
+  imported: number
+  failed: ImportFailure[]
+}
 
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
   const binary = atob(base64)
@@ -58,21 +84,34 @@ export async function loadEpubFromDevice(bookId: string): Promise<EpubBook> {
   return parseEpubBuffer(base64ToArrayBuffer(base64), `${bookId}.epub`)
 }
 
-/** 浏览器：用 File；手机 APK：系统文件选择器 */
-export async function importEpub(file?: File): Promise<EpubBook> {
+async function readPickedFileBuffer(picked: PickedFile): Promise<ArrayBuffer> {
+  if (picked.data) {
+    return base64ToArrayBuffer(picked.data)
+  }
+  if (picked.blob) {
+    return picked.blob.arrayBuffer()
+  }
+  if (picked.path) {
+    const url = Capacitor.convertFileSrc(picked.path)
+    const response = await fetch(url)
+    if (!response.ok) throw new Error('无法读取所选文件')
+    return response.arrayBuffer()
+  }
+  throw new Error('无法读取文件内容')
+}
+
+function pickedFileName(picked: PickedFile): string {
+  return picked.name || picked.path?.split('/').pop() || 'book.epub'
+}
+
+async function importEpubBuffer(buffer: ArrayBuffer, fileName: string): Promise<EpubBook> {
+  assertEpubFileName(fileName)
+  assertEpubSize(buffer.byteLength, fileName)
+  assertZipMagic(buffer)
+
+  const book = await parseEpubBuffer(buffer, fileName)
+
   if (Capacitor.isNativePlatform()) {
-    const result = await FilePicker.pickFiles({
-      types: ['application/epub+zip', 'application/epub'],
-      readData: true,
-    })
-
-    const picked = result.files[0]
-    if (!picked?.data) throw new Error('未选择文件或无法读取内容')
-
-    const fileName = picked.name || picked.path?.split('/').pop() || 'book.epub'
-    const buffer = base64ToArrayBuffer(picked.data)
-    const book = await parseEpubBuffer(buffer, fileName)
-
     await saveEpubToDevice(book.id, buffer)
     const coverBlob = await extractCoverFromBook(book)
     if (coverBlob) await saveBookCover(book.id, coverBlob)
@@ -83,13 +122,80 @@ export async function importEpub(file?: File): Promise<EpubBook> {
       fileName,
       hasCover: Boolean(coverBlob),
     })
-    return book
   }
 
-  if (!file) throw new Error('请选择 EPUB 文件')
-  return parseEpubBuffer(await file.arrayBuffer(), file.name)
+  return book
+}
+
+async function importOnePickedFile(picked: PickedFile): Promise<EpubBook> {
+  const fileName = pickedFileName(picked)
+
+  if (picked.size != null) {
+    assertEpubSize(picked.size, fileName)
+  }
+
+  assertEpubFileName(fileName)
+
+  const buffer = await readPickedFileBuffer(picked)
+  return importEpubBuffer(buffer, fileName)
+}
+
+/** 批量导入 EPUB（手机支持多选；非 EPUB / 超大文件会跳过并给出提示） */
+export async function importEpubBatch(files?: File[]): Promise<ImportBatchResult> {
+  const failed: ImportFailure[] = []
+  let imported = 0
+
+  if (Capacitor.isNativePlatform()) {
+    const result = await FilePicker.pickFiles({
+      limit: 0,
+      readData: false,
+    })
+
+    if (!result.files.length) {
+      throw new ImportCancelledError()
+    }
+
+    for (const picked of result.files) {
+      const fileName = pickedFileName(picked)
+      try {
+        await importOnePickedFile(picked)
+        imported += 1
+      } catch (err) {
+        if (isImportCancelled(err)) throw err
+        failed.push({
+          fileName,
+          message: toImportUserMessage(err, fileName),
+        })
+      }
+    }
+
+    return { imported, failed }
+  }
+
+  if (!files?.length) {
+    throw new ImportCancelledError()
+  }
+
+  for (const file of files) {
+    const fileName = file.name || 'book.epub'
+    try {
+      const buffer = await file.arrayBuffer()
+      await importEpubBuffer(buffer, fileName)
+      imported += 1
+    } catch (err) {
+      if (isImportCancelled(err)) throw err
+      failed.push({
+        fileName,
+        message: toImportUserMessage(err, fileName),
+      })
+    }
+  }
+
+  return { imported, failed }
 }
 
 export function isNativeApp(): boolean {
   return Capacitor.isNativePlatform()
 }
+
+export { MAX_EPUB_BYTES, toImportUserMessage, isImportCancelled } from './importValidation'

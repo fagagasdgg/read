@@ -14,6 +14,7 @@
 | 2026-06-30 | v1 | 真机反馈修复：EPUB 插图从 zip 加载；发音内联播放；新增英音喇叭 |
 | 2026-06-30 | v1 | 阅读控制面板、目录跳转、阅读设置；手机书架列表与删除 |
 | 2026-06-30 | v1 | 书架封面提取；发音实时拼 URL；多变体词形解析 |
+| 2026-06-30 | v1 | 导入：友好报错、50MB 上限、多选、readData:false 防卡死 |
 
 ## 一、需求清单总览
 
@@ -133,6 +134,9 @@
 | BUG-007 | 点击变体不刷新弹窗 | exactToken 查词 + lookup seq |
 | BUG-008 | 发音截断（excellent→cellent） | 播放时用 lemma 实时拼 URL，不用缓存 usSpeechUrl |
 | BUG-009 | 多变体文案查词失败（meaner或more mean） | extractVariantLookupWord 取首个英文词 |
+| BUG-010 | 导入非 EPUB 显示 JSZip 原始报错 | importValidation 人性化提示 |
+| BUG-011 | 导入大 PDF 卡死 | 扩展名校验 + 50MB 上限 + 不 readData 进内存 |
+| BUG-012 | 多选 EPUB 只导入一本 | limit:0 批量处理 |
 
 ### 待规避（v1 历史问题，详见 KNOWN_ISSUES.md）
 
