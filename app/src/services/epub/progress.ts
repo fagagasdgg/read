@@ -28,12 +28,12 @@ async function writeAll(all: Record<string, ReadingProgress>): Promise<void> {
 }
 
 export function loadProgress(bookId: string): ReadingProgress | null {
-  // 同步读取：优先 localStorage（WebView 内也可用）
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const all = JSON.parse(raw) as Record<string, ReadingProgress>
-      if (all[bookId]) return all[bookId]
+      const item = all[bookId]
+      if (item) return normalizeProgress(item)
     }
   } catch {
     // ignore
@@ -41,9 +41,19 @@ export function loadProgress(bookId: string): ReadingProgress | null {
   return null
 }
 
+function normalizeProgress(item: ReadingProgress): ReadingProgress {
+  const legacy = item as ReadingProgress & { scrollTop?: number }
+  return {
+    ...item,
+    pageIndex: legacy.pageIndex ?? 0,
+  }
+}
+
 export async function loadProgressAsync(bookId: string): Promise<ReadingProgress | null> {
   const all = await readAll()
-  return all[bookId] ?? loadProgress(bookId)
+  const item = all[bookId]
+  if (item) return normalizeProgress(item)
+  return loadProgress(bookId)
 }
 
 export function saveProgress(bookId: string, chapterIndex: number, pageIndex = 0): void {

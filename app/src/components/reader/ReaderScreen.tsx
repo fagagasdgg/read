@@ -4,6 +4,7 @@ import {
   loadChapterHtml,
   loadEpubFromDevice,
   loadProgress,
+  loadProgressAsync,
   saveProgress,
   touchBookLastRead,
 } from '../../services/epub'
@@ -90,6 +91,17 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     [book, chapterIndex],
   )
 
+  const flushProgress = useCallback(() => {
+    if (!book) return
+    if (progressSaveTimer.current) {
+      clearTimeout(progressSaveTimer.current)
+      progressSaveTimer.current = null
+    }
+    saveProgress(book.id, chapterIndex, pageIndex)
+  }, [book, chapterIndex, pageIndex])
+
+  useEffect(() => () => flushProgress(), [flushProgress])
+
   useEffect(() => {
     const timer = setInterval(() => setNow(formatTime(new Date())), 30_000)
     return () => clearInterval(timer)
@@ -105,9 +117,9 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     setError('')
 
     loadEpubFromDevice(bookId)
-      .then((parsed) => {
+      .then(async (parsed) => {
         if (cancelled) return
-        const saved = loadProgress(parsed.id)
+        const saved = (await loadProgressAsync(parsed.id)) ?? loadProgress(parsed.id)
         const startIndex = saved?.chapterIndex ?? 0
         const safeIndex = Math.min(startIndex, parsed.chapters.length - 1)
         chapterLandRef.current = {
@@ -135,6 +147,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     let cancelled = false
     let revokeAssets: (() => void) | undefined
 
+    setChapterHtml('')
     setLoading(true)
     setError('')
 
@@ -163,14 +176,24 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
 
   useEffect(() => {
     chapterLandAppliedRef.current = false
+    setPageIndex(0)
   }, [chapterIndex])
 
   useEffect(() => {
-    if (!pageCount || measuring || chapterLandAppliedRef.current) return
+    if (!book || !chapterHtml || loading || measuring || chapterLandAppliedRef.current) return
 
     const land = chapterLandRef.current
-    let nextPage = 0
+    if (land.mode === 'start') {
+      chapterLandAppliedRef.current = true
+      return
+    }
 
+    // 多页章节在 pageCount 尚未稳定前不要应用 restore/end（否则会误落到第 0 页）
+    const contentOverflows =
+      contentEl && pageHeight > 0 && contentEl.scrollHeight > pageHeight + 8
+    if (contentOverflows && pageCount <= 1) return
+
+    let nextPage = 0
     if (land.mode === 'end') {
       nextPage = pageCount - 1
     } else if (land.mode === 'restore') {
@@ -180,8 +203,8 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     chapterLandRef.current = { mode: 'start' }
     chapterLandAppliedRef.current = true
     setPageIndex(nextPage)
-    if (book) saveProgress(book.id, chapterIndex, nextPage)
-  }, [pageCount, measuring, book, chapterIndex])
+    saveProgress(book.id, chapterIndex, nextPage)
+  }, [pageCount, pageHeight, measuring, loading, chapterHtml, book, chapterIndex, contentEl])
 
   useEffect(() => {
     if (!pageCount) return
@@ -230,9 +253,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
   }
 
   function exitBook() {
-    if (book) {
-      saveProgress(book.id, chapterIndex, pageIndex)
-    }
+    flushProgress()
     setOverlay(null)
     setWordLookup(null)
     onExit()
@@ -240,7 +261,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
 
   function selectChapter(index: number) {
     if (!book) return
-    saveProgress(book.id, chapterIndex, pageIndex)
+    flushProgress()
     chapterLandRef.current = { mode: 'start' }
     setChapterIndex(index)
     setWordLookup(null)
