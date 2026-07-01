@@ -32,7 +32,8 @@ read/
 │   │   │   └── BookshelfScreen.tsx  # 应用首页书架（木质 UI）
 │   │   │
 │   │   ├── components/reader/
-│   │   │   ├── ReaderScreen.tsx     # 阅读器主屏（书架、翻页、点词、面板）
+│   │   │   ├── ReaderScreen.tsx     # 阅读器主屏（视口分页、翻页、点词、面板）
+│   │   │   ├── useChapterPages.ts   # 章节 HTML 视口分页 Hook
 │   │   │   ├── ChapterContent.tsx   # 章节 HTML 逐词渲染 + 插图
 │   │   │   ├── WordDetailPopup.tsx  # 点击单词弹出的释义浮窗
 │   │   │   ├── ReaderControlPanel.tsx # 底部房子唤出的控制面板
@@ -41,6 +42,7 @@ read/
 │   │   │   └── tokenize.ts          # 英文单词切分
 │   │   │
 │   │   ├── lib/
+│   │   │   ├── chapterPaginate.ts   # 按视口高度切分章节 HTML
 │   │   │   └── lemmatize.ts         # 词形还原
 │   │   │
 │   │   └── services/
@@ -54,7 +56,7 @@ read/
 │   │       │   ├── parser.ts        # EPUB 解压、OPF/spine、插图 blob
 │   │       │   ├── import.ts        # 浏览器/手机 EPUB 导入
 │   │       │   ├── library.ts       # 书架书籍注册表（手机）
-│   │       │   ├── progress.ts      # 阅读章节进度
+│   │       │   ├── progress.ts      # 阅读进度（chapterIndex + pageIndex）
 │   │       │   ├── types.ts
 │   │       │   └── index.ts
 │   │       └── settings/

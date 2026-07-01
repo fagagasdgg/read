@@ -46,11 +46,11 @@ export async function loadProgressAsync(bookId: string): Promise<ReadingProgress
   return all[bookId] ?? loadProgress(bookId)
 }
 
-export function saveProgress(bookId: string, chapterIndex: number, scrollTop = 0): void {
+export function saveProgress(bookId: string, chapterIndex: number, pageIndex = 0): void {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     const all: Record<string, ReadingProgress> = raw ? JSON.parse(raw) : {}
-    all[bookId] = { bookId, chapterIndex, scrollTop, updatedAt: Date.now() }
+    all[bookId] = { bookId, chapterIndex, pageIndex, updatedAt: Date.now() }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all))
     void writeAll(all)
   } catch {

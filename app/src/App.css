@@ -128,7 +128,9 @@
   flex-direction: column;
   background: var(--reader-bg, #f3e9d2);
   color: var(--reader-text, #1f2937);
-  min-height: calc(100vh - 120px);
+  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .bookshelf-list {
@@ -189,7 +191,16 @@
 
 .reader-body {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.reader-page-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   padding: 12px 20px 8px;
 }
 

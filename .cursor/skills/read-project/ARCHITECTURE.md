@@ -61,7 +61,7 @@
 ```
 Book         { id, title, author, coverPath, filePath, groupId?, sortOrder, lastReadAt }
 Group        { id, name, sortOrder }
-ReadingProgress { bookId, chapterHref, anchor, percent, updatedAt }
+ReadingProgress { bookId, chapterIndex, pageIndex, updatedAt }
 WordEntry    { lemma, phonetic, level, meanings[], variants[], cachedAt }
 WordNote     { id, lemma, text, createdAt }
 MasteredWord { lemma }
@@ -76,13 +76,13 @@ UserSettings { englishLevel, inlineFontSize, inlineColor, maxMeanings, offsetX, 
 - 整章加载 + 未来行间翻译会对全章单词批量查词，耗时长、占内存
 - 仅记录章节序号时，章内阅读位置会丢失
 
-**短期已做**：
-- 阅读进度增加 `scrollTop`（章内滚动位置），退出/翻章时保存
+**已实现（2026-06-30）**：
+1. **视口分页**：`chapterPaginate.ts` 按块级元素测量高度切页；`ReaderScreen` 固定视口 + 底部翻页；进度 `chapterIndex + pageIndex`
+2. **惰性行间翻译**（待实现）：仅对当前视口内可见单词查词/缓存
 
-**中期方案（待实现）**：
-1. **视口分页**：按屏幕高度切分为「页」，底部上一页/下一页切换视口而非 spine 项
-2. **惰性行间翻译**：仅对当前视口内可见单词查词/缓存，滚动时再加载
-3. **目录与 spine 解耦**：目录用 NCX/nav；阅读可按子锚点或分页索引恢复
+**曾用过渡方案**：`scrollTop` 章内滚动（已废弃，旧数据 `pageIndex` 缺省为 0）
+
+**目录与 spine**：目录用 NCX/nav；阅读按章节 + 页码恢复。
 
 **章节标题**：优先 NCX/nav 标签；禁止用 HTML `<title>`（常为书名）；正文标题需与书名去重。
 

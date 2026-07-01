@@ -19,6 +19,8 @@ export interface EpubBook {
 export interface ReadingProgress {
   bookId: string
   chapterIndex: number
-  scrollTop: number
+  pageIndex: number
+  /** @deprecated 视口分页后改用 pageIndex */
+  scrollTop?: number
   updatedAt: number
 }
