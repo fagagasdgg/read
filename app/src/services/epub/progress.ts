@@ -20,11 +20,18 @@ async function readAll(): Promise<Record<string, ReadingProgress>> {
 
 async function writeAll(all: Record<string, ReadingProgress>): Promise<void> {
   const payload = JSON.stringify(all)
+  localStorage.setItem(STORAGE_KEY, payload)
   if (Capacitor.isNativePlatform()) {
     await Preferences.set({ key: STORAGE_KEY, value: payload })
-    return
   }
-  localStorage.setItem(STORAGE_KEY, payload)
+}
+
+function normalizeProgress(item: ReadingProgress): ReadingProgress {
+  const legacy = item as ReadingProgress & { scrollTop?: number }
+  return {
+    ...item,
+    pageIndex: legacy.pageIndex ?? 0,
+  }
 }
 
 export function loadProgress(bookId: string): ReadingProgress | null {
@@ -41,14 +48,6 @@ export function loadProgress(bookId: string): ReadingProgress | null {
   return null
 }
 
-function normalizeProgress(item: ReadingProgress): ReadingProgress {
-  const legacy = item as ReadingProgress & { scrollTop?: number }
-  return {
-    ...item,
-    pageIndex: legacy.pageIndex ?? 0,
-  }
-}
-
 export async function loadProgressAsync(bookId: string): Promise<ReadingProgress | null> {
   const all = await readAll()
   const item = all[bookId]
@@ -56,14 +55,20 @@ export async function loadProgressAsync(bookId: string): Promise<ReadingProgress
   return loadProgress(bookId)
 }
 
-export function saveProgress(bookId: string, chapterIndex: number, pageIndex = 0): void {
+export async function saveProgressAsync(
+  bookId: string,
+  chapterIndex: number,
+  pageIndex = 0,
+): Promise<void> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    const all: Record<string, ReadingProgress> = raw ? JSON.parse(raw) : {}
+    const all = await readAll()
     all[bookId] = { bookId, chapterIndex, pageIndex, updatedAt: Date.now() }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all))
-    void writeAll(all)
+    await writeAll(all)
   } catch {
     // 开发阶段忽略存储失败
   }
+}
+
+export function saveProgress(bookId: string, chapterIndex: number, pageIndex = 0): void {
+  void saveProgressAsync(bookId, chapterIndex, pageIndex)
 }

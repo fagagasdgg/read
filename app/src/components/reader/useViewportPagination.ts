@@ -5,10 +5,11 @@ export function useViewportPagination(
   contentEl: HTMLElement | null,
   windowEl: HTMLElement | null,
   remeasureKey: string,
-): { pageHeight: number; pageCount: number; measuring: boolean } {
+): { pageHeight: number; pageCount: number; measuring: boolean; layoutStable: boolean } {
   const [pageHeight, setPageHeight] = useState(0)
   const [pageCount, setPageCount] = useState(1)
   const [measuring, setMeasuring] = useState(true)
+  const [layoutStable, setLayoutStable] = useState(false)
 
   const measure = useCallback(() => {
     if (!contentEl || !windowEl) return
@@ -34,10 +35,12 @@ export function useViewportPagination(
       setPageCount(1)
       setPageHeight(0)
       setMeasuring(false)
+      setLayoutStable(false)
       return
     }
 
     setMeasuring(true)
+    setLayoutStable(false)
     let raf2 = 0
     const raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(measure)
@@ -56,5 +59,33 @@ export function useViewportPagination(
     }
   }, [contentEl, windowEl, measure, remeasureKey])
 
-  return { pageHeight, pageCount, measuring }
+  useEffect(() => {
+    if (!contentEl || !windowEl || measuring || pageHeight < 40) {
+      setLayoutStable(false)
+      return
+    }
+
+    setLayoutStable(false)
+    const timer = window.setTimeout(() => setLayoutStable(true), 150)
+    return () => window.clearTimeout(timer)
+  }, [contentEl, windowEl, measuring, pageCount, pageHeight, remeasureKey])
+
+  return { pageHeight, pageCount, measuring, layoutStable }
+}
+
+export function shouldWaitForMultiPageLand(
+  mode: 'start' | 'end' | 'restore',
+  targetPage: number,
+  pageCount: number,
+  pageHeight: number,
+  contentEl: HTMLElement | null,
+): boolean {
+  if (mode === 'start') return false
+  if (!contentEl || pageHeight <= 0) return true
+
+  const multiPage = contentEl.scrollHeight > pageHeight + 8
+  if (!multiPage) return false
+
+  if (mode === 'end') return pageCount <= 1
+  return targetPage > 0 && pageCount <= 1
 }
