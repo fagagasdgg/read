@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { lookupWord, playSpeech } from '../../services/dictionary'
+import { extractVariantLookupWord } from '../../lib/variantToken'
+import { lookupWord, playSpeechWord } from '../../services/dictionary'
 import type { WordEntry } from '../../services/dictionary'
 
 export interface WordLookupRequest {
@@ -78,7 +79,7 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
                     type="button"
                     className="popup-audio-btn"
                     aria-label="播放美音"
-                    onClick={() => playSpeech(entry.usSpeechUrl)}
+                    onClick={() => playSpeechWord(entry.lemma, 2)}
                   >
                     🔊
                   </button>
@@ -91,7 +92,7 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
                   type="button"
                   className="popup-audio-btn"
                   aria-label="播放英音"
-                  onClick={() => playSpeech(entry.ukSpeechUrl)}
+                  onClick={() => playSpeechWord(entry.lemma, 1)}
                 >
                   🔊
                 </button>
@@ -121,7 +122,8 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
                     className="form-chip"
                     onClick={(e) => {
                       e.stopPropagation()
-                      onLookupVariant?.(form.value)
+                      const token = extractVariantLookupWord(form.value)
+                      if (token) onLookupVariant?.(token)
                     }}
                   >
                     {form.label}: {form.value}

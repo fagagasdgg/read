@@ -9,13 +9,28 @@ export interface SavedBookMeta {
   fileName: string
   importedAt: number
   lastReadAt: number
+  hasCover?: boolean
 }
 
 const REGISTRY_KEY = 'read-book-registry'
 const BOOKS_DIR = 'books'
+const COVERS_DIR = 'covers'
 
 function epubPath(bookId: string): string {
   return `${BOOKS_DIR}/${bookId}.epub`
+}
+
+function coverPath(bookId: string): string {
+  return `${COVERS_DIR}/${bookId}.jpg`
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
 }
 
 async function readRegistry(): Promise<SavedBookMeta[]> {
@@ -41,7 +56,9 @@ async function writeRegistry(books: SavedBookMeta[]): Promise<void> {
   localStorage.setItem(REGISTRY_KEY, payload)
 }
 
-export async function registerBook(meta: Omit<SavedBookMeta, 'importedAt' | 'lastReadAt'>): Promise<void> {
+export async function registerBook(
+  meta: Omit<SavedBookMeta, 'importedAt' | 'lastReadAt'> & { hasCover?: boolean },
+): Promise<void> {
   const now = Date.now()
   const books = await readRegistry()
   const existing = books.find((b) => b.id === meta.id)
@@ -50,6 +67,7 @@ export async function registerBook(meta: Omit<SavedBookMeta, 'importedAt' | 'las
     existing.author = meta.author
     existing.fileName = meta.fileName
     existing.lastReadAt = now
+    if (meta.hasCover !== undefined) existing.hasCover = meta.hasCover
   } else {
     books.unshift({
       ...meta,
@@ -59,6 +77,39 @@ export async function registerBook(meta: Omit<SavedBookMeta, 'importedAt' | 'las
   }
   books.sort((a, b) => b.lastReadAt - a.lastReadAt)
   await writeRegistry(books)
+}
+
+export async function setBookHasCover(bookId: string, hasCover: boolean): Promise<void> {
+  const books = await readRegistry()
+  const item = books.find((b) => b.id === bookId)
+  if (!item) return
+  item.hasCover = hasCover
+  await writeRegistry(books)
+}
+
+export async function saveBookCover(bookId: string, blob: Blob): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return
+  const base64 = arrayBufferToBase64(await blob.arrayBuffer())
+  await Filesystem.writeFile({
+    path: coverPath(bookId),
+    data: base64,
+    directory: Directory.Data,
+    recursive: true,
+  })
+}
+
+export async function getBookCoverDataUrl(bookId: string): Promise<string | null> {
+  if (!Capacitor.isNativePlatform()) return null
+  try {
+    const { data } = await Filesystem.readFile({
+      path: coverPath(bookId),
+      directory: Directory.Data,
+    })
+    if (typeof data !== 'string' || !data) return null
+    return `data:image/jpeg;base64,${data}`
+  } catch {
+    return null
+  }
 }
 
 export async function touchBookLastRead(bookId: string): Promise<void> {
@@ -84,6 +135,10 @@ export async function removeSavedBook(bookId: string): Promise<void> {
   try {
     await Filesystem.deleteFile({
       path: epubPath(bookId),
+      directory: Directory.Data,
+    })
+    await Filesystem.deleteFile({
+      path: coverPath(bookId),
       directory: Directory.Data,
     })
   } catch {

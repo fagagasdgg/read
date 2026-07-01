@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { lookupWord, playSpeech } from '../services/dictionary'
+import { lookupWord, playSpeechWord } from '../services/dictionary'
 import type { WordEntry } from '../services/dictionary'
 
 export function DictDebugPage() {
@@ -52,19 +52,11 @@ export function DictDebugPage() {
           <div className="word-title">
             <strong>{entry.lemma}</strong>
             <span>美 /{entry.phoneticUs}/</span>
-            <button type="button" onClick={() => playSpeech(entry.usSpeechUrl)}>
+            <button type="button" onClick={() => playSpeechWord(entry.lemma, 2)}>
               🔊 美音
             </button>
             <span>英 /{entry.phoneticUk}/</span>
-            <button
-              type="button"
-              onClick={() =>
-                playSpeech(
-                  entry.ukSpeechUrl ||
-                    `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(entry.lemma)}&type=1`,
-                )
-              }
-            >
+            <button type="button" onClick={() => playSpeechWord(entry.lemma, 1)}>
               🔊 英音
             </button>
           </div>

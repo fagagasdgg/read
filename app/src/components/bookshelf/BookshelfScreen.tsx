@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   type SavedBookMeta,
+  extractCoverFromBook,
+  getBookCoverDataUrl,
   importEpub,
   isNativeApp,
   listSavedBooks,
+  loadEpubFromDevice,
   removeSavedBook,
+  saveBookCover,
+  setBookHasCover,
 } from '../../services/epub'
 
 const COVER_COLORS = ['#8b5e3c', '#5c7a8a', '#6b8f71', '#9a6b4f', '#4a6fa5', '#7a5c8a']
@@ -15,11 +20,59 @@ function coverColor(id: string): string {
   return COVER_COLORS[hash]
 }
 
-function coverInitials(title: string): string {
-  const words = title.trim().split(/\s+/).filter(Boolean)
-  if (!words.length) return '?'
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
-  return `${words[0][0] ?? ''}${words[1][0] ?? ''}`.toUpperCase()
+function BookCover({
+  book,
+  disabled,
+  onOpen,
+}: {
+  book: SavedBookMeta
+  disabled: boolean
+  onOpen: () => void
+}) {
+  const [coverUrl, setCoverUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      let url = await getBookCoverDataUrl(book.id)
+      if (!url) {
+        try {
+          const parsed = await loadEpubFromDevice(book.id)
+          const blob = await extractCoverFromBook(parsed)
+          if (blob) {
+            await saveBookCover(book.id, blob)
+            await setBookHasCover(book.id, true)
+            url = await getBookCoverDataUrl(book.id)
+          }
+        } catch {
+          // 无封面则显示书名
+        }
+      }
+      if (!cancelled) setCoverUrl(url)
+    }
+
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [book.id])
+
+  return (
+    <button
+      type="button"
+      className="bookshelf-cover"
+      style={coverUrl ? undefined : { background: coverColor(book.id) }}
+      disabled={disabled}
+      onClick={onOpen}
+    >
+      {coverUrl ? (
+        <img className="bookshelf-cover-img" src={coverUrl} alt={book.title} />
+      ) : (
+        <span className="bookshelf-cover-title">{book.title}</span>
+      )}
+    </button>
+  )
 }
 
 interface BookshelfScreenProps {
@@ -105,16 +158,11 @@ export function BookshelfScreen({ onOpenBook }: BookshelfScreenProps) {
           <ul className="bookshelf-grid">
             {books.map((book) => (
               <li key={book.id} className="bookshelf-book">
-                <button
-                  type="button"
-                  className="bookshelf-cover"
-                  style={{ background: coverColor(book.id) }}
+                <BookCover
+                  book={book}
                   disabled={loading}
-                  onClick={() => onOpenBook(book.id)}
-                >
-                  <span className="bookshelf-cover-text">{coverInitials(book.title)}</span>
-                </button>
-                <p className="bookshelf-book-title">{book.title}</p>
+                  onOpen={() => onOpenBook(book.id)}
+                />
                 <button
                   type="button"
                   className="bookshelf-book-delete"

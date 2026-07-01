@@ -1,7 +1,13 @@
+const VOICE_BASE = 'https://dict.youdao.com/dictvoice'
+
 let playing: HTMLAudioElement | null = null
 
-export function playSpeech(url: string): void {
-  if (!url) return
+/** 播放时始终用单词原文拼 URL，避免缓存或 API 字段导致发音截断 */
+export function playSpeechWord(word: string, type: 1 | 2): void {
+  const token = word.trim().toLowerCase()
+  if (!token) return
+
+  const url = `${VOICE_BASE}?audio=${encodeURIComponent(token)}&type=${type}`
 
   if (playing) {
     playing.pause()
@@ -16,4 +22,19 @@ export function playSpeech(url: string): void {
   void audio.play().catch(() => {
     if (playing === audio) playing = null
   })
+}
+
+/** @deprecated 请使用 playSpeechWord */
+export function playSpeech(url: string): void {
+  if (!url) return
+  try {
+    const parsed = new URL(url)
+    const audio = parsed.searchParams.get('audio')
+    const type = Number(parsed.searchParams.get('type') ?? 2) as 1 | 2
+    if (audio) {
+      playSpeechWord(decodeURIComponent(audio), type === 1 ? 1 : 2)
+    }
+  } catch {
+    // ignore
+  }
 }

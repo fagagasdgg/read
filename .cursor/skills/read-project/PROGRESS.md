@@ -13,7 +13,7 @@
 | 2026-06-30 | v1 | 手机 EPUB 导入（FilePicker）；APK 打包指南 APK_BUILD.md；JDK 17 已安装 |
 | 2026-06-30 | v1 | 真机反馈修复：EPUB 插图从 zip 加载；发音内联播放；新增英音喇叭 |
 | 2026-06-30 | v1 | 阅读控制面板、目录跳转、阅读设置；手机书架列表与删除 |
-| 2026-06-30 | v1 | 书架首页木质 UI；导入不自动打开；目录 NCX 标题；发音/变体/滚动进度修复 |
+| 2026-06-30 | v1 | 书架封面提取；发音实时拼 URL；多变体词形解析 |
 
 ## 一、需求清单总览
 
@@ -131,6 +131,8 @@
 | BUG-005 | 目录全显示书名 | 解析 NCX/nav；不用 HTML title |
 | BUG-006 | 长单词发音截断（如 quickly→ckly） | 发音 URL 改用 lemma 原文 |
 | BUG-007 | 点击变体不刷新弹窗 | exactToken 查词 + lookup seq |
+| BUG-008 | 发音截断（excellent→cellent） | 播放时用 lemma 实时拼 URL，不用缓存 usSpeechUrl |
+| BUG-009 | 多变体文案查词失败（meaner或more mean） | extractVariantLookupWord 取首个英文词 |
 
 ### 待规避（v1 历史问题，详见 KNOWN_ISSUES.md）
 

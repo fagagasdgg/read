@@ -3,7 +3,8 @@ import { Directory, Filesystem } from '@capacitor/filesystem'
 import { Preferences } from '@capacitor/preferences'
 import { FilePicker } from '@capawesome/capacitor-file-picker'
 import { parseEpubBuffer } from './parser'
-import { registerBook } from './library'
+import { extractCoverFromBook } from './cover'
+import { registerBook, saveBookCover } from './library'
 import type { EpubBook } from './types'
 
 const LAST_BOOK_KEY = 'read-last-book-id'
@@ -73,11 +74,14 @@ export async function importEpub(file?: File): Promise<EpubBook> {
     const book = await parseEpubBuffer(buffer, fileName)
 
     await saveEpubToDevice(book.id, buffer)
+    const coverBlob = await extractCoverFromBook(book)
+    if (coverBlob) await saveBookCover(book.id, coverBlob)
     await registerBook({
       id: book.id,
       title: book.title,
       author: book.author,
       fileName,
+      hasCover: Boolean(coverBlob),
     })
     return book
   }
