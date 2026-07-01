@@ -78,7 +78,7 @@ UserSettings { englishLevel, inlineFontSize, inlineColor, maxMeanings, offsetX, 
 
 **已实现（2026-06-30）**：
 1. **视口分页**：完整渲染章节后按 `scrollHeight / 视口高度` 计算页数，`translateY` 切换页；进度 `chapterIndex + pageIndex`
-2. **惰性行间翻译**（待实现）：仅对当前视口内可见单词查词/缓存
+2. **惰性行间翻译**（已实现 MVP）：`useInlineGlosses` 仅对当前视口可见单词查词；按 `examLevel` 与用户水平过滤
 
 **曾用过渡方案**：`scrollTop` 章内滚动（已废弃，旧数据 `pageIndex` 缺省为 0）
 

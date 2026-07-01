@@ -9,14 +9,20 @@ import {
   touchBookLastRead,
 } from '../../services/epub'
 import {
+  getFontById,
   getThemeById,
   loadReadingSettings,
   type ReadingSettings,
 } from '../../services/settings/readingSettings'
+import {
+  loadUserSettings,
+  type UserSettings,
+} from '../../services/settings/userSettings'
 import { ChapterContent } from './ChapterContent'
 import { ReaderControlPanel } from './ReaderControlPanel'
 import { ReadingSettingsPanel } from './ReadingSettingsPanel'
 import { TocPanel } from './TocPanel'
+import { useInlineGlosses } from './useInlineGlosses'
 import { useViewportPagination, shouldWaitForMultiPageLand } from './useViewportPagination'
 import { WordDetailPopup, type WordLookupRequest } from './WordDetailPopup'
 
@@ -45,21 +51,33 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
   const [now, setNow] = useState(() => formatTime(new Date()))
   const [overlay, setOverlay] = useState<ReaderOverlay>(null)
   const [readingSettings, setReadingSettings] = useState<ReadingSettings | null>(null)
+  const [userSettings, setUserSettings] = useState<UserSettings | null>(null)
   const [viewportEl, setViewportEl] = useState<HTMLElement | null>(null)
   const [contentEl, setContentEl] = useState<HTMLElement | null>(null)
   const chapterLandRef = useRef<{ mode: ChapterLandMode; page?: number }>({ mode: 'start' })
   const chapterLandAppliedRef = useRef(false)
   const progressSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const remeasureKey = `${chapterIndex}:${chapterHtml}:${readingSettings?.fontSize ?? ''}:${readingSettings?.lineHeight ?? ''}`
+  const remeasureKey = `${chapterIndex}:${chapterHtml}:${readingSettings?.fontSize ?? ''}:${readingSettings?.lineHeight ?? ''}:${readingSettings?.fontFamilyId ?? ''}`
   const { pageHeight, pageCount, measuring, layoutStable } = useViewportPagination(
     contentEl,
     viewportEl,
     remeasureKey,
   )
 
+  const { glosses } = useInlineGlosses(
+    contentEl,
+    viewportEl,
+    pageIndex,
+    pageHeight,
+    layoutStable,
+    userSettings,
+    chapterHtml,
+  )
+
   const chapter = book?.chapters[chapterIndex]
   const theme = getThemeById(readingSettings?.themeId ?? 'parchment')
+  const font = getFontById(readingSettings?.fontFamilyId ?? 'serif')
   const chapterFraction = pageCount > 0 ? (pageIndex + 1) / pageCount : 0
   const progressPercent = book
     ? Math.round(((chapterIndex + chapterFraction) / book.chapters.length) * 100)
@@ -75,6 +93,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     ? ({
         '--reader-font-size': `${readingSettings.fontSize}px`,
         '--reader-line-height': String(readingSettings.lineHeight),
+        '--reader-font-family': font.stack,
         '--reader-bg': theme.background,
         '--reader-text': theme.text,
         '--reader-bar': theme.bar,
@@ -112,6 +131,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
 
   useEffect(() => {
     void loadReadingSettings().then(setReadingSettings)
+    void loadUserSettings().then(setUserSettings)
   }, [])
 
   useEffect(() => {
@@ -337,7 +357,11 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
               ref={setContentEl}
               style={{ transform: `translateY(-${pageOffset}px)` }}
             >
-              <ChapterContent html={chapterHtml} onWordTap={handleWordTap} />
+              <ChapterContent
+                html={chapterHtml}
+                onWordTap={handleWordTap}
+                glosses={glosses}
+              />
             </div>
           )}
         </div>
@@ -386,10 +410,12 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
         />
       )}
 
-      {overlay === 'settings' && readingSettings && (
+      {overlay === 'settings' && readingSettings && userSettings && (
         <ReadingSettingsPanel
           settings={readingSettings}
+          userSettings={userSettings}
           onChange={setReadingSettings}
+          onUserChange={setUserSettings}
           onClose={() => setOverlay(null)}
         />
       )}

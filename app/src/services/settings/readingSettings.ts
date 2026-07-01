@@ -9,10 +9,40 @@ export interface ReadingTheme {
   bar: string
 }
 
+export interface ReadingFont {
+  id: string
+  label: string
+  stack: string
+}
+
+export const READING_FONTS: ReadingFont[] = [
+  {
+    id: 'system',
+    label: '系统默认',
+    stack: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  },
+  {
+    id: 'serif',
+    label: '书籍衬线',
+    stack: 'Georgia, "Noto Serif", "Times New Roman", serif',
+  },
+  {
+    id: 'classic',
+    label: '经典印刷',
+    stack: '"Palatino Linotype", Palatino, "Book Antiqua", serif',
+  },
+  {
+    id: 'sans',
+    label: '清晰无衬线',
+    stack: 'Roboto, "Helvetica Neue", Arial, sans-serif',
+  },
+]
+
 export interface ReadingSettings {
   fontSize: number
   lineHeight: number
   themeId: string
+  fontFamilyId: string
 }
 
 export const READING_THEMES: ReadingTheme[] = [
@@ -28,6 +58,11 @@ const DEFAULT_SETTINGS: ReadingSettings = {
   fontSize: 17,
   lineHeight: 1.75,
   themeId: 'parchment',
+  fontFamilyId: 'serif',
+}
+
+export function getFontById(fontFamilyId: string): ReadingFont {
+  return READING_FONTS.find((f) => f.id === fontFamilyId) ?? READING_FONTS[0]
 }
 
 export function getThemeById(themeId: string): ReadingTheme {

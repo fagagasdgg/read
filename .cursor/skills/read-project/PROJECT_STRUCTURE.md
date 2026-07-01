@@ -34,14 +34,17 @@ read/
 │   │   ├── components/reader/
 │   │   │   ├── ReaderScreen.tsx     # 阅读器主屏（视口分页、翻页、点词、面板）
 │   │   │   ├── useViewportPagination.ts # 视口高度测量与页数计算
-│   │   │   ├── ChapterContent.tsx   # 章节 HTML 逐词渲染 + 插图
+│   │   │   ├── useInlineGlosses.ts    # 视口可见词惰性查词、行间释义
+│   │   │   ├── ChapterContent.tsx   # 逐词渲染 + 行间释义 + 插图
 │   │   │   ├── WordDetailPopup.tsx  # 点击单词弹出的释义浮窗
 │   │   │   ├── ReaderControlPanel.tsx # 底部房子唤出的控制面板
 │   │   │   ├── TocPanel.tsx         # 章节目录侧栏
-│   │   │   ├── ReadingSettingsPanel.tsx # 字号/行距/背景设置
+│   │   │   ├── ReadingSettingsPanel.tsx # 字号/行距/字体/背景/行间翻译
 │   │   │   └── tokenize.ts          # 英文单词切分
 │   │   │
 │   │   ├── lib/
+│   │   │   ├── examLevel.ts         # 考试等级比较（行间翻译过滤）
+│   │   │   ├── formatInlineGloss.ts # 行间释义文案格式化
 │   │   │   └── lemmatize.ts         # 词形还原
 │   │   │
 │   │   └── services/
@@ -59,7 +62,8 @@ read/
 │   │       │   ├── types.ts
 │   │       │   └── index.ts
 │   │       └── settings/
-│   │           └── readingSettings.ts # 字号/行距/主题
+│   │           ├── readingSettings.ts # 字号/行距/主题/字体栈
+│   │           └── userSettings.ts    # 英语水平、行间翻译开关
 │   │
 │   ├── dist/                        # 构建产物
 │   └── android/                     # Android 工程
@@ -82,12 +86,14 @@ read/
 | 阅读器 | `components/reader/ReaderScreen.tsx` | 阅读页（由书架进入） |
 | 控制面板 | `components/reader/ReaderControlPanel.tsx` | 退出、目录、设置入口 |
 | 目录 | `components/reader/TocPanel.tsx` | 章节列表跳转 |
-| 阅读设置 | `components/reader/ReadingSettingsPanel.tsx` | 字号、行距、背景 |
-| 逐词渲染 | `components/reader/ChapterContent.tsx` | 不用 iframe，单词可点击 |
+| 阅读设置 | `components/reader/ReadingSettingsPanel.tsx` | 字号、行距、字体、背景、英语水平 |
+| 行间翻译 | `components/reader/useInlineGlosses.ts` | 当前页可见词查词并生成释义 |
+| 逐词渲染 | `components/reader/ChapterContent.tsx` | 不用 iframe，单词可点击，支持行间释义 |
 | EPUB 解析 | `services/epub/parser.ts` | jszip + OPF/spine + 插图 |
 | 书架 | `services/epub/library.ts` | 已导入书籍元数据 |
-| 阅读进度 | `services/epub/progress.ts` | 章节索引 + 章内 scrollTop |
+| 阅读进度 | `services/epub/progress.ts` | chapterIndex + pageIndex |
 | 阅读设置存储 | `services/settings/readingSettings.ts` | Preferences / localStorage |
+| 用户设置 | `services/settings/userSettings.ts` | 英语水平、行间翻译 |
 | 词典 | `services/dictionary/` | 联网查词 + 缓存 + 发音 |
 
 ## 计划中（尚未创建）
