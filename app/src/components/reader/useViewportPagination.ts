@@ -83,9 +83,16 @@ export function shouldWaitForMultiPageLand(
   if (mode === 'start') return false
   if (!contentEl || pageHeight <= 0) return true
 
-  const multiPage = contentEl.scrollHeight > pageHeight + 8
-  if (!multiPage) return false
+  const likelyMultiPage = contentEl.scrollHeight > pageHeight + 8
 
-  if (mode === 'end') return pageCount <= 1
-  return targetPage > 0 && pageCount <= 1
+  // 内容明显超出一页但 pageCount 仍为 1 → 测量未完成（end / restore 均需等待）
+  if (likelyMultiPage && pageCount <= 1) {
+    return true
+  }
+
+  if (mode === 'restore' && targetPage > 0 && pageCount <= 1) {
+    return true
+  }
+
+  return false
 }

@@ -38,6 +38,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
   const [chapterIndex, setChapterIndex] = useState(0)
   const [pageIndex, setPageIndex] = useState(0)
   const [chapterHtml, setChapterHtml] = useState('')
+  const [chapterHtmlReadyIndex, setChapterHtmlReadyIndex] = useState(-1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [wordLookup, setWordLookup] = useState<WordLookupRequest | null>(null)
@@ -50,7 +51,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
   const chapterLandAppliedRef = useRef(false)
   const progressSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const remeasureKey = `${chapterHtml}:${readingSettings?.fontSize ?? ''}:${readingSettings?.lineHeight ?? ''}`
+  const remeasureKey = `${chapterIndex}:${chapterHtml}:${readingSettings?.fontSize ?? ''}:${readingSettings?.lineHeight ?? ''}`
   const { pageHeight, pageCount, measuring, layoutStable } = useViewportPagination(
     contentEl,
     viewportEl,
@@ -151,8 +152,11 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     let revokeAssets: (() => void) | undefined
 
     setChapterHtml('')
+    setChapterHtmlReadyIndex(-1)
     setLoading(true)
     setError('')
+
+    const requestedChapter = chapterIndex
 
     loadChapterHtml(book, chapterIndex)
       .then((result) => {
@@ -162,6 +166,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
         }
         revokeAssets = result.revoke
         setChapterHtml(result.html)
+        setChapterHtmlReadyIndex(requestedChapter)
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : '章节加载失败')
@@ -179,11 +184,20 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
 
   useEffect(() => {
     chapterLandAppliedRef.current = false
+    setChapterHtmlReadyIndex(-1)
     setPageIndex(0)
   }, [chapterIndex])
 
   useEffect(() => {
-    if (!book || !chapterHtml || loading || measuring || !layoutStable || chapterLandAppliedRef.current) {
+    if (
+      !book ||
+      !chapterHtml ||
+      chapterHtmlReadyIndex !== chapterIndex ||
+      loading ||
+      measuring ||
+      !layoutStable ||
+      chapterLandAppliedRef.current
+    ) {
       return
     }
 
@@ -215,6 +229,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     chapterHtml,
     book,
     chapterIndex,
+    chapterHtmlReadyIndex,
     contentEl,
   ])
 
