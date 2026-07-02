@@ -34,7 +34,7 @@ read/
 │   │   │   └── HomeShell.tsx        # 底部 Tab：书架 / 笔记
 │   │   ├── components/notes/
 │   │   │   ├── NotesScreen.tsx      # 笔记本列表
-│   │   │   └── NotebookDetailScreen.tsx # 空白笔记本占位页
+│   │   │   └── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页）
 │   │   │
 │   │   ├── components/reader/
 │   │   │   ├── ReaderScreen.tsx     # 阅读器主屏（视口分页、翻页、点词、面板）
@@ -72,7 +72,7 @@ read/
 │   │       │   ├── mastered.ts      # 已掌握单词列表
 │   │       │   └── phrases.ts       # 按 lemma 存储词组（联网+手动）
 │   │       ├── notes/
-│   │       │   └── notebooks.ts     # 笔记本注册表与文档存储
+│   │       │   └── notebooks.ts     # 笔记本与句子条目结构化存储
 │   │       ├── epub/
 │   │       │   ├── groups.ts        # 书架分组 CRUD
 │   │       │   ├── parser.ts        # EPUB 解压、OPF/spine、插图 blob
