@@ -17,6 +17,8 @@ export interface UserSettings {
   englishLevel: EnglishLevelId
   showInlineTranslation: boolean
   maxInlineMeanings: number
+  /** 行间翻译字号（px），与正文字号独立 */
+  inlineGlossFontSize: number
 }
 
 const STORAGE_KEY = 'read-user-settings'
@@ -25,6 +27,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   englishLevel: 'CET4',
   showInlineTranslation: true,
   maxInlineMeanings: 4,
+  inlineGlossFontSize: 11,
 }
 
 export async function loadUserSettings(): Promise<UserSettings> {

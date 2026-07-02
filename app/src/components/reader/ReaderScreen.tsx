@@ -68,10 +68,10 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
   const { glosses } = useInlineGlosses(
     contentEl,
     viewportEl,
+    chapterIndex,
     pageIndex,
     layoutStable,
     userSettings,
-    chapterHtml,
   )
 
   const chapter = book?.chapters[chapterIndex]
@@ -93,6 +93,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
         '--reader-font-size': `${readingSettings.fontSize}px`,
         '--reader-line-height': String(readingSettings.lineHeight),
         '--reader-font-family': font.stack,
+        '--reader-inline-gloss-size': `${userSettings?.inlineGlossFontSize ?? 11}px`,
         '--reader-bg': theme.background,
         '--reader-text': theme.text,
         '--reader-bar': theme.bar,

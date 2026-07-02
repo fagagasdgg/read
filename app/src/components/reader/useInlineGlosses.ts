@@ -2,14 +2,23 @@ import { useEffect, useRef, useState } from 'react'
 import { shouldShowInlineForWord } from '../../lib/examLevel'
 import { formatInlineGloss } from '../../lib/formatInlineGloss'
 import { toLemma } from '../../lib/lemmatize'
-import { lookupLemmasBatch } from '../../services/dictionary'
+import {
+  getCachedRecords,
+  lookupLemmasBatch,
+} from '../../services/dictionary'
+import { isWordNotFoundMarker } from '../../services/dictionary/types'
 import type { UserSettings } from '../../services/settings/userSettings'
 
-/** 本章内已解析的行间释义（含「不显示」标记），避免翻页反复清空 */
-const glossSessionCache = new Map<string, string | null>()
+/** 按章节保留行间释义会话缓存，避免重进章节时重复读库 */
+const glossSessionByChapter = new Map<number, Map<string, string | null>>()
 
-function clearGlossSessionCache(): void {
-  glossSessionCache.clear()
+function getChapterSession(chapterIndex: number): Map<string, string | null> {
+  let session = glossSessionByChapter.get(chapterIndex)
+  if (!session) {
+    session = new Map()
+    glossSessionByChapter.set(chapterIndex, session)
+  }
+  return session
 }
 
 function collectVisibleLemmas(contentEl: HTMLElement, viewportEl: HTMLElement): string[] {
@@ -29,56 +38,73 @@ function collectVisibleLemmas(contentEl: HTMLElement, viewportEl: HTMLElement): 
   return [...lemmas]
 }
 
-function buildGlossMap(
+function glossesFromSession(
+  session: Map<string, string | null>,
   lemmas: string[],
-  entries: Map<string, import('../../services/dictionary/types').WordEntry>,
-  userSettings: UserSettings,
 ): Record<string, string> {
   const glosses: Record<string, string> = {}
-
   for (const lemma of lemmas) {
-    const entry = entries.get(lemma)
-    if (!entry) continue
-
-    if (!shouldShowInlineForWord(entry.examLevels, userSettings.englishLevel)) {
-      glossSessionCache.set(lemma, null)
-      continue
-    }
-
-    const text = formatInlineGloss(entry, userSettings.maxInlineMeanings)
-    glossSessionCache.set(lemma, text)
-    glosses[lemma] = text
-  }
-
-  return glosses
-}
-
-function glossesFromSession(lemmas: string[]): Record<string, string> {
-  const glosses: Record<string, string> = {}
-  for (const lemma of lemmas) {
-    const cached = glossSessionCache.get(lemma)
+    const cached = session.get(lemma)
     if (cached) glosses[lemma] = cached
   }
   return glosses
 }
 
+function applyRecordToSession(
+  session: Map<string, string | null>,
+  lemma: string,
+  record: import('../../services/dictionary/types').DictionaryCacheValue | undefined,
+  userSettings: UserSettings,
+): string | null {
+  if (!record) return null
+
+  if (isWordNotFoundMarker(record)) {
+    session.set(lemma, null)
+    return null
+  }
+
+  if (!shouldShowInlineForWord(record.examLevels, userSettings.englishLevel)) {
+    session.set(lemma, null)
+    return null
+  }
+
+  const text = formatInlineGloss(record, userSettings.maxInlineMeanings)
+  session.set(lemma, text)
+  return text
+}
+
+async function hydrateGlossesFromLocal(
+  session: Map<string, string | null>,
+  lemmas: string[],
+  userSettings: UserSettings,
+): Promise<Record<string, string>> {
+  const needDb = lemmas.filter((lemma) => !session.has(lemma))
+  if (needDb.length) {
+    const records = await getCachedRecords(needDb)
+    for (const lemma of needDb) {
+      applyRecordToSession(session, lemma, records.get(lemma), userSettings)
+    }
+  }
+
+  return glossesFromSession(session, lemmas)
+}
+
 export function useInlineGlosses(
   contentEl: HTMLElement | null,
   viewportEl: HTMLElement | null,
+  chapterIndex: number,
   pageIndex: number,
   layoutStable: boolean,
   userSettings: UserSettings | null,
-  chapterHtml: string,
 ): { glosses: Record<string, string>; loading: boolean } {
   const [glosses, setGlosses] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const runIdRef = useRef(0)
-  const pageKeyRef = useRef('')
 
   useEffect(() => {
-    clearGlossSessionCache()
-    pageKeyRef.current = ''
-  }, [chapterHtml, userSettings?.englishLevel, userSettings?.showInlineTranslation])
+    if (!userSettings) return
+    glossSessionByChapter.forEach((session) => session.clear())
+  }, [userSettings?.englishLevel, userSettings?.showInlineTranslation])
 
   useEffect(() => {
     if (!userSettings?.showInlineTranslation) {
@@ -87,23 +113,15 @@ export function useInlineGlosses(
       return
     }
 
-    if (!contentEl || !viewportEl || !layoutStable || !chapterHtml) {
+    if (!contentEl || !viewportEl || !layoutStable) {
       return
     }
 
-    const pageKey = `${chapterHtml}:${pageIndex}`
-    const pageChanged = pageKeyRef.current !== pageKey
-    pageKeyRef.current = pageKey
-
+    const session = getChapterSession(chapterIndex)
     const runId = ++runIdRef.current
     let cancelled = false
 
     const run = async () => {
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      })
-      if (cancelled || runId !== runIdRef.current) return
-
       const lemmas = collectVisibleLemmas(contentEl, viewportEl)
       if (!lemmas.length) {
         setGlosses({})
@@ -111,12 +129,12 @@ export function useInlineGlosses(
         return
       }
 
-      const cachedGlosses = glossesFromSession(lemmas)
-      if (pageChanged || Object.keys(cachedGlosses).length > 0) {
-        setGlosses(cachedGlosses)
-      }
+      const localGlosses = await hydrateGlossesFromLocal(session, lemmas, userSettings)
+      if (cancelled || runId !== runIdRef.current) return
 
-      const missing = lemmas.filter((lemma) => !glossSessionCache.has(lemma))
+      setGlosses(localGlosses)
+
+      const missing = lemmas.filter((lemma) => !session.has(lemma))
       if (!missing.length) {
         setLoading(false)
         return
@@ -125,11 +143,16 @@ export function useInlineGlosses(
       setLoading(true)
 
       try {
-        const entries = await lookupLemmasBatch(missing, { prefetchVariants: true })
+        await lookupLemmasBatch(missing, { prefetchVariants: true })
         if (cancelled || runId !== runIdRef.current) return
 
-        const merged = buildGlossMap(lemmas, entries, userSettings)
-        const next = { ...cachedGlosses, ...merged }
+        const records = await getCachedRecords(missing)
+        const next = { ...localGlosses }
+        for (const lemma of missing) {
+          applyRecordToSession(session, lemma, records.get(lemma), userSettings)
+          const text = session.get(lemma)
+          if (text) next[lemma] = text
+        }
         setGlosses(next)
       } finally {
         if (!cancelled && runId === runIdRef.current) {
@@ -146,10 +169,10 @@ export function useInlineGlosses(
   }, [
     contentEl,
     viewportEl,
+    chapterIndex,
     pageIndex,
     layoutStable,
     userSettings,
-    chapterHtml,
   ])
 
   return { glosses, loading }

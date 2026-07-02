@@ -31,6 +31,23 @@ export interface WordEntry {
   source: 'youdao'
 }
 
+/** 有道查不到的词，避免重复联网 */
+export interface WordNotFoundMarker {
+  lemma: string
+  notFound: true
+  cachedAt: number
+}
+
+export type DictionaryCacheValue = WordEntry | WordNotFoundMarker
+
+export function isWordNotFoundMarker(value: DictionaryCacheValue): value is WordNotFoundMarker {
+  return 'notFound' in value && value.notFound === true
+}
+
+export function isWordEntry(value: DictionaryCacheValue): value is WordEntry {
+  return !isWordNotFoundMarker(value)
+}
+
 export interface LookupOptions {
   forceRefresh?: boolean
   /** 点击词形变体时按原词查询，不做词形还原 */

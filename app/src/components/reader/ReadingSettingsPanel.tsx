@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { getDictionaryCacheStats } from '../../services/dictionary'
 import {
   ENGLISH_LEVEL_OPTIONS,
   type UserSettings,
@@ -25,6 +27,12 @@ export function ReadingSettingsPanel({
   onUserChange,
   onClose,
 }: ReadingSettingsPanelProps) {
+  const [cacheStats, setCacheStats] = useState({ wordCount: 0, notFoundCount: 0 })
+
+  useEffect(() => {
+    void getDictionaryCacheStats().then(setCacheStats)
+  }, [])
+
   function updateReading(partial: Partial<ReadingSettings>) {
     const next = { ...settings, ...partial }
     onChange(next)
@@ -132,6 +140,15 @@ export function ReadingSettingsPanel({
 
         <p className="reader-settings-note">
           仅对高于你所选水平的单词显示行间释义。偏移、颜色等高级选项将在主设置中开放。
+        </p>
+
+        <div className="reader-settings-divider" />
+
+        <h4 className="reader-settings-subtitle">词典缓存（调试）</h4>
+        <p className="reader-cache-stats">
+          已缓存词条：<strong>{cacheStats.wordCount}</strong>
+          <br />
+          查不到已标记：<strong>{cacheStats.notFoundCount}</strong>
         </p>
       </div>
     </div>

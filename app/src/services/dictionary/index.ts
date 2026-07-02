@@ -1,17 +1,31 @@
 import { normalizeWordToken, toLemma } from '../../lib/lemmatize'
 import { extractVariantLookupWord } from '../../lib/variantToken'
-import { getCachedWord, getCachedWords, setCachedWord } from './cache'
+import {
+  getCachedRecord,
+  getCachedRecords,
+  isLemmaMarkedNotFound,
+  setCachedWord,
+  setNotFoundLemma,
+} from './cache'
 import { fetchFromYoudao } from './youdao'
-import type { LookupOptions, WordEntry } from './types'
+import { isWordEntry, isWordNotFoundMarker, type LookupOptions, type WordEntry } from './types'
 
-export type { LookupOptions, WordEntry, WordDefinition, WordForm, ExamLevel } from './types'
-export { exportCachedWordsJson, listCachedWords } from './cache'
+export type {
+  LookupOptions,
+  WordEntry,
+  WordDefinition,
+  WordForm,
+  ExamLevel,
+  WordNotFoundMarker,
+  DictionaryCacheValue,
+} from './types'
+export {
+  exportCachedWordsJson,
+  getCachedRecords,
+  getDictionaryCacheStats,
+  listCachedWords,
+} from './cache'
 export { playSpeech, playSpeechWord } from './speech'
-
-export interface LookupResult {
-  entry: WordEntry
-  fromCache: boolean
-}
 
 async function cacheVariantForms(entry: WordEntry): Promise<void> {
   const tasks = entry.forms.map(async (form) => {
@@ -20,12 +34,18 @@ async function cacheVariantForms(entry: WordEntry): Promise<void> {
     const lemma = normalizeWordToken(token)
     if (!lemma || lemma === entry.lemma) return
 
-    const existing = await getCachedWord(lemma)
+    if (await isLemmaMarkedNotFound(lemma)) return
+
+    const existing = await getCachedRecord(lemma)
     if (existing) return
 
     try {
       const variantEntry = await fetchFromYoudao(lemma)
-      if (variantEntry) await setCachedWord(variantEntry)
+      if (variantEntry) {
+        await setCachedWord(variantEntry)
+        return
+      }
+      await setNotFoundLemma(lemma)
     } catch {
       // 变体预取失败不影响主词
     }
@@ -37,17 +57,23 @@ async function cacheVariantForms(entry: WordEntry): Promise<void> {
 export async function lookupWordDetailed(
   rawWord: string,
   options: LookupOptions = {},
-): Promise<LookupResult | null> {
+): Promise<{ entry: WordEntry; fromCache: boolean } | null> {
   const lemma = options.exactToken ? normalizeWordToken(rawWord) : toLemma(rawWord)
   if (!lemma) return null
 
   if (!options.forceRefresh) {
-    const cached = await getCachedWord(lemma)
-    if (cached) return { entry: cached, fromCache: true }
+    const record = await getCachedRecord(lemma)
+    if (record) {
+      if (isWordNotFoundMarker(record)) return null
+      return { entry: record, fromCache: true }
+    }
   }
 
   const entry = await fetchFromYoudao(lemma)
-  if (!entry) return null
+  if (!entry) {
+    await setNotFoundLemma(lemma)
+    return null
+  }
 
   await setCachedWord(entry)
   void cacheVariantForms(entry)
@@ -63,15 +89,20 @@ export async function lookupWord(
   return result?.entry ?? null
 }
 
-/** 批量查词：先读本地缓存，仅对未命中词联网；结果写入 IndexedDB */
+/** 批量查词：先读本地（含查不到标记），仅对未记录词联网 */
 export async function lookupLemmasBatch(
   lemmas: string[],
   options: { prefetchVariants?: boolean } = {},
 ): Promise<Map<string, WordEntry>> {
   const unique = [...new Set(lemmas.filter(Boolean))]
-  const found = await getCachedWords(unique)
-  const missing = unique.filter((lemma) => !found.has(lemma))
+  const records = await getCachedRecords(unique)
+  const found = new Map<string, WordEntry>()
 
+  for (const [lemma, record] of records) {
+    if (isWordEntry(record)) found.set(lemma, record)
+  }
+
+  const missing = unique.filter((lemma) => !records.has(lemma))
   if (!missing.length) return found
 
   const concurrency = 6
@@ -82,14 +113,17 @@ export async function lookupLemmasBatch(
       const lemma = missing[index++]
       try {
         const entry = await fetchFromYoudao(lemma)
-        if (!entry) continue
+        if (!entry) {
+          await setNotFoundLemma(lemma)
+          continue
+        }
         await setCachedWord(entry)
         found.set(lemma, entry)
         if (options.prefetchVariants) {
           void cacheVariantForms(entry)
         }
       } catch {
-        // 单词查询失败，跳过
+        // 单词查询失败，跳过（下次可重试）
       }
     }
   }
@@ -98,5 +132,15 @@ export async function lookupLemmasBatch(
     Array.from({ length: Math.min(concurrency, missing.length) }, () => worker()),
   )
 
+  return found
+}
+
+/** 仅从本地缓存解析词条（不联网） */
+export async function lookupLemmasLocal(lemmas: string[]): Promise<Map<string, WordEntry>> {
+  const records = await getCachedRecords(lemmas)
+  const found = new Map<string, WordEntry>()
+  for (const [lemma, record] of records) {
+    if (isWordEntry(record)) found.set(lemma, record)
+  }
   return found
 }

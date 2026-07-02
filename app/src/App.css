@@ -226,11 +226,13 @@
   position: absolute;
   left: 0;
   bottom: 100%;
-  font-size: 0.62em;
+  font-size: var(--reader-inline-gloss-size, 11px);
   line-height: 1.15;
   color: #6b7280;
   white-space: nowrap;
   pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
   max-width: 14em;
   overflow: visible;
   z-index: 1;
@@ -657,15 +659,16 @@
 }
 
 .popup-loading,
-.popup-error,
-.popup-source {
+.popup-error {
   margin: 8px 0;
   font-size: 0.9rem;
 }
 
-.popup-source {
-  color: #6b7280;
-  font-size: 0.8rem;
+.reader-cache-stats {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #4b5563;
+  line-height: 1.6;
 }
 
 .popup-error {
