@@ -8,6 +8,7 @@ import {
 } from '../../services/dictionary'
 import type { WordEntry } from '../../services/dictionary'
 import { isMasteredLemma, setMasteredLemma } from '../../services/words/mastered'
+import { WordPhraseSection } from './WordPhraseSection'
 
 export interface WordLookupRequest {
   word: string
@@ -165,6 +166,8 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
                 ))}
               </div>
             )}
+
+            <WordPhraseSection lemma={entry.lemma} />
 
             <div className="popup-actions">
               <button

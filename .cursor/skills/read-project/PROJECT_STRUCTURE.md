@@ -1,7 +1,7 @@
 # 项目结构
 
 > 按 `xq/需求.md` §98.1 维护。每次新增/删除/重命名文件后更新本文档。
-> Last updated: 2026-06-29
+> Last updated: 2026-07-02
 
 ```
 read/
@@ -37,6 +37,7 @@ read/
 │   │   │   ├── useInlineGlosses.ts    # 视口可见词惰性查词、行间释义
 │   │   │   ├── ChapterContent.tsx   # 逐词渲染 + 行间释义 + 插图
 │   │   │   ├── WordDetailPopup.tsx  # 点击单词弹出的释义浮窗
+│   │   │   ├── WordPhraseSection.tsx # 词组获取/展示/补充/清空
 │   │   │   ├── ReaderControlPanel.tsx # 底部房子唤出的控制面板
 │   │   │   ├── SettingStepper.tsx   # 设置项步进器（防滚动误触）
 │   │   │   ├── TocPanel.tsx         # 目录/笔记侧栏
@@ -47,6 +48,7 @@ read/
 │   │   │   ├── examLevel.ts         # 考试等级比较（行间翻译过滤）
 │   │   │   ├── formatInlineGloss.ts # 行间释义文案格式化（词性数 + 每词性释义数）
 │   │   │   ├── splitTranslationMeanings.ts # 拆分同一词性下的多个释义
+│   │   │   ├── pickYoudaoText.ts    # 解析有道嵌套文本字段
 │   │   │   └── lemmatize.ts         # 词形还原
 │   │   │
 │   │   └── services/
@@ -56,12 +58,14 @@ read/
 │   │       │   ├── lookup.ts        # 多信源串联查词
 │   │       │   ├── providers.ts     # 信源元数据
 │   │       │   ├── sourceStatus.ts  # 信源健康度与统计
+│   │       │   ├── fetchPhrases.ts  # 有道词组 phrs 联网获取
 │   │       │   ├── cache.ts
 │   │       │   ├── speech.ts        # 内联 Audio 播放
 │   │       │   ├── types.ts
 │   │       │   └── index.ts
 │   │       ├── words/
-│   │       │   └── mastered.ts      # 已掌握单词列表
+│   │       │   ├── mastered.ts      # 已掌握单词列表
+│   │       │   └── phrases.ts       # 按 lemma 存储词组（联网+手动）
 │   │       ├── epub/
 │   │       │   ├── parser.ts        # EPUB 解压、OPF/spine、插图 blob
 │   │       │   ├── import.ts        # 浏览器/手机 EPUB 导入
