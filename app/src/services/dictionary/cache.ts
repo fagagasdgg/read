@@ -29,6 +29,21 @@ export async function getCachedWord(lemma: string): Promise<WordEntry | null> {
   return (await db.get(STORE, lemma)) ?? null
 }
 
+export async function getCachedWords(lemmas: string[]): Promise<Map<string, WordEntry>> {
+  const unique = [...new Set(lemmas.filter(Boolean))]
+  if (!unique.length) return new Map()
+
+  const db = await getDb()
+  const pairs = await Promise.all(
+    unique.map(async (lemma) => {
+      const entry = await db.get(STORE, lemma)
+      return entry ? ([lemma, entry] as const) : null
+    }),
+  )
+
+  return new Map(pairs.filter((item): item is readonly [string, WordEntry] => item !== null))
+}
+
 export async function setCachedWord(entry: WordEntry): Promise<void> {
   const db = await getDb()
   await db.put(STORE, entry, entry.lemma)

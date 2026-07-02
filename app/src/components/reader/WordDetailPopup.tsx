@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { extractVariantLookupWord } from '../../lib/variantToken'
-import { lookupWord, playSpeechWord } from '../../services/dictionary'
+import { lookupWordDetailed, playSpeechWord } from '../../services/dictionary'
 import type { WordEntry } from '../../services/dictionary'
 
 export interface WordLookupRequest {
@@ -18,11 +18,13 @@ interface WordDetailPopupProps {
 export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetailPopupProps) {
   const [loading, setLoading] = useState(false)
   const [entry, setEntry] = useState<WordEntry | null>(null)
+  const [fromCache, setFromCache] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!lookup) {
       setEntry(null)
+      setFromCache(false)
       setError('')
       return
     }
@@ -31,12 +33,17 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
     setLoading(true)
     setError('')
     setEntry(null)
+    setFromCache(false)
 
-    lookupWord(lookup.word, { exactToken: lookup.exactToken })
+    lookupWordDetailed(lookup.word, { exactToken: lookup.exactToken })
       .then((result) => {
         if (cancelled) return
-        setEntry(result)
-        if (!result) setError('未找到该词的释义')
+        if (!result) {
+          setError('未找到该词的释义')
+          return
+        }
+        setEntry(result.entry)
+        setFromCache(result.fromCache)
       })
       .catch((err) => {
         if (cancelled) return
@@ -66,6 +73,7 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
 
         {entry && !loading && (
           <>
+            <p className="popup-source">{fromCache ? '来源：本地缓存' : '来源：网络查询'}</p>
             <div className="popup-word-title">
               <strong>{entry.lemma}</strong>
             </div>

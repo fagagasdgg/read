@@ -35,6 +35,7 @@ function renderTextNode(
           key={`${key}-w-${i}`}
           className="reader-word"
           data-word={seg.value}
+          data-lemma={lemma}
           onClick={(e) => {
             e.stopPropagation()
             onWordTap(seg.value)
@@ -53,6 +54,7 @@ function renderTextNode(
         <span
           className="reader-word reader-word-has-gloss"
           data-word={seg.value}
+          data-lemma={lemma}
           onClick={(e) => {
             e.stopPropagation()
             onWordTap(seg.value)

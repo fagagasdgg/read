@@ -225,20 +225,15 @@
 .reader-inline-gloss {
   position: absolute;
   left: 0;
-  bottom: calc(100% - 2px);
+  bottom: 100%;
   font-size: 0.62em;
   line-height: 1.15;
   color: #6b7280;
   white-space: nowrap;
   pointer-events: none;
-  max-width: 12em;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: 14em;
+  overflow: visible;
   z-index: 1;
-}
-
-.reader-word-has-gloss {
-  padding-top: 0.95em;
 }
 
 .reader-block {
@@ -662,9 +657,15 @@
 }
 
 .popup-loading,
-.popup-error {
+.popup-error,
+.popup-source {
   margin: 8px 0;
   font-size: 0.9rem;
+}
+
+.popup-source {
+  color: #6b7280;
+  font-size: 0.8rem;
 }
 
 .popup-error {
