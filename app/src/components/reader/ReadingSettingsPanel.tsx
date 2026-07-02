@@ -15,8 +15,11 @@ import {
   type BackupDirectorySettings,
 } from '../../services/settings/backupDirectory'
 import { getMasteredWordCount, subscribeMasteredWords } from '../../services/words/mastered'
+import { SettingStepper } from './SettingStepper'
 import {
   ENGLISH_LEVEL_OPTIONS,
+  INLINE_GLOSS_COLORS,
+  buildInlineGlossResetPatch,
   type UserSettings,
   saveUserSettings,
 } from '../../services/settings/userSettings'
@@ -153,29 +156,25 @@ export function ReadingSettingsPanel({
         </header>
 
         <div className="reader-settings-body">
-          <label className="reader-setting-row">
-            <span>字号 {settings.fontSize}px</span>
-            <input
-              type="range"
-              min={14}
-              max={26}
-              step={1}
-              value={settings.fontSize}
-              onChange={(e) => updateReading({ fontSize: Number(e.target.value) })}
-            />
-          </label>
+          <SettingStepper
+            label="字号"
+            value={settings.fontSize}
+            min={14}
+            max={26}
+            step={1}
+            formatValue={(v) => `${v}px`}
+            onChange={(fontSize) => updateReading({ fontSize })}
+          />
 
-          <label className="reader-setting-row">
-            <span>行间距 {(settings.lineHeight * 100).toFixed(0)}%</span>
-            <input
-              type="range"
-              min={1.4}
-              max={3}
-              step={0.05}
-              value={settings.lineHeight}
-              onChange={(e) => updateReading({ lineHeight: Number(e.target.value) })}
-            />
-          </label>
+          <SettingStepper
+            label="行间距"
+            value={settings.lineHeight}
+            min={1.4}
+            max={3}
+            step={0.05}
+            formatValue={(v) => `${(v * 100).toFixed(0)}%`}
+            onChange={(lineHeight) => updateReading({ lineHeight })}
+          />
 
           <div className="reader-setting-row">
             <span>英文字体</span>
@@ -242,82 +241,85 @@ export function ReadingSettingsPanel({
           </label>
 
           <p className="reader-settings-note">
-            仅对高于你所选水平的单词显示行间释义。偏移、颜色等高级选项将在主设置中开放。
+            仅对高于你所选水平的单词显示行间释义。
           </p>
 
-          <label className="reader-setting-row">
-            <span>最多显示 {userSettings.maxInlinePosCount} 个词性翻译</span>
-            <input
-              type="range"
-              min={1}
-              max={10}
-              step={1}
-              value={userSettings.maxInlinePosCount}
-              onChange={(e) => updateUser({ maxInlinePosCount: Number(e.target.value) })}
-            />
-          </label>
+          <SettingStepper
+            label="最多显示词性翻译"
+            value={userSettings.maxInlinePosCount}
+            min={1}
+            max={10}
+            formatValue={(v) => `${v} 个`}
+            onChange={(maxInlinePosCount) => updateUser({ maxInlinePosCount })}
+          />
 
-          <label className="reader-setting-row">
-            <span>每个词性最多显示 {userSettings.maxMeaningsPerPos} 个释义</span>
-            <input
-              type="range"
-              min={1}
-              max={10}
-              step={1}
-              value={userSettings.maxMeaningsPerPos}
-              onChange={(e) => updateUser({ maxMeaningsPerPos: Number(e.target.value) })}
-            />
-          </label>
+          <SettingStepper
+            label="每个词性最多显示释义"
+            value={userSettings.maxMeaningsPerPos}
+            min={1}
+            max={10}
+            formatValue={(v) => `${v} 个`}
+            onChange={(maxMeaningsPerPos) => updateUser({ maxMeaningsPerPos })}
+          />
 
           <p className="reader-settings-note">
             例如设为 2 + 2：显示 n. 前两个释义、adj. 前两个释义。
           </p>
 
-          <label className="reader-setting-row">
-            <span>行间翻译字号 {userSettings.inlineGlossFontSize}px</span>
-            <input
-              type="range"
-              min={8}
-              max={16}
-              step={1}
-              value={userSettings.inlineGlossFontSize}
-              onChange={(e) => updateUser({ inlineGlossFontSize: Number(e.target.value) })}
-            />
-          </label>
+          <SettingStepper
+            label="行间翻译字号"
+            value={userSettings.inlineGlossFontSize}
+            min={8}
+            max={16}
+            formatValue={(v) => `${v}px`}
+            onChange={(inlineGlossFontSize) => updateUser({ inlineGlossFontSize })}
+          />
 
-          <label className="reader-setting-row reader-setting-color-row">
+          <div className="reader-setting-row">
             <span>行间翻译颜色</span>
-            <input
-              type="color"
-              className="reader-setting-color-input"
-              value={userSettings.inlineGlossColor}
-              onChange={(e) => updateUser({ inlineGlossColor: e.target.value })}
-            />
-          </label>
+            <div className="reader-gloss-color-grid">
+              {INLINE_GLOSS_COLORS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`reader-gloss-color-chip${userSettings.inlineGlossColor === item.color ? ' active' : ''}`}
+                  style={{ color: item.color }}
+                  onClick={() => updateUser({ inlineGlossColor: item.color })}
+                  aria-label={item.label}
+                  title={item.label}
+                >
+                  <span className="reader-gloss-color-dot" style={{ background: item.color }} />
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          <label className="reader-setting-row">
-            <span>水平偏移 {userSettings.inlineGlossOffsetX}px</span>
-            <input
-              type="range"
-              min={-20}
-              max={20}
-              step={1}
-              value={userSettings.inlineGlossOffsetX}
-              onChange={(e) => updateUser({ inlineGlossOffsetX: Number(e.target.value) })}
-            />
-          </label>
+          <SettingStepper
+            label="水平偏移"
+            value={userSettings.inlineGlossOffsetX}
+            min={-20}
+            max={20}
+            formatValue={(v) => `${v}px`}
+            onChange={(inlineGlossOffsetX) => updateUser({ inlineGlossOffsetX })}
+          />
 
-          <label className="reader-setting-row">
-            <span>垂直偏移 {userSettings.inlineGlossOffsetY}px</span>
-            <input
-              type="range"
-              min={-20}
-              max={20}
-              step={1}
-              value={userSettings.inlineGlossOffsetY}
-              onChange={(e) => updateUser({ inlineGlossOffsetY: Number(e.target.value) })}
-            />
-          </label>
+          <SettingStepper
+            label="垂直偏移"
+            value={userSettings.inlineGlossOffsetY}
+            min={-20}
+            max={20}
+            formatValue={(v) => `${v}px`}
+            onChange={(inlineGlossOffsetY) => updateUser({ inlineGlossOffsetY })}
+          />
+
+          <button
+            type="button"
+            className="reader-gloss-reset-btn"
+            onClick={() => updateUser(buildInlineGlossResetPatch())}
+          >
+            恢复行间翻译默认
+          </button>
 
           <div className="reader-settings-divider" />
 

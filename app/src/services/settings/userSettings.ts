@@ -13,6 +13,22 @@ export const ENGLISH_LEVEL_OPTIONS = [
 
 export type EnglishLevelId = (typeof ENGLISH_LEVEL_OPTIONS)[number]['id']
 
+/** 行间翻译预设色：黑/蓝/红 + 低对比度阅读友好色 */
+export const INLINE_GLOSS_COLORS = [
+  { id: 'ink', label: '墨黑', color: '#3d3d3d' },
+  { id: 'blue', label: '靛蓝', color: '#5a7394' },
+  { id: 'red', label: '暗红', color: '#a85858' },
+  { id: 'warm-gray', label: '灰褐', color: '#7a7168' },
+  { id: 'sage', label: '松绿', color: '#6d7a62' },
+  { id: 'slate', label: '青灰', color: '#627480' },
+  { id: 'plum', label: '紫灰', color: '#7a6f82' },
+  { id: 'sepia', label: '赭石', color: '#8f7355' },
+] as const
+
+export type InlineGlossColorId = (typeof INLINE_GLOSS_COLORS)[number]['id']
+
+export const DEFAULT_INLINE_GLOSS_COLOR = INLINE_GLOSS_COLORS[3].color
+
 export interface UserSettings {
   englishLevel: EnglishLevelId
   showInlineTranslation: boolean
@@ -41,7 +57,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   maxInlinePosCount: 4,
   maxMeaningsPerPos: 4,
   inlineGlossFontSize: 11,
-  inlineGlossColor: '#6b7280',
+  inlineGlossColor: DEFAULT_INLINE_GLOSS_COLOR,
   inlineGlossOffsetX: 0,
   inlineGlossOffsetY: 0,
 }
@@ -71,6 +87,43 @@ function migrateLegacySettings(partial: LegacyUserSettings): Partial<UserSetting
   return next
 }
 
+function normalizeGlossColor(color: string): string {
+  const trimmed = color.trim().toLowerCase()
+  const preset = INLINE_GLOSS_COLORS.find((item) => item.color === trimmed)
+  if (preset) return preset.color
+
+  // 旧版默认灰 → 灰褐
+  if (trimmed === '#6b7280') return DEFAULT_INLINE_GLOSS_COLOR
+
+  let best: string = DEFAULT_INLINE_GLOSS_COLOR
+  let bestDistance = Number.POSITIVE_INFINITY
+  const parse = (hex: string) => {
+    const value = hex.replace('#', '')
+    return {
+      r: parseInt(value.slice(0, 2), 16),
+      g: parseInt(value.slice(2, 4), 16),
+      b: parseInt(value.slice(4, 6), 16),
+    }
+  }
+
+  try {
+    const source = parse(trimmed)
+    for (const item of INLINE_GLOSS_COLORS) {
+      const target = parse(item.color)
+      const distance =
+        (source.r - target.r) ** 2 + (source.g - target.g) ** 2 + (source.b - target.b) ** 2
+      if (distance < bestDistance) {
+        bestDistance = distance
+        best = item.color
+      }
+    }
+  } catch {
+    return DEFAULT_INLINE_GLOSS_COLOR
+  }
+
+  return best
+}
+
 function normalizeUserSettings(partial: LegacyUserSettings): UserSettings {
   const migrated = migrateLegacySettings(partial)
   const merged = { ...DEFAULT_SETTINGS, ...migrated }
@@ -80,7 +133,7 @@ function normalizeUserSettings(partial: LegacyUserSettings): UserSettings {
     maxInlinePosCount: clampCount(merged.maxInlinePosCount, DEFAULT_SETTINGS.maxInlinePosCount),
     maxMeaningsPerPos: clampCount(merged.maxMeaningsPerPos, DEFAULT_SETTINGS.maxMeaningsPerPos),
     inlineGlossFontSize: Math.min(16, Math.max(8, Math.round(merged.inlineGlossFontSize))),
-    inlineGlossColor: merged.inlineGlossColor?.trim() || DEFAULT_SETTINGS.inlineGlossColor,
+    inlineGlossColor: normalizeGlossColor(merged.inlineGlossColor || DEFAULT_INLINE_GLOSS_COLOR),
     inlineGlossOffsetX: clampOffset(merged.inlineGlossOffsetX, DEFAULT_SETTINGS.inlineGlossOffsetX),
     inlineGlossOffsetY: clampOffset(merged.inlineGlossOffsetY, DEFAULT_SETTINGS.inlineGlossOffsetY),
   }
@@ -109,4 +162,25 @@ export async function saveUserSettings(settings: UserSettings): Promise<void> {
     return
   }
   localStorage.setItem(STORAGE_KEY, payload)
+}
+
+export const INLINE_GLOSS_DEFAULTS = {
+  maxInlinePosCount: DEFAULT_SETTINGS.maxInlinePosCount,
+  maxMeaningsPerPos: DEFAULT_SETTINGS.maxMeaningsPerPos,
+  inlineGlossFontSize: DEFAULT_SETTINGS.inlineGlossFontSize,
+  inlineGlossColor: DEFAULT_INLINE_GLOSS_COLOR,
+  inlineGlossOffsetX: DEFAULT_SETTINGS.inlineGlossOffsetX,
+  inlineGlossOffsetY: DEFAULT_SETTINGS.inlineGlossOffsetY,
+} as const
+
+export function buildInlineGlossResetPatch(): Pick<
+  UserSettings,
+  | 'maxInlinePosCount'
+  | 'maxMeaningsPerPos'
+  | 'inlineGlossFontSize'
+  | 'inlineGlossColor'
+  | 'inlineGlossOffsetX'
+  | 'inlineGlossOffsetY'
+> {
+  return { ...INLINE_GLOSS_DEFAULTS }
 }

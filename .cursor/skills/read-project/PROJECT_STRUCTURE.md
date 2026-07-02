@@ -38,7 +38,8 @@ read/
 │   │   │   ├── ChapterContent.tsx   # 逐词渲染 + 行间释义 + 插图
 │   │   │   ├── WordDetailPopup.tsx  # 点击单词弹出的释义浮窗
 │   │   │   ├── ReaderControlPanel.tsx # 底部房子唤出的控制面板
-│   │   │   ├── TocPanel.tsx         # 章节目录侧栏
+│   │   │   ├── SettingStepper.tsx   # 设置项步进器（防滚动误触）
+│   │   │   ├── TocPanel.tsx         # 目录/笔记侧栏
 │   │   │   ├── ReadingSettingsPanel.tsx # 字号/行距/字体/背景/信源/导出
 │   │   │   └── tokenize.ts          # 英文单词切分
 │   │   │
