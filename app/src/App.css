@@ -700,6 +700,41 @@
   align-items: center;
 }
 
+.popup-actions {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.popup-mastered-btn {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.popup-mastered-btn.active {
+  border-color: #86efac;
+  background: #ecfdf5;
+  color: #166534;
+}
+
+.popup-mastered-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.popup-mastered-note {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
 .popup-loading,
 .popup-error {
   margin: 8px 0;
@@ -715,6 +750,34 @@
   gap: 10px;
 }
 
+.reader-dict-sources-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.reader-dict-sources-header .reader-settings-subtitle {
+  margin: 0;
+}
+
+.reader-dict-probe-btn {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.reader-dict-probe-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .reader-dict-source-item {
   display: flex;
   flex-direction: column;
@@ -724,6 +787,13 @@
   background: #f9fafb;
 }
 
+.reader-dict-source-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .reader-dict-source-name {
   display: flex;
   align-items: center;
@@ -731,6 +801,34 @@
   font-size: 0.9rem;
   font-weight: 600;
   color: #111827;
+}
+
+.reader-dict-health {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.reader-dict-health-unknown {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.reader-dict-health-healthy {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.reader-dict-health-degraded {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.reader-dict-health-offline {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 .reader-dict-source-role {
@@ -757,11 +855,60 @@
   line-height: 1.4;
 }
 
+.reader-dict-source-metrics,
+.reader-dict-source-time {
+  font-size: 0.78rem;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+.reader-dict-metric-sep {
+  margin: 0 4px;
+  color: #d1d5db;
+}
+
+.reader-dict-source-error {
+  font-size: 0.75rem;
+  color: #b91c1c;
+  line-height: 1.35;
+}
+
 .reader-cache-stats {
-  margin: 0;
+  margin: 0 0 12px;
   font-size: 0.85rem;
   color: #4b5563;
   line-height: 1.6;
+}
+
+.reader-backup-dir-path {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: #374151;
+  line-height: 1.45;
+  word-break: break-all;
+}
+
+.reader-backup-dir-btn {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.reader-backup-dir-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.reader-backup-dir-message {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: #4b5563;
+  line-height: 1.45;
 }
 
 .popup-error {

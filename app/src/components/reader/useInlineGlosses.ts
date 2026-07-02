@@ -8,6 +8,7 @@ import {
 } from '../../services/dictionary'
 import { shouldRetryNotFound } from '../../services/dictionary/cache'
 import { isWordNotFoundMarker } from '../../services/dictionary/types'
+import { getMasteredLemmaSet, subscribeMasteredWords } from '../../services/words/mastered'
 import type { UserSettings } from '../../services/settings/userSettings'
 
 /** 按章节保留行间释义会话缓存，避免重进章节时重复读库 */
@@ -90,7 +91,13 @@ function applyRecordToSession(
   lemma: string,
   record: import('../../services/dictionary/types').DictionaryCacheValue | undefined,
   userSettings: UserSettings,
+  mastered: Set<string>,
 ): string | null {
+  if (mastered.has(lemma)) {
+    session.set(lemma, null)
+    return null
+  }
+
   if (!record) return null
 
   if (isWordNotFoundMarker(record)) {
@@ -113,12 +120,13 @@ async function hydrateGlossesFromLocal(
   session: Map<string, string | null>,
   lemmas: string[],
   userSettings: UserSettings,
+  mastered: Set<string>,
 ): Promise<Record<string, string>> {
   const needDb = lemmas.filter((lemma) => !session.has(lemma))
   if (needDb.length) {
     const records = await getCachedRecords(needDb)
     for (const lemma of needDb) {
-      applyRecordToSession(session, lemma, records.get(lemma), userSettings)
+      applyRecordToSession(session, lemma, records.get(lemma), userSettings, mastered)
     }
   }
 
@@ -136,12 +144,24 @@ export function useInlineGlosses(
 ): { glosses: Record<string, string>; loading: boolean } {
   const [glosses, setGlosses] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+  const [masteredVersion, setMasteredVersion] = useState(0)
   const runIdRef = useRef(0)
+
+  useEffect(() => {
+    return subscribeMasteredWords(() => {
+      glossSessionByChapter.forEach((session) => session.clear())
+      setMasteredVersion((value) => value + 1)
+    })
+  }, [])
 
   useEffect(() => {
     if (!userSettings) return
     glossSessionByChapter.forEach((session) => session.clear())
-  }, [userSettings?.englishLevel, userSettings?.showInlineTranslation])
+  }, [
+    userSettings?.englishLevel,
+    userSettings?.showInlineTranslation,
+    userSettings?.maxInlineMeanings,
+  ])
 
   useEffect(() => {
     if (!userSettings?.showInlineTranslation) {
@@ -159,6 +179,7 @@ export function useInlineGlosses(
     let cancelled = false
 
     const run = async () => {
+      const mastered = await getMasteredLemmaSet()
       const lemmas = collectVisibleLemmas(contentEl, viewportEl)
       if (!lemmas.length) {
         setGlosses((prev) => (Object.keys(prev).length ? {} : prev))
@@ -171,7 +192,7 @@ export function useInlineGlosses(
         setGlosses((prev) => (glossMapsEqual(prev, sessionGlosses) ? prev : sessionGlosses))
       }
 
-      const localGlosses = await hydrateGlossesFromLocal(session, lemmas, userSettings)
+      const localGlosses = await hydrateGlossesFromLocal(session, lemmas, userSettings, mastered)
       if (cancelled || runId !== runIdRef.current) return
 
       setGlosses((prev) => (glossMapsEqual(prev, localGlosses) ? prev : localGlosses))
@@ -191,7 +212,7 @@ export function useInlineGlosses(
         const records = await getCachedRecords(missing)
         const next = { ...localGlosses }
         for (const lemma of missing) {
-          applyRecordToSession(session, lemma, records.get(lemma), userSettings)
+          applyRecordToSession(session, lemma, records.get(lemma), userSettings, mastered)
           const text = session.get(lemma)
           if (text) next[lemma] = text
         }
@@ -215,6 +236,7 @@ export function useInlineGlosses(
     pageIndex,
     layoutStable,
     userSettings,
+    masteredVersion,
   ])
 
   useEffect(() => {

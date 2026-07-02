@@ -108,9 +108,11 @@ GET https://dict.youdao.com/jsonapi_s?doctype=json&jsonversion=4&q={单词}
 
 **开发环境跨域**：浏览器走 Vite 代理 `/api/youdao`；APK 内开启 `CapacitorHttp`。
 
-**为何选有道**：与 v1 截图字段一致（中文释义、等级、音标、变体）；国内可用；正常查词量免费。
+| 词典 | `services/dictionary/` | 联网查词 + 缓存 + 发音 + 信源状态 |
 
-**备注**：有道 `ec` 不含 BNC/COCA 词频；若后续需要可叠加 ECDICT。
+**为何选有道 + 词霸双信源**：有道字段与产品截图一致；词霸作国内备用。两者均为网页公开接口，无需用户登录；设置页可查看各信源健康度与可用率。
+
+**信源状态**：`sourceStatus.ts` 记录每次联网 hit/miss/error，持久化到 Preferences；设置页可手动「检测信源」（探测词 hello）。
 
 ## 目录结构（当前）
 

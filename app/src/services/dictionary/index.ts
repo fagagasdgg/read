@@ -28,6 +28,13 @@ export {
   listCachedWords,
 } from './cache'
 export { DICTIONARY_SOURCES, getDictionarySourceLabel } from './providers'
+export {
+  formatSourceCheckTime,
+  getDictionarySourceStatus,
+  probeDictionarySources,
+  subscribeDictionarySourceStatus,
+} from './sourceStatus'
+export type { SourceHealth, SourceStatusView } from './sourceStatus'
 export { playSpeech, playSpeechWord } from './speech'
 
 async function cacheVariantForms(entry: WordEntry): Promise<void> {

@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { extractVariantLookupWord } from '../../lib/variantToken'
-import { lookupWord, playSpeech, playSpeechWord, getDictionarySourceLabel } from '../../services/dictionary'
+import {
+  lookupWord,
+  playSpeech,
+  playSpeechWord,
+  getDictionarySourceLabel,
+} from '../../services/dictionary'
 import type { WordEntry } from '../../services/dictionary'
+import { isMasteredLemma, setMasteredLemma } from '../../services/words/mastered'
 
 export interface WordLookupRequest {
   word: string
@@ -19,11 +25,14 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
   const [loading, setLoading] = useState(false)
   const [entry, setEntry] = useState<WordEntry | null>(null)
   const [error, setError] = useState('')
+  const [mastered, setMastered] = useState(false)
+  const [masteredSaving, setMasteredSaving] = useState(false)
 
   useEffect(() => {
     if (!lookup) {
       setEntry(null)
       setError('')
+      setMastered(false)
       return
     }
 
@@ -31,12 +40,18 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
     setLoading(true)
     setError('')
     setEntry(null)
+    setMastered(false)
 
     lookupWord(lookup.word, { exactToken: lookup.exactToken })
-      .then((result) => {
+      .then(async (result) => {
         if (cancelled) return
         setEntry(result)
-        if (!result) setError('未找到该词的释义')
+        if (!result) {
+          setError('未找到该词的释义')
+          return
+        }
+        const marked = await isMasteredLemma(result.lemma)
+        if (!cancelled) setMastered(marked)
       })
       .catch((err) => {
         if (cancelled) return
@@ -51,6 +66,18 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
       cancelled = true
     }
   }, [lookup])
+
+  async function toggleMastered() {
+    if (!entry || masteredSaving) return
+    const next = !mastered
+    setMasteredSaving(true)
+    try {
+      await setMasteredLemma(entry.lemma, next)
+      setMastered(next)
+    } finally {
+      setMasteredSaving(false)
+    }
+  }
 
   if (!lookup) return null
 
@@ -138,6 +165,20 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
                 ))}
               </div>
             )}
+
+            <div className="popup-actions">
+              <button
+                type="button"
+                className={`popup-mastered-btn${mastered ? ' active' : ''}`}
+                onClick={() => void toggleMastered()}
+                disabled={masteredSaving}
+              >
+                {mastered ? '已掌握（点击恢复行间翻译）' : '标记为已掌握'}
+              </button>
+              {mastered && (
+                <p className="popup-mastered-note">该词将不再显示行间翻译，点词弹窗仍可查看释义。</p>
+              )}
+            </div>
           </>
         )}
       </div>

@@ -1,7 +1,7 @@
 # 项目结构
 
 > 按 `xq/需求.md` §98.1 维护。每次新增/删除/重命名文件后更新本文档。
-> Last updated: 2026-06-30
+> Last updated: 2026-06-29
 
 ```
 read/
@@ -39,7 +39,7 @@ read/
 │   │   │   ├── WordDetailPopup.tsx  # 点击单词弹出的释义浮窗
 │   │   │   ├── ReaderControlPanel.tsx # 底部房子唤出的控制面板
 │   │   │   ├── TocPanel.tsx         # 章节目录侧栏
-│   │   │   ├── ReadingSettingsPanel.tsx # 字号/行距/字体/背景/行间翻译
+│   │   │   ├── ReadingSettingsPanel.tsx # 字号/行距/字体/背景/信源/导出
 │   │   │   └── tokenize.ts          # 英文单词切分
 │   │   │
 │   │   ├── lib/
@@ -48,12 +48,18 @@ read/
 │   │   │   └── lemmatize.ts         # 词形还原
 │   │   │
 │   │   └── services/
-│   │       ├── dictionary/          # 有道 API + IndexedDB 缓存 + 发音
+│   │       ├── dictionary/          # 有道 + 词霸 API、缓存、信源状态
 │   │       │   ├── youdao.ts
+│   │       │   ├── iciba.ts
+│   │       │   ├── lookup.ts        # 多信源串联查词
+│   │       │   ├── providers.ts     # 信源元数据
+│   │       │   ├── sourceStatus.ts  # 信源健康度与统计
 │   │       │   ├── cache.ts
 │   │       │   ├── speech.ts        # 内联 Audio 播放
 │   │       │   ├── types.ts
 │   │       │   └── index.ts
+│   │       ├── words/
+│   │       │   └── mastered.ts      # 已掌握单词列表
 │   │       ├── epub/
 │   │       │   ├── parser.ts        # EPUB 解压、OPF/spine、插图 blob
 │   │       │   ├── import.ts        # 浏览器/手机 EPUB 导入
@@ -63,7 +69,8 @@ read/
 │   │       │   └── index.ts
 │   │       └── settings/
 │   │           ├── readingSettings.ts # 字号/行距/主题/字体栈
-│   │           └── userSettings.ts    # 英语水平、行间翻译开关
+│   │           ├── userSettings.ts    # 英语水平、行间翻译
+│   │           └── backupDirectory.ts   # 默认数据备份目录
 │   │
 │   ├── dist/                        # 构建产物
 │   └── android/                     # Android 工程
@@ -86,9 +93,11 @@ read/
 | 阅读器 | `components/reader/ReaderScreen.tsx` | 阅读页（由书架进入） |
 | 控制面板 | `components/reader/ReaderControlPanel.tsx` | 退出、目录、设置入口 |
 | 目录 | `components/reader/TocPanel.tsx` | 章节列表跳转 |
-| 阅读设置 | `components/reader/ReadingSettingsPanel.tsx` | 字号、行距、字体、背景、英语水平 |
+| 阅读设置 | `components/reader/ReadingSettingsPanel.tsx` | 字号、行距、字体、背景、信源状态 |
 | 行间翻译 | `components/reader/useInlineGlosses.ts` | 当前页可见词查词并生成释义 |
+| 点词弹窗 | `components/reader/WordDetailPopup.tsx` | 释义、发音、变体、已掌握 |
 | 逐词渲染 | `components/reader/ChapterContent.tsx` | 不用 iframe，单词可点击，支持行间释义 |
+| 已掌握词 | `services/words/mastered.ts` | 隐藏行间翻译的单词列表 |
 | EPUB 解析 | `services/epub/parser.ts` | jszip + OPF/spine + 插图 |
 | 书架 | `services/epub/library.ts` | 已导入书籍元数据 |
 | 阅读进度 | `services/epub/progress.ts` | chapterIndex + pageIndex |

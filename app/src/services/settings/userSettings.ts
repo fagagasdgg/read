@@ -30,23 +30,32 @@ const DEFAULT_SETTINGS: UserSettings = {
   inlineGlossFontSize: 11,
 }
 
+function normalizeUserSettings(partial: Partial<UserSettings>): UserSettings {
+  const merged = { ...DEFAULT_SETTINGS, ...partial }
+  return {
+    ...merged,
+    maxInlineMeanings: Math.min(10, Math.max(1, merged.maxInlineMeanings)),
+  }
+}
+
 export async function loadUserSettings(): Promise<UserSettings> {
   try {
     if (Capacitor.isNativePlatform()) {
       const { value } = await Preferences.get({ key: STORAGE_KEY })
       if (!value) return { ...DEFAULT_SETTINGS }
-      return { ...DEFAULT_SETTINGS, ...(JSON.parse(value) as Partial<UserSettings>) }
+      const parsed = JSON.parse(value) as Partial<UserSettings>
+      return normalizeUserSettings(parsed)
     }
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...DEFAULT_SETTINGS }
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<UserSettings>) }
+    return normalizeUserSettings(JSON.parse(raw) as Partial<UserSettings>)
   } catch {
     return { ...DEFAULT_SETTINGS }
   }
 }
 
 export async function saveUserSettings(settings: UserSettings): Promise<void> {
-  const payload = JSON.stringify(settings)
+  const payload = JSON.stringify(normalizeUserSettings(settings))
   if (Capacitor.isNativePlatform()) {
     await Preferences.set({ key: STORAGE_KEY, value: payload })
     return
