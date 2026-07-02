@@ -224,11 +224,11 @@
 
 .reader-inline-gloss {
   position: absolute;
-  left: 0;
-  bottom: 100%;
+  left: var(--reader-inline-gloss-offset-x, 0px);
+  bottom: calc(100% + var(--reader-inline-gloss-offset-y, 0px));
   font-size: var(--reader-inline-gloss-size, 11px);
   line-height: 1.15;
-  color: #6b7280;
+  color: var(--reader-inline-gloss-color, #6b7280);
   white-space: nowrap;
   pointer-events: none;
   user-select: none;
@@ -524,6 +524,22 @@
 
 .reader-setting-row input[type='range'] {
   width: 100%;
+}
+
+.reader-setting-color-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.reader-setting-color-input {
+  width: 44px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
 }
 
 .reader-theme-grid {

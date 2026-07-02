@@ -1,11 +1,24 @@
 import type { WordEntry } from '../services/dictionary/types'
+import { splitTranslationMeanings } from './splitTranslationMeanings'
 
-export function formatInlineGloss(entry: WordEntry, maxMeanings: number): string {
+export interface InlineGlossFormatOptions {
+  maxPosCount: number
+  maxMeaningsPerPos: number
+}
+
+export function formatInlineGloss(
+  entry: WordEntry,
+  options: InlineGlossFormatOptions,
+): string {
+  const { maxPosCount, maxMeaningsPerPos } = options
+
   return entry.definitions
-    .slice(0, maxMeanings)
+    .slice(0, maxPosCount)
     .map((item) => {
       const pos = item.pos?.trim()
-      return pos ? `${pos} ${item.translation}` : item.translation
+      const meanings = splitTranslationMeanings(item.translation).slice(0, maxMeaningsPerPos)
+      const translation = meanings.join('；')
+      return pos ? `${pos} ${translation}` : translation
     })
     .join('；')
 }

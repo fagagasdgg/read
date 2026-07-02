@@ -44,7 +44,8 @@ read/
 │   │   │
 │   │   ├── lib/
 │   │   │   ├── examLevel.ts         # 考试等级比较（行间翻译过滤）
-│   │   │   ├── formatInlineGloss.ts # 行间释义文案格式化
+│   │   │   ├── formatInlineGloss.ts # 行间释义文案格式化（词性数 + 每词性释义数）
+│   │   │   ├── splitTranslationMeanings.ts # 拆分同一词性下的多个释义
 │   │   │   └── lemmatize.ts         # 词形还原
 │   │   │
 │   │   └── services/
@@ -102,7 +103,7 @@ read/
 | 书架 | `services/epub/library.ts` | 已导入书籍元数据 |
 | 阅读进度 | `services/epub/progress.ts` | chapterIndex + pageIndex |
 | 阅读设置存储 | `services/settings/readingSettings.ts` | Preferences / localStorage |
-| 用户设置 | `services/settings/userSettings.ts` | 英语水平、行间翻译 |
+| 用户设置 | `services/settings/userSettings.ts` | 英语水平、行间翻译词性/释义数、字号颜色偏移 |
 | 词典 | `services/dictionary/` | 联网查词 + 缓存 + 发音 |
 
 ## 计划中（尚未创建）

@@ -111,7 +111,10 @@ function applyRecordToSession(
     return null
   }
 
-  const text = formatInlineGloss(record, userSettings.maxInlineMeanings)
+  const text = formatInlineGloss(record, {
+    maxPosCount: userSettings.maxInlinePosCount,
+    maxMeaningsPerPos: userSettings.maxMeaningsPerPos,
+  })
   session.set(lemma, text)
   return text
 }
@@ -160,7 +163,8 @@ export function useInlineGlosses(
   }, [
     userSettings?.englishLevel,
     userSettings?.showInlineTranslation,
-    userSettings?.maxInlineMeanings,
+    userSettings?.maxInlinePosCount,
+    userSettings?.maxMeaningsPerPos,
   ])
 
   useEffect(() => {

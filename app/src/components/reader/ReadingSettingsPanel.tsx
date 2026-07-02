@@ -246,14 +246,76 @@ export function ReadingSettingsPanel({
           </p>
 
           <label className="reader-setting-row">
-            <span>行间最多显示 {userSettings.maxInlineMeanings} 个义项</span>
+            <span>最多显示 {userSettings.maxInlinePosCount} 个词性翻译</span>
             <input
               type="range"
               min={1}
               max={10}
               step={1}
-              value={userSettings.maxInlineMeanings}
-              onChange={(e) => updateUser({ maxInlineMeanings: Number(e.target.value) })}
+              value={userSettings.maxInlinePosCount}
+              onChange={(e) => updateUser({ maxInlinePosCount: Number(e.target.value) })}
+            />
+          </label>
+
+          <label className="reader-setting-row">
+            <span>每个词性最多显示 {userSettings.maxMeaningsPerPos} 个释义</span>
+            <input
+              type="range"
+              min={1}
+              max={10}
+              step={1}
+              value={userSettings.maxMeaningsPerPos}
+              onChange={(e) => updateUser({ maxMeaningsPerPos: Number(e.target.value) })}
+            />
+          </label>
+
+          <p className="reader-settings-note">
+            例如设为 2 + 2：显示 n. 前两个释义、adj. 前两个释义。
+          </p>
+
+          <label className="reader-setting-row">
+            <span>行间翻译字号 {userSettings.inlineGlossFontSize}px</span>
+            <input
+              type="range"
+              min={8}
+              max={16}
+              step={1}
+              value={userSettings.inlineGlossFontSize}
+              onChange={(e) => updateUser({ inlineGlossFontSize: Number(e.target.value) })}
+            />
+          </label>
+
+          <label className="reader-setting-row reader-setting-color-row">
+            <span>行间翻译颜色</span>
+            <input
+              type="color"
+              className="reader-setting-color-input"
+              value={userSettings.inlineGlossColor}
+              onChange={(e) => updateUser({ inlineGlossColor: e.target.value })}
+            />
+          </label>
+
+          <label className="reader-setting-row">
+            <span>水平偏移 {userSettings.inlineGlossOffsetX}px</span>
+            <input
+              type="range"
+              min={-20}
+              max={20}
+              step={1}
+              value={userSettings.inlineGlossOffsetX}
+              onChange={(e) => updateUser({ inlineGlossOffsetX: Number(e.target.value) })}
+            />
+          </label>
+
+          <label className="reader-setting-row">
+            <span>垂直偏移 {userSettings.inlineGlossOffsetY}px</span>
+            <input
+              type="range"
+              min={-20}
+              max={20}
+              step={1}
+              value={userSettings.inlineGlossOffsetY}
+              onChange={(e) => updateUser({ inlineGlossOffsetY: Number(e.target.value) })}
             />
           </label>
 
