@@ -1,13 +1,13 @@
 import { useState } from 'react'
-import { BookshelfScreen } from './components/bookshelf/BookshelfScreen'
+import { HomeShell } from './components/home/HomeShell'
 import { ReaderScreen } from './components/reader/ReaderScreen'
 import { DictDebugPage } from './pages/DictDebugPage'
 import './App.css'
 
-type AppView = 'bookshelf' | 'reading' | 'dict-debug'
+type AppView = 'home' | 'reading' | 'dict-debug'
 
 function App() {
-  const [view, setView] = useState<AppView>('bookshelf')
+  const [view, setView] = useState<AppView>('home')
   const [readingBookId, setReadingBookId] = useState<string | null>(null)
   const [devTapCount, setDevTapCount] = useState(0)
 
@@ -18,7 +18,7 @@ function App() {
 
   function exitBook() {
     setReadingBookId(null)
-    setView('bookshelf')
+    setView('home')
   }
 
   if (view === 'reading' && readingBookId) {
@@ -29,7 +29,7 @@ function App() {
     return (
       <main className="app-shell dev-only">
         <header className="dev-header">
-          <button type="button" onClick={() => setView('bookshelf')}>
+          <button type="button" onClick={() => setView('home')}>
             ← 返回书架
           </button>
           <span>词典联调（仅开发环境）</span>
@@ -41,9 +41,7 @@ function App() {
 
   return (
     <main className="app-shell bookshelf-app">
-      <BookshelfScreen
-        onOpenBook={openBook}
-      />
+      <HomeShell onOpenBook={openBook} />
       {import.meta.env.DEV && (
         <button
           type="button"

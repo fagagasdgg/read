@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
 import { Preferences } from '@capacitor/preferences'
+import { removeBookFromAllGroups } from './groups'
 
 export interface SavedBookMeta {
   id: string
@@ -127,6 +128,7 @@ export async function listSavedBooks(): Promise<SavedBookMeta[]> {
 }
 
 export async function removeSavedBook(bookId: string): Promise<void> {
+  await removeBookFromAllGroups(bookId)
   const books = (await readRegistry()).filter((b) => b.id !== bookId)
   await writeRegistry(books)
 

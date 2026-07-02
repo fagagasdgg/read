@@ -16,3 +16,13 @@ export {
   setBookHasCover,
 } from './library'
 export type { SavedBookMeta } from './library'
+export {
+  listBookGroups,
+  getGroupForBook,
+  createBookGroup,
+  renameBookGroup,
+  addBookToGroup,
+  removeBookFromGroup,
+  buildBookshelfLayout,
+} from './groups'
+export type { BookGroup } from './groups'
