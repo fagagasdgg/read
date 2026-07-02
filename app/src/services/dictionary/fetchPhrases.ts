@@ -14,16 +14,24 @@ interface YoudaoPhraseTr {
   l?: unknown
 }
 
+interface YoudaoPhraseFlatItem {
+  headword?: string
+  translation?: string
+}
+
 interface YoudaoPhraseItem {
   phr?: {
     headword?: unknown
+    translation?: string
     trs?: Array<{ tr?: unknown } | YoudaoPhraseTr>
   }
+  headword?: string
+  translation?: string
 }
 
 interface YoudaoPhraseResponse {
   phrs?: {
-    phrs?: YoudaoPhraseItem[] | string
+    phrs?: Array<YoudaoPhraseItem | YoudaoPhraseFlatItem> | string
   }
 }
 
@@ -78,8 +86,27 @@ function parseYoudaoPhrases(data: YoudaoPhraseResponse): FetchedPhrase[] {
   const items: FetchedPhrase[] = []
 
   for (const entry of raw) {
-    const phr = entry.phr
+    // jsonapi_s v4 扁平格式：{ headword, translation }
+    if (typeof entry.headword === 'string' && typeof entry.translation === 'string') {
+      const phrase = entry.headword.trim()
+      const translation = entry.translation.trim()
+      if (phrase && translation) {
+        items.push({ phrase, translation })
+      }
+      continue
+    }
+
+    // 旧版嵌套格式：{ phr: { headword, trs } }
+    const phr = 'phr' in entry ? entry.phr : undefined
     if (!phr) continue
+
+    if (typeof phr.translation === 'string' && phr.translation.trim()) {
+      const phrase = pickYoudaoText(phr.headword)
+      if (phrase) {
+        items.push({ phrase, translation: phr.translation.trim() })
+      }
+      continue
+    }
 
     const phrase = pickYoudaoText(phr.headword)
     const translations = (phr.trs ?? [])
