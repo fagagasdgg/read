@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
+import { getAllDictionarySourceIds } from './providers'
 import {
   isWordEntry,
   isWordNotFoundMarker,
@@ -45,7 +46,8 @@ export async function getCachedWord(lemma: string): Promise<WordEntry | null> {
 
 export async function isLemmaMarkedNotFound(lemma: string): Promise<boolean> {
   const record = await getCachedRecord(lemma)
-  return record !== null && isWordNotFoundMarker(record)
+  if (!record || !isWordNotFoundMarker(record)) return false
+  return !shouldRetryNotFound(record)
 }
 
 export async function getCachedRecords(
@@ -85,9 +87,21 @@ export async function setNotFoundLemma(lemma: string): Promise<void> {
     lemma,
     notFound: true,
     cachedAt: Date.now(),
+    triedSources: getAllDictionarySourceIds(),
   }
   const db = await getDb()
   await db.put(STORE, marker, lemma)
+}
+
+/** 旧版仅标记有道的 notFound 记录，可用备用信源重试 */
+export function shouldRetryNotFound(record: WordNotFoundMarker): boolean {
+  const tried = record.triedSources ?? ['youdao']
+  return getAllDictionarySourceIds().some((id) => !tried.includes(id))
+}
+
+export function normalizeNotFoundMarker(record: WordNotFoundMarker): WordNotFoundMarker {
+  if (record.triedSources?.length) return record
+  return { ...record, triedSources: ['youdao'] }
 }
 
 export async function listCachedWords(): Promise<WordEntry[]> {

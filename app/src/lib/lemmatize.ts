@@ -13,7 +13,10 @@ const IRREGULAR: Record<string, string> = {
 }
 
 export function normalizeWordToken(raw: string): string {
-  return raw.toLowerCase().replace(/[^a-z'-]/g, '')
+  return raw
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u2032\u00b4']/g, "'")
+    .replace(/[^a-z'-]/g, '')
 }
 
 export function toLemma(raw: string): string {

@@ -70,6 +70,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     viewportEl,
     chapterIndex,
     pageIndex,
+    pageHeight,
     layoutStable,
     userSettings,
   )

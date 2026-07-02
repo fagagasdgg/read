@@ -6,6 +6,7 @@ import {
   getCachedRecords,
   lookupLemmasBatch,
 } from '../../services/dictionary'
+import { shouldRetryNotFound } from '../../services/dictionary/cache'
 import { isWordNotFoundMarker } from '../../services/dictionary/types'
 import type { UserSettings } from '../../services/settings/userSettings'
 
@@ -21,6 +22,16 @@ function getChapterSession(chapterIndex: number): Map<string, string | null> {
   return session
 }
 
+function glossMapsEqual(a: Record<string, string>, b: Record<string, string>): boolean {
+  const aKeys = Object.keys(a)
+  const bKeys = Object.keys(b)
+  if (aKeys.length !== bKeys.length) return false
+  for (const key of aKeys) {
+    if (a[key] !== b[key]) return false
+  }
+  return true
+}
+
 function collectVisibleLemmas(contentEl: HTMLElement, viewportEl: HTMLElement): string[] {
   const bounds = viewportEl.getBoundingClientRect()
   const lemmas = new Set<string>()
@@ -29,6 +40,30 @@ function collectVisibleLemmas(contentEl: HTMLElement, viewportEl: HTMLElement): 
     const rect = el.getBoundingClientRect()
     if (rect.bottom <= bounds.top || rect.top >= bounds.bottom) continue
     if (rect.right <= bounds.left || rect.left >= bounds.right) continue
+
+    const lemma =
+      el.dataset.lemma || toLemma(el.dataset.word ?? el.textContent ?? '')
+    if (lemma) lemmas.add(lemma)
+  }
+
+  return [...lemmas]
+}
+
+function collectPageLemmas(
+  contentEl: HTMLElement,
+  viewportEl: HTMLElement,
+  pageOffset: number,
+): string[] {
+  const bounds = viewportEl.getBoundingClientRect()
+  const lemmas = new Set<string>()
+
+  for (const el of contentEl.querySelectorAll<HTMLElement>('.reader-word')) {
+    const rect = el.getBoundingClientRect()
+    const top = rect.top - bounds.top + pageOffset
+    const bottom = rect.bottom - bounds.top + pageOffset
+    const viewHeight = bounds.height
+
+    if (bottom <= 0 || top >= viewHeight) continue
 
     const lemma =
       el.dataset.lemma || toLemma(el.dataset.word ?? el.textContent ?? '')
@@ -59,6 +94,7 @@ function applyRecordToSession(
   if (!record) return null
 
   if (isWordNotFoundMarker(record)) {
+    if (shouldRetryNotFound(record)) return null
     session.set(lemma, null)
     return null
   }
@@ -94,6 +130,7 @@ export function useInlineGlosses(
   viewportEl: HTMLElement | null,
   chapterIndex: number,
   pageIndex: number,
+  pageHeight: number,
   layoutStable: boolean,
   userSettings: UserSettings | null,
 ): { glosses: Record<string, string>; loading: boolean } {
@@ -124,15 +161,20 @@ export function useInlineGlosses(
     const run = async () => {
       const lemmas = collectVisibleLemmas(contentEl, viewportEl)
       if (!lemmas.length) {
-        setGlosses({})
+        setGlosses((prev) => (Object.keys(prev).length ? {} : prev))
         setLoading(false)
         return
+      }
+
+      const sessionGlosses = glossesFromSession(session, lemmas)
+      if (!cancelled && runId === runIdRef.current) {
+        setGlosses((prev) => (glossMapsEqual(prev, sessionGlosses) ? prev : sessionGlosses))
       }
 
       const localGlosses = await hydrateGlossesFromLocal(session, lemmas, userSettings)
       if (cancelled || runId !== runIdRef.current) return
 
-      setGlosses(localGlosses)
+      setGlosses((prev) => (glossMapsEqual(prev, localGlosses) ? prev : localGlosses))
 
       const missing = lemmas.filter((lemma) => !session.has(lemma))
       if (!missing.length) {
@@ -153,7 +195,7 @@ export function useInlineGlosses(
           const text = session.get(lemma)
           if (text) next[lemma] = text
         }
-        setGlosses(next)
+        setGlosses((prev) => (glossMapsEqual(prev, next) ? prev : next))
       } finally {
         if (!cancelled && runId === runIdRef.current) {
           setLoading(false)
@@ -173,6 +215,43 @@ export function useInlineGlosses(
     pageIndex,
     layoutStable,
     userSettings,
+  ])
+
+  useEffect(() => {
+    if (
+      !userSettings?.showInlineTranslation ||
+      !contentEl ||
+      !viewportEl ||
+      !layoutStable ||
+      pageHeight <= 0
+    ) {
+      return
+    }
+
+    const session = getChapterSession(chapterIndex)
+    const offsets = [pageHeight, -pageHeight]
+
+    const timer = window.setTimeout(() => {
+      const prefetch = new Set<string>()
+      for (const offset of offsets) {
+        for (const lemma of collectPageLemmas(contentEl, viewportEl, offset)) {
+          if (!session.has(lemma)) prefetch.add(lemma)
+        }
+      }
+      if (prefetch.size) {
+        void lookupLemmasBatch([...prefetch], { prefetchVariants: false })
+      }
+    }, 120)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    contentEl,
+    viewportEl,
+    chapterIndex,
+    pageIndex,
+    pageHeight,
+    layoutStable,
+    userSettings?.showInlineTranslation,
   ])
 
   return { glosses, loading }

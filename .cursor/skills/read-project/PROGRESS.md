@@ -17,6 +17,7 @@
 | 2026-06-30 | v1 | 视口分页：按屏高切页、pageIndex 进度、底部导航固定可见 |
 | 2026-06-30 | v1 | 跨章上一页、进度保存修复（layoutStable + Preferences） |
 | 2026-06-30 | v1 | 行距上限 300%、英文字体栈；行间翻译 MVP + 英语水平 |
+| 2026-06-29 | v1 | 设置页可关闭/滚动；金山词霸备用查词；取词弯引号修复；翻页性能优化 |
 
 ## 一、需求清单总览
 
@@ -96,7 +97,7 @@
 | W-05 | 词形变体可点击查详情 | 已完成 | exactToken 按变体原词查询 |
 | W-06 | 笔记：添加/删除/显示开关 | 待开始 | |
 | W-07 | 「已掌握」开关（隐藏行间翻译） | 待开始 | |
-| W-08 | 联网词典查询（免费 API） | 已完成 | 有道 jsonapi_s + Vite 代理 |
+| W-08 | 联网词典查询（免费 API） | 已完成 | 有道主 + 金山词霸备；设置页展示信源 |
 | W-09 | 本地词典缓存 | 已完成 | IndexedDB |
 | W-10 | 词形还原（大小写/变体→原型） | 进行中 | compromise + 不规则表 |
 | W-11 | 导出已存单词为 JSON | 待开始 | 更多设置 |
@@ -141,7 +142,10 @@
 | BUG-009 | 多变体文案查词失败（meaner或more mean） | extractVariantLookupWord 取首个英文词 |
 | BUG-010 | 导入非 EPUB 显示 JSZip 原始报错 | importValidation 人性化提示 |
 | BUG-011 | 导入大 PDF 卡死 | 扩展名校验 + 50MB 上限 + 不 readData 进内存 |
-| BUG-012 | 多选 EPUB 只导入一本 | limit:0 批量处理 |
+| BUG-013 | 设置页占满屏无法点蒙版关闭 | 顶部关闭按钮 + max-height 滚动 |
+| BUG-014 | owl's / didn't 把 s 单独查词 | tokenize 弯引号归一 + 过滤孤立碎片 |
+| BUG-015 | 有道词库不足（如 nonsense） | 金山词霸签名 API 备用；旧 notFound 可重试 |
+| BUG-016 | 重读章节翻页略卡 | gloss 会话缓存优化 + 邻页预取 + layoutStable 50ms |
 
 ### 待规避（v1 历史问题，详见 KNOWN_ISSUES.md）
 

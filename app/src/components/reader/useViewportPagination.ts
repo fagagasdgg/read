@@ -66,7 +66,7 @@ export function useViewportPagination(
     }
 
     setLayoutStable(false)
-    const timer = window.setTimeout(() => setLayoutStable(true), 150)
+    const timer = window.setTimeout(() => setLayoutStable(true), 50)
     return () => window.clearTimeout(timer)
   }, [contentEl, windowEl, measuring, pageCount, pageHeight, remeasureKey])
 

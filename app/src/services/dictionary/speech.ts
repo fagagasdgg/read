@@ -24,17 +24,35 @@ export function playSpeechWord(word: string, type: 1 | 2): void {
   })
 }
 
-/** @deprecated 请使用 playSpeechWord */
+/** @deprecated 优先使用 playSpeechWord；iciba 等外链发音可直接传入完整 URL */
 export function playSpeech(url: string): void {
   if (!url) return
-  try {
-    const parsed = new URL(url)
-    const audio = parsed.searchParams.get('audio')
-    const type = Number(parsed.searchParams.get('type') ?? 2) as 1 | 2
-    if (audio) {
-      playSpeechWord(decodeURIComponent(audio), type === 1 ? 1 : 2)
+
+  if (url.includes('dict.youdao.com/dictvoice')) {
+    try {
+      const parsed = new URL(url)
+      const audio = parsed.searchParams.get('audio')
+      const type = Number(parsed.searchParams.get('type') ?? 2) as 1 | 2
+      if (audio) {
+        playSpeechWord(decodeURIComponent(audio), type === 1 ? 1 : 2)
+        return
+      }
+    } catch {
+      // fall through
     }
-  } catch {
-    // ignore
   }
+
+  if (playing) {
+    playing.pause()
+    playing = null
+  }
+
+  const audio = new Audio(url)
+  playing = audio
+  audio.addEventListener('ended', () => {
+    if (playing === audio) playing = null
+  })
+  void audio.play().catch(() => {
+    if (playing === audio) playing = null
+  })
 }

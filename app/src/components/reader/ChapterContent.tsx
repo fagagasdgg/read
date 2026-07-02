@@ -1,4 +1,11 @@
-import { type ReactNode, useMemo, createElement } from 'react'
+import {
+  createContext,
+  memo,
+  type ReactNode,
+  useContext,
+  useMemo,
+  createElement,
+} from 'react'
 import { toLemma } from '../../lib/lemmatize'
 import { splitTextSegments } from './tokenize'
 
@@ -9,17 +16,71 @@ const BLOCK_TAGS = new Set([
 
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'SVG', 'LINK', 'META', 'HEAD'])
 
+const GlossContext = createContext<Record<string, string>>({})
+
 interface ChapterContentProps {
   html: string
   onWordTap: (rawWord: string) => void
   glosses?: Record<string, string>
 }
 
+interface ReaderWordProps {
+  wordKey: string
+  value: string
+  lemma: string
+  onWordTap: (w: string) => void
+}
+
+const ReaderWord = memo(function ReaderWord({
+  wordKey,
+  value,
+  lemma,
+  onWordTap,
+}: ReaderWordProps) {
+  const glosses = useContext(GlossContext)
+  const gloss = glosses[lemma]
+
+  if (!gloss) {
+    return (
+      <span
+        key={wordKey}
+        className="reader-word"
+        data-word={value}
+        data-lemma={lemma}
+        onClick={(e) => {
+          e.stopPropagation()
+          onWordTap(value)
+        }}
+      >
+        {value}
+      </span>
+    )
+  }
+
+  return (
+    <span key={wordKey} className="reader-word-wrap">
+      <span className="reader-inline-gloss" aria-hidden>
+        {gloss}
+      </span>
+      <span
+        className="reader-word reader-word-has-gloss"
+        data-word={value}
+        data-lemma={lemma}
+        onClick={(e) => {
+          e.stopPropagation()
+          onWordTap(value)
+        }}
+      >
+        {value}
+      </span>
+    </span>
+  )
+})
+
 function renderTextNode(
   text: string,
   key: string,
   onWordTap: (w: string) => void,
-  glosses: Record<string, string>,
 ): ReactNode[] {
   return splitTextSegments(text).map((seg, i) => {
     if (seg.type === 'text') {
@@ -27,42 +88,14 @@ function renderTextNode(
     }
 
     const lemma = toLemma(seg.value)
-    const gloss = glosses[lemma]
-
-    if (!gloss) {
-      return (
-        <span
-          key={`${key}-w-${i}`}
-          className="reader-word"
-          data-word={seg.value}
-          data-lemma={lemma}
-          onClick={(e) => {
-            e.stopPropagation()
-            onWordTap(seg.value)
-          }}
-        >
-          {seg.value}
-        </span>
-      )
-    }
-
     return (
-      <span key={`${key}-w-${i}`} className="reader-word-wrap">
-        <span className="reader-inline-gloss" aria-hidden>
-          {gloss}
-        </span>
-        <span
-          className="reader-word reader-word-has-gloss"
-          data-word={seg.value}
-          data-lemma={lemma}
-          onClick={(e) => {
-            e.stopPropagation()
-            onWordTap(seg.value)
-          }}
-        >
-          {seg.value}
-        </span>
-      </span>
+      <ReaderWord
+        key={`${key}-w-${i}`}
+        wordKey={`${key}-w-${i}`}
+        value={seg.value}
+        lemma={lemma}
+        onWordTap={onWordTap}
+      />
     )
   })
 }
@@ -71,12 +104,11 @@ function renderNode(
   node: ChildNode,
   key: string,
   onWordTap: (w: string) => void,
-  glosses: Record<string, string>,
 ): ReactNode {
   if (node.nodeType === Node.TEXT_NODE) {
     const text = node.textContent ?? ''
     if (!text.trim() && !text.includes(' ')) return null
-    return <>{renderTextNode(text, key, onWordTap, glosses)}</>
+    return <>{renderTextNode(text, key, onWordTap)}</>
   }
 
   if (node.nodeType !== Node.ELEMENT_NODE) return null
@@ -86,7 +118,7 @@ function renderNode(
   if (SKIP_TAGS.has(tag)) return null
 
   const children = Array.from(el.childNodes)
-    .map((child, i) => renderNode(child, `${key}-${i}`, onWordTap, glosses))
+    .map((child, i) => renderNode(child, `${key}-${i}`, onWordTap))
     .filter(Boolean)
 
   if (tag === 'BR') return <br key={key} />
@@ -111,9 +143,13 @@ export function ChapterContent({ html, onWordTap, glosses = {} }: ChapterContent
     const root = doc.getElementById('root')
     if (!root) return null
     return Array.from(root.childNodes).map((node, i) =>
-      renderNode(node, `n-${i}`, onWordTap, glosses),
+      renderNode(node, `n-${i}`, onWordTap),
     )
-  }, [html, onWordTap, glosses])
+  }, [html, onWordTap])
 
-  return <article className="chapter-content">{content}</article>
+  return (
+    <GlossContext.Provider value={glosses}>
+      <article className="chapter-content">{content}</article>
+    </GlossContext.Provider>
+  )
 }

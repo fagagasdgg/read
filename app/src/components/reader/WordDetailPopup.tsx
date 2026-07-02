@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { extractVariantLookupWord } from '../../lib/variantToken'
-import { lookupWord, playSpeechWord } from '../../services/dictionary'
+import { lookupWord, playSpeech, playSpeechWord, getDictionarySourceLabel } from '../../services/dictionary'
 import type { WordEntry } from '../../services/dictionary'
 
 export interface WordLookupRequest {
@@ -68,6 +68,7 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
           <>
             <div className="popup-word-title">
               <strong>{entry.lemma}</strong>
+              <span className="popup-source">来源：{getDictionarySourceLabel(entry.source)}</span>
             </div>
 
             <div className="popup-phonetics">
@@ -79,7 +80,10 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
                     type="button"
                     className="popup-audio-btn"
                     aria-label="播放美音"
-                    onClick={() => playSpeechWord(entry.lemma, 2)}
+                    onClick={() => {
+                      if (entry.source === 'iciba' && entry.usSpeechUrl) playSpeech(entry.usSpeechUrl)
+                      else playSpeechWord(entry.lemma, 2)
+                    }}
                   >
                     🔊
                   </button>
@@ -92,7 +96,10 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
                   type="button"
                   className="popup-audio-btn"
                   aria-label="播放英音"
-                  onClick={() => playSpeechWord(entry.lemma, 1)}
+                  onClick={() => {
+                    if (entry.source === 'iciba' && entry.ukSpeechUrl) playSpeech(entry.ukSpeechUrl)
+                    else playSpeechWord(entry.lemma, 1)
+                  }}
                 >
                   🔊
                 </button>

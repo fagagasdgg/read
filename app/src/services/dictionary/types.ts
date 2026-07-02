@@ -1,3 +1,5 @@
+export type DictionarySourceId = 'youdao' | 'iciba'
+
 export type ExamLevel =
   | '中考'
   | '高考'
@@ -28,14 +30,15 @@ export interface WordEntry {
   definitions: WordDefinition[]
   forms: WordForm[]
   cachedAt: number
-  source: 'youdao'
+  source: DictionarySourceId
 }
 
-/** 有道查不到的词，避免重复联网 */
+/** 所有信源都查不到的词，避免重复联网 */
 export interface WordNotFoundMarker {
   lemma: string
   notFound: true
   cachedAt: number
+  triedSources: DictionarySourceId[]
 }
 
 export type DictionaryCacheValue = WordEntry | WordNotFoundMarker

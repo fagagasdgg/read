@@ -6,9 +6,10 @@ import {
   isLemmaMarkedNotFound,
   setCachedWord,
   setNotFoundLemma,
+  shouldRetryNotFound,
 } from './cache'
-import { fetchFromYoudao } from './youdao'
-import { isWordEntry, isWordNotFoundMarker, type LookupOptions, type WordEntry } from './types'
+import { fetchWordFromProviders } from './lookup'
+import { isWordEntry, isWordNotFoundMarker, type DictionaryCacheValue, type LookupOptions, type WordEntry } from './types'
 
 export type {
   LookupOptions,
@@ -18,6 +19,7 @@ export type {
   ExamLevel,
   WordNotFoundMarker,
   DictionaryCacheValue,
+  DictionarySourceId,
 } from './types'
 export {
   exportCachedWordsJson,
@@ -25,6 +27,7 @@ export {
   getDictionaryCacheStats,
   listCachedWords,
 } from './cache'
+export { DICTIONARY_SOURCES, getDictionarySourceLabel } from './providers'
 export { playSpeech, playSpeechWord } from './speech'
 
 async function cacheVariantForms(entry: WordEntry): Promise<void> {
@@ -40,7 +43,7 @@ async function cacheVariantForms(entry: WordEntry): Promise<void> {
     if (existing) return
 
     try {
-      const variantEntry = await fetchFromYoudao(lemma)
+      const variantEntry = await fetchWordFromProviders(lemma)
       if (variantEntry) {
         await setCachedWord(variantEntry)
         return
@@ -54,6 +57,11 @@ async function cacheVariantForms(entry: WordEntry): Promise<void> {
   await Promise.all(tasks)
 }
 
+function getSkipSources(record: DictionaryCacheValue | undefined) {
+  if (!record || !isWordNotFoundMarker(record)) return []
+  return record.triedSources ?? ['youdao']
+}
+
 export async function lookupWordDetailed(
   rawWord: string,
   options: LookupOptions = {},
@@ -61,15 +69,13 @@ export async function lookupWordDetailed(
   const lemma = options.exactToken ? normalizeWordToken(rawWord) : toLemma(rawWord)
   if (!lemma) return null
 
-  if (!options.forceRefresh) {
-    const record = await getCachedRecord(lemma)
-    if (record) {
-      if (isWordNotFoundMarker(record)) return null
-      return { entry: record, fromCache: true }
-    }
+  const record = !options.forceRefresh ? await getCachedRecord(lemma) : null
+  if (record) {
+    if (isWordNotFoundMarker(record) && !shouldRetryNotFound(record)) return null
+    if (isWordEntry(record)) return { entry: record, fromCache: true }
   }
 
-  const entry = await fetchFromYoudao(lemma)
+  const entry = await fetchWordFromProviders(lemma, { skipSources: getSkipSources(record ?? undefined) })
   if (!entry) {
     await setNotFoundLemma(lemma)
     return null
@@ -102,7 +108,12 @@ export async function lookupLemmasBatch(
     if (isWordEntry(record)) found.set(lemma, record)
   }
 
-  const missing = unique.filter((lemma) => !records.has(lemma))
+  const missing = unique.filter((lemma) => {
+    const record = records.get(lemma)
+    if (!record) return true
+    if (isWordNotFoundMarker(record)) return shouldRetryNotFound(record)
+    return false
+  })
   if (!missing.length) return found
 
   const concurrency = 6
@@ -111,8 +122,11 @@ export async function lookupLemmasBatch(
   async function worker(): Promise<void> {
     while (index < missing.length) {
       const lemma = missing[index++]
+      const prior = records.get(lemma)
       try {
-        const entry = await fetchFromYoudao(lemma)
+        const entry = await fetchWordFromProviders(lemma, {
+          skipSources: getSkipSources(prior),
+        })
         if (!entry) {
           await setNotFoundLemma(lemma)
           continue
