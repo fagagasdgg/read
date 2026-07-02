@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AppToast } from '../common/AppToast'
 import {
   type BookGroup,
   type SavedBookMeta,
@@ -377,9 +378,9 @@ export function BookshelfScreen({ onOpenBook }: BookshelfScreenProps) {
         </div>
       )}
 
-      {loading && <p className="bookshelf-toast">{statusText || '处理中…'}</p>}
-      {!loading && statusText && <p className="bookshelf-toast bookshelf-toast-ok">{statusText}</p>}
-      {error && <pre className="bookshelf-error">{error}</pre>}
+      {loading && <AppToast message={statusText || '处理中…'} />}
+      {!loading && statusText && <AppToast message={statusText} variant="ok" />}
+      {error && <AppToast message={error} variant="error" />}
     </div>
   )
 }

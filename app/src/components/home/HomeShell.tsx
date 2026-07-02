@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { BookshelfScreen } from '../bookshelf/BookshelfScreen'
 import { NotesScreen } from '../notes/NotesScreen'
+import { AppSettingsScreen } from '../settings/AppSettingsScreen'
 
-export type HomeTab = 'bookshelf' | 'notes'
+export type HomeTab = 'bookshelf' | 'notes' | 'settings'
 
 interface HomeShellProps {
   onOpenBook: (bookId: string) => void
@@ -20,6 +21,9 @@ export function HomeShell({ onOpenBook }: HomeShellProps) {
           </section>
           <section className="home-panel" aria-hidden={tab !== 'notes'}>
             <NotesScreen />
+          </section>
+          <section className="home-panel" aria-hidden={tab !== 'settings'}>
+            <AppSettingsScreen />
           </section>
         </div>
       </div>
@@ -44,6 +48,16 @@ export function HomeShell({ onOpenBook }: HomeShellProps) {
             📝
           </span>
           <span>笔记</span>
+        </button>
+        <button
+          type="button"
+          className={`home-tab-btn${tab === 'settings' ? ' active' : ''}`}
+          onClick={() => setTab('settings')}
+        >
+          <span className="home-tab-icon" aria-hidden>
+            ⚙️
+          </span>
+          <span>设置</span>
         </button>
       </nav>
     </div>

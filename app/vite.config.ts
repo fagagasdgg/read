@@ -21,6 +21,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/iciba/, ''),
       },
+      '/api/youdao-fanyi': {
+        target: 'https://fanyi.youdao.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/youdao-fanyi/, ''),
+      },
     },
   },
 })

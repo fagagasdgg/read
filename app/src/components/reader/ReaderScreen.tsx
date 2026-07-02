@@ -21,8 +21,10 @@ import {
 import { ChapterContent } from './ChapterContent'
 import { ReaderControlPanel } from './ReaderControlPanel'
 import { ReadingSettingsPanel } from './ReadingSettingsPanel'
+import { SelectionToolbar } from './SelectionToolbar'
 import { TocPanel } from './TocPanel'
 import { useInlineGlosses } from './useInlineGlosses'
+import { useTextSelection } from './useTextSelection'
 import { useViewportPagination, shouldWaitForMultiPageLand } from './useViewportPagination'
 import { WordDetailPopup, type WordLookupRequest } from './WordDetailPopup'
 
@@ -74,6 +76,8 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     layoutStable,
     userSettings,
   )
+
+  const { selection, clearSelection } = useTextSelection(contentEl)
 
   const chapter = book?.chapters[chapterIndex]
   const theme = getThemeById(readingSettings?.themeId ?? 'parchment')
@@ -416,11 +420,20 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
 
       {overlay === 'settings' && readingSettings && userSettings && (
         <ReadingSettingsPanel
+          bookId={book.id}
           settings={readingSettings}
           userSettings={userSettings}
           onChange={setReadingSettings}
           onUserChange={setUserSettings}
           onClose={() => setOverlay(null)}
+        />
+      )}
+
+      {selection && !overlay && !wordLookup && (
+        <SelectionToolbar
+          bookId={book.id}
+          selection={selection}
+          onClear={clearSelection}
         />
       )}
 

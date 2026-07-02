@@ -1,23 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
+import { getDictionaryCacheStats } from '../../services/dictionary'
 import {
-  DICTIONARY_SOURCES,
-  formatSourceCheckTime,
-  getDictionaryCacheStats,
-  getDictionarySourceStatus,
-  probeDictionarySources,
-  subscribeDictionarySourceStatus,
-  type SourceStatusView,
-} from '../../services/dictionary'
-import {
-  formatBackupDirectoryLabel,
-  loadBackupDirectorySettings,
-  pickBackupDirectory,
-  type BackupDirectorySettings,
-} from '../../services/settings/backupDirectory'
+  getBookDefaultNotebookId,
+  setBookDefaultNotebookId,
+} from '../../services/notes/bookNotebook'
+import { listNotebooks, type NotebookMeta } from '../../services/notes/notebooks'
 import { getMasteredWordCount, subscribeMasteredWords } from '../../services/words/mastered'
+import { getLemmaPhraseWordCount } from '../../services/words/phrases'
 import { SettingStepper } from './SettingStepper'
 import {
-  ENGLISH_LEVEL_OPTIONS,
   INLINE_GLOSS_COLORS,
   buildInlineGlossResetPatch,
   type UserSettings,
@@ -31,6 +22,7 @@ import {
 } from '../../services/settings/readingSettings'
 
 interface ReadingSettingsPanelProps {
+  bookId: string
   settings: ReadingSettings
   userSettings: UserSettings
   onChange: (settings: ReadingSettings) => void
@@ -38,32 +30,8 @@ interface ReadingSettingsPanelProps {
   onClose: () => void
 }
 
-function mergeSourceViews(staticSources: typeof DICTIONARY_SOURCES, dynamic: SourceStatusView[]) {
-  const map = new Map(dynamic.map((item) => [item.id, item]))
-  return staticSources.map((source) => {
-    const status = map.get(source.id)
-    if (status) return { ...source, status }
-    return {
-      ...source,
-      status: {
-        id: source.id,
-        label: source.label,
-        role: source.role,
-        health: 'unknown' as const,
-        healthLabel: '未检测',
-        totalChecks: 0,
-        hitCount: 0,
-        missCount: 0,
-        errorCount: 0,
-        successRate: null,
-        lastCheckAt: null,
-        lastErrorMessage: '',
-      },
-    }
-  })
-}
-
 export function ReadingSettingsPanel({
+  bookId,
   settings,
   userSettings,
   onChange,
@@ -71,41 +39,33 @@ export function ReadingSettingsPanel({
   onClose,
 }: ReadingSettingsPanelProps) {
   const [cacheStats, setCacheStats] = useState({ wordCount: 0, notFoundCount: 0 })
-  const [sourceViews, setSourceViews] = useState<SourceStatusView[]>([])
-  const [probing, setProbing] = useState(false)
   const [masteredCount, setMasteredCount] = useState(0)
-  const [backupDir, setBackupDir] = useState<BackupDirectorySettings | null>(null)
-  const [pickingDir, setPickingDir] = useState(false)
-  const [dirMessage, setDirMessage] = useState('')
+  const [phraseWordCount, setPhraseWordCount] = useState(0)
+  const [notebooks, setNotebooks] = useState<NotebookMeta[]>([])
+  const [defaultNotebookId, setDefaultNotebookId] = useState<string>('')
 
   const refreshStats = useCallback(async () => {
-    const [cache, sources, mastered, dir] = await Promise.all([
+    const [cache, mastered, phraseWords, nbList, bookNb] = await Promise.all([
       getDictionaryCacheStats(),
-      getDictionarySourceStatus(),
       getMasteredWordCount(),
-      loadBackupDirectorySettings(),
+      getLemmaPhraseWordCount(),
+      listNotebooks(),
+      getBookDefaultNotebookId(bookId),
     ])
     setCacheStats(cache)
-    setSourceViews(sources)
     setMasteredCount(mastered)
-    setBackupDir(dir)
-  }, [])
+    setPhraseWordCount(phraseWords)
+    setNotebooks(nbList)
+    setDefaultNotebookId(bookNb ?? '')
+  }, [bookId])
 
   useEffect(() => {
     void refreshStats()
-    const unsubSources = subscribeDictionarySourceStatus(() => {
-      void getDictionarySourceStatus().then(setSourceViews)
-    })
     const unsubMastered = subscribeMasteredWords(() => {
       void getMasteredWordCount().then(setMasteredCount)
     })
-    return () => {
-      unsubSources()
-      unsubMastered()
-    }
+    return unsubMastered
   }, [refreshStats])
-
-  const sourcesWithStatus = mergeSourceViews(DICTIONARY_SOURCES, sourceViews)
 
   function updateReading(partial: Partial<ReadingSettings>) {
     const next = { ...settings, ...partial }
@@ -119,30 +79,10 @@ export function ReadingSettingsPanel({
     void saveUserSettings(next)
   }
 
-  async function handleProbeSources() {
-    setProbing(true)
-    try {
-      const next = await probeDictionarySources()
-      setSourceViews(next)
-    } finally {
-      setProbing(false)
-    }
-  }
-
-  async function handlePickBackupDirectory() {
-    setPickingDir(true)
-    setDirMessage('')
-    try {
-      const next = await pickBackupDirectory()
-      if (next) {
-        setBackupDir(next)
-        setDirMessage('默认备份目录已更新')
-      }
-    } catch (err) {
-      setDirMessage(err instanceof Error ? err.message : '选择目录失败')
-    } finally {
-      setPickingDir(false)
-    }
+  async function handleDefaultNotebookChange(notebookId: string) {
+    const nextId = notebookId || null
+    setDefaultNotebookId(notebookId)
+    await setBookDefaultNotebookId(bookId, nextId)
   }
 
   return (
@@ -156,6 +96,8 @@ export function ReadingSettingsPanel({
         </header>
 
         <div className="reader-settings-body">
+          <h4 className="reader-settings-subtitle">排版</h4>
+
           <SettingStepper
             label="字号"
             value={settings.fontSize}
@@ -223,25 +165,8 @@ export function ReadingSettingsPanel({
             />
           </label>
 
-          <label className="reader-setting-row">
-            <span>你的英语水平</span>
-            <select
-              className="reader-level-select"
-              value={userSettings.englishLevel}
-              onChange={(e) =>
-                updateUser({ englishLevel: e.target.value as UserSettings['englishLevel'] })
-              }
-            >
-              {ENGLISH_LEVEL_OPTIONS.map((level) => (
-                <option key={level.id} value={level.id}>
-                  {level.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
           <p className="reader-settings-note">
-            仅对高于你所选水平的单词显示行间释义。
+            英语水平请在应用「设置」页调整，影响行间释义显示阈值。
           </p>
 
           <SettingStepper
@@ -323,76 +248,24 @@ export function ReadingSettingsPanel({
 
           <div className="reader-settings-divider" />
 
-          <div className="reader-dict-sources-header">
-            <h4 className="reader-settings-subtitle">查词信源</h4>
-            <button
-              type="button"
-              className="reader-dict-probe-btn"
-              onClick={() => void handleProbeSources()}
-              disabled={probing}
+          <h4 className="reader-settings-subtitle">本书笔记</h4>
+          <label className="reader-setting-row">
+            <span>默认保存笔记本</span>
+            <select
+              className="reader-level-select"
+              value={defaultNotebookId}
+              onChange={(e) => void handleDefaultNotebookChange(e.target.value)}
             >
-              {probing ? '检测中…' : '检测信源'}
-            </button>
-          </div>
-
-          <ul className="reader-dict-sources">
-            {sourcesWithStatus.map(({ id, label, role, description, status }) => (
-              <li key={id} className="reader-dict-source-item">
-                <div className="reader-dict-source-top">
-                  <span className="reader-dict-source-name">
-                    {label}
-                    <em className={`reader-dict-source-role reader-dict-source-role-${role}`}>
-                      {role === 'primary' ? '主' : '备'}
-                    </em>
-                  </span>
-                  <span className={`reader-dict-health reader-dict-health-${status.health}`}>
-                    {status.healthLabel}
-                  </span>
-                </div>
-                <span className="reader-dict-source-desc">{description}</span>
-                <span className="reader-dict-source-metrics">
-                  {status.totalChecks > 0 ? (
-                    <>
-                      可用率 <strong>{status.successRate ?? 0}%</strong>
-                      <span className="reader-dict-metric-sep">·</span>
-                      命中 {status.hitCount}
-                      <span className="reader-dict-metric-sep">·</span>
-                      失败 {status.errorCount}
-                    </>
-                  ) : (
-                    '尚无查词记录，可点「检测信源」'
-                  )}
-                </span>
-                <span className="reader-dict-source-time">
-                  最近检测：{formatSourceCheckTime(status.lastCheckAt)}
-                </span>
-                {status.lastErrorMessage && status.health !== 'healthy' && (
-                  <span className="reader-dict-source-error">{status.lastErrorMessage}</span>
-                )}
-              </li>
-            ))}
-          </ul>
+              <option value="">每次保存时选择</option>
+              {notebooks.map((nb) => (
+                <option key={nb.id} value={nb.id}>
+                  {nb.title}
+                </option>
+              ))}
+            </select>
+          </label>
           <p className="reader-settings-note">
-            阅读时自动累计各信源状态；有道未命中时自动尝试金山词霸。
-          </p>
-
-          <div className="reader-settings-divider" />
-
-          <h4 className="reader-settings-subtitle">数据备份目录</h4>
-          <p className="reader-backup-dir-path">
-            当前目录：<strong>{formatBackupDirectoryLabel(backupDir ?? { displayPath: '', nativePath: '', webDirectoryName: '', updatedAt: 0 })}</strong>
-          </p>
-          <button
-            type="button"
-            className="reader-backup-dir-btn"
-            onClick={() => void handlePickBackupDirectory()}
-            disabled={pickingDir}
-          >
-            {pickingDir ? '打开选择器…' : '选择默认保存目录'}
-          </button>
-          {dirMessage && <p className="reader-backup-dir-message">{dirMessage}</p>}
-          <p className="reader-settings-note">
-            导入/导出功能开发完成后，将在此目录读写词典、笔记、已掌握单词等数据。卸载重装后可通过导入恢复。
+            选段翻译或深度解析后存笔记时，将优先保存到此笔记本；未设置则每次弹出选择。
           </p>
 
           <div className="reader-settings-divider" />
@@ -404,6 +277,11 @@ export function ReadingSettingsPanel({
             查不到已标记：<strong>{cacheStats.notFoundCount}</strong>
             <br />
             已掌握单词：<strong>{masteredCount}</strong>
+            <br />
+            已添加词组的单词：<strong>{phraseWordCount}</strong>
+          </p>
+          <p className="reader-settings-note">
+            查词信源、数据备份等应用级设置请前往首页「设置」页。
           </p>
         </div>
       </div>

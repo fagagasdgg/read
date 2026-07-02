@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { AppToast, type AppToastVariant } from '../common/AppToast'
 import {
   createNotebook,
   listNotebooks,
@@ -20,6 +21,7 @@ export function NotesScreen() {
   const [notebooks, setNotebooks] = useState<NotebookMeta[]>([])
   const [openNotebookId, setOpenNotebookId] = useState<string | null>(null)
   const [statusText, setStatusText] = useState('')
+  const [statusVariant, setStatusVariant] = useState<AppToastVariant>('ok')
 
   const refresh = useCallback(async () => {
     setNotebooks(await listNotebooks())
@@ -29,14 +31,29 @@ export function NotesScreen() {
     void refresh()
   }, [refresh])
 
+  function showToast(message: string, variant: AppToastVariant = 'ok') {
+    setStatusVariant(variant)
+    setStatusText(message)
+    setTimeout(() => setStatusText(''), 2500)
+  }
+
   async function handleCreate() {
     const input = window.prompt('笔记本名称', '')
     if (input === null) return
 
-    const notebook = await createNotebook(input || undefined)
-    await refresh()
-    setStatusText(`已创建「${notebook.title}」`)
-    setTimeout(() => setStatusText(''), 2000)
+    const title = input.trim()
+    if (!title) {
+      showToast('笔记本名称不能为空', 'error')
+      return
+    }
+
+    try {
+      const notebook = await createNotebook(title)
+      await refresh()
+      showToast(`已创建「${notebook.title}」`)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '创建失败', 'error')
+    }
   }
 
   async function handleRemove(id: string, title: string) {
@@ -113,7 +130,7 @@ export function NotesScreen() {
         )}
       </div>
 
-      {statusText && <p className="bookshelf-toast bookshelf-toast-ok">{statusText}</p>}
+      <AppToast message={statusText} variant={statusVariant} />
     </div>
   )
 }

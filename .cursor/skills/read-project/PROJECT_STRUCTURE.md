@@ -17,7 +17,7 @@ read/
 │   └── build-apk.yml                # 推送 main 自动打 debug APK
 │
 ├── app/                             # 主应用（Capacitor + React + TypeScript）
-│   ├── vite.config.ts               # Vite；含 /api/youdao 代理
+│   ├── vite.config.ts               # Vite；含 /api/youdao、/api/youdao-fanyi 代理
 │   ├── capacitor.config.ts          # Capacitor；CapacitorHttp
 │   │
 │   ├── src/
@@ -31,10 +31,15 @@ read/
 │   │   ├── components/bookshelf/
 │   │   │   └── BookshelfScreen.tsx  # 书架网格、分组、导入删除
 │   │   ├── components/home/
-│   │   │   └── HomeShell.tsx        # 底部 Tab：书架 / 笔记
+│   │   │   └── HomeShell.tsx        # 底部 Tab：书架 / 笔记 / 设置
 │   │   ├── components/notes/
 │   │   │   ├── NotesScreen.tsx      # 笔记本列表
-│   │   │   └── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页）
+│   │   │   ├── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页）
+│   │   │   └── NotebookPickerSheet.tsx  # 保存笔记时选择笔记本
+│   │   ├── components/settings/
+│   │   │   ├── AppSettingsScreen.tsx    # 应用级设置（英语水平、备份、信源）
+│   │   │   ├── DictionarySourcesSection.tsx
+│   │   │   └── BackupDirectorySection.tsx
 │   │   │
 │   │   ├── components/reader/
 │   │   │   ├── ReaderScreen.tsx     # 阅读器主屏（视口分页、翻页、点词、面板）
@@ -46,7 +51,9 @@ read/
 │   │   │   ├── ReaderControlPanel.tsx # 底部房子唤出的控制面板
 │   │   │   ├── SettingStepper.tsx   # 设置项步进器（防滚动误触）
 │   │   │   ├── TocPanel.tsx         # 目录/笔记侧栏
-│   │   │   ├── ReadingSettingsPanel.tsx # 字号/行距/字体/背景/信源/导出
+│   │   │   ├── ReadingSettingsPanel.tsx # 排版、行间翻译、本书默认笔记本
+│   │   │   ├── SelectionToolbar.tsx   # 选段：复制、传统翻译、存笔记
+│   │   │   ├── useTextSelection.ts    # 阅读区文本选区检测
 │   │   │   └── tokenize.ts          # 英文单词切分
 │   │   │
 │   │   ├── lib/
@@ -72,7 +79,11 @@ read/
 │   │       │   ├── mastered.ts      # 已掌握单词列表
 │   │       │   └── phrases.ts       # 按 lemma 存储词组（联网+手动）
 │   │       ├── notes/
-│   │       │   └── notebooks.ts     # 笔记本与句子条目结构化存储
+│   │       │   ├── notebooks.ts     # 笔记本与句子条目结构化存储
+│   │       │   └── bookNotebook.ts  # 每本书默认保存笔记本
+│   │       ├── translation/
+│   │       │   ├── traditionalTranslate.ts # 有道传统翻译
+│   │       │   └── formatTranslation.ts
 │   │       ├── epub/
 │   │       │   ├── groups.ts        # 书架分组 CRUD
 │   │       │   ├── parser.ts        # EPUB 解压、OPF/spine、插图 blob

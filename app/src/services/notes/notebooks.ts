@@ -50,6 +50,30 @@ function defaultTitle(count: number): string {
   return `笔记本 ${count + 1}`
 }
 
+function normalizeTitleKey(title: string): string {
+  return title.trim().toLowerCase()
+}
+
+export async function isNotebookTitleTaken(
+  title: string,
+  excludeId?: string,
+): Promise<boolean> {
+  const key = normalizeTitleKey(title)
+  if (!key) return false
+  const notebooks = await readRegistry()
+  return notebooks.some(
+    (item) => item.id !== excludeId && normalizeTitleKey(item.title) === key,
+  )
+}
+
+function pickUniqueDefaultTitle(notebooks: NotebookMeta[]): string {
+  let index = notebooks.length
+  while (notebooks.some((item) => normalizeTitleKey(item.title) === normalizeTitleKey(defaultTitle(index)))) {
+    index += 1
+  }
+  return defaultTitle(index)
+}
+
 async function readRegistry(): Promise<NotebookMeta[]> {
   try {
     if (Capacitor.isNativePlatform()) {
@@ -165,9 +189,16 @@ export async function listNotebooks(): Promise<NotebookMeta[]> {
 export async function createNotebook(title?: string): Promise<NotebookMeta> {
   const notebooks = await readRegistry()
   const now = Date.now()
+  const trimmed = title?.trim()
+  const resolvedTitle = trimmed || pickUniqueDefaultTitle(notebooks)
+
+  if (trimmed && (await isNotebookTitleTaken(resolvedTitle))) {
+    throw new Error(`笔记本「${resolvedTitle}」已存在，请使用其他名称`)
+  }
+
   const meta: NotebookMeta = {
     id: createId(),
-    title: title?.trim() || defaultTitle(notebooks.length),
+    title: resolvedTitle,
     createdAt: now,
     updatedAt: now,
   }
@@ -229,4 +260,31 @@ export async function touchNotebook(id: string): Promise<void> {
   item.updatedAt = Date.now()
   notebooks.sort((a, b) => b.updatedAt - a.updatedAt)
   await writeRegistry(notebooks)
+}
+
+export async function addNotebookEntry(
+  notebookId: string,
+  sentence: string,
+  analysis: Partial<NotebookEntryAnalysis> = {},
+): Promise<NotebookEntry> {
+  const doc = await readDocument(notebookId)
+  if (!doc) throw new Error('笔记本不存在')
+
+  const entry: NotebookEntry = {
+    id: createEntryId(),
+    sentence: sentence.trim(),
+    createdAt: Date.now(),
+    analysis: {
+      translation: analysis.translation?.trim() ?? '',
+      collocations: analysis.collocations?.trim() ?? '',
+      slangs: analysis.slangs?.trim() ?? '',
+      sentencePattern: analysis.sentencePattern?.trim() ?? '',
+    },
+  }
+
+  doc.entries.unshift(entry)
+  doc.updatedAt = Date.now()
+  await writeDocument(doc)
+  await touchNotebook(notebookId)
+  return entry
 }

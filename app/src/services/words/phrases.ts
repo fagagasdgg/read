@@ -182,3 +182,9 @@ export async function getWordPhraseCount(rawLemma: string): Promise<number> {
   const record = await getWordPhraseRecord(rawLemma)
   return record?.items.length ?? 0
 }
+
+/** 已添加词组的单词数（至少有一条词组记录） */
+export async function getLemmaPhraseWordCount(): Promise<number> {
+  const store = await readStore()
+  return Object.values(store).filter((record) => record.items.length > 0).length
+}
