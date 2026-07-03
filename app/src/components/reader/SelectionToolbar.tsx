@@ -13,6 +13,11 @@ interface SelectionToolbarProps {
 
 type ToolbarMode = 'actions' | 'preview'
 
+function truncateText(text: string, max = 120): string {
+  if (text.length <= max) return text
+  return `${text.slice(0, max)}…`
+}
+
 export function SelectionToolbar({ bookId, selection, onClear }: SelectionToolbarProps) {
   const [mode, setMode] = useState<ToolbarMode>('actions')
   const [translation, setTranslation] = useState('')
@@ -21,12 +26,6 @@ export function SelectionToolbar({ bookId, selection, onClear }: SelectionToolba
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [showPicker, setShowPicker] = useState(false)
-
-  const top = Math.max(8, selection.rect.top - 52)
-  const left = Math.min(
-    Math.max(8, selection.rect.left + selection.rect.width / 2),
-    window.innerWidth - 8,
-  )
 
   async function handleCopy() {
     setError('')
@@ -87,11 +86,16 @@ export function SelectionToolbar({ bookId, selection, onClear }: SelectionToolba
 
   return (
     <>
-      <div
-        className="selection-toolbar"
-        style={{ top: `${top}px`, left: `${left}px` }}
-        onMouseDown={(e) => e.preventDefault()}
-      >
+      <button
+        type="button"
+        className="selection-action-backdrop"
+        aria-label="关闭选段菜单"
+        onClick={onClear}
+      />
+
+      <div className="selection-action-bar" onMouseDown={(e) => e.preventDefault()}>
+        <p className="selection-action-snippet">{truncateText(selection.text)}</p>
+
         {mode === 'actions' ? (
           <div className="selection-toolbar-row">
             <button type="button" onClick={() => void handleCopy()}>
@@ -107,6 +111,9 @@ export function SelectionToolbar({ bookId, selection, onClear }: SelectionToolba
             <button type="button" className="selection-toolbar-disabled" disabled title="即将推出">
               深度解析
             </button>
+            <button type="button" className="selection-action-close" onClick={onClear}>
+              关闭
+            </button>
           </div>
         ) : (
           <div className="selection-toolbar-preview">
@@ -121,6 +128,7 @@ export function SelectionToolbar({ bookId, selection, onClear }: SelectionToolba
             </div>
           </div>
         )}
+
         {message && <p className="selection-toolbar-message">{message}</p>}
         {error && <p className="selection-toolbar-error">{error}</p>}
       </div>

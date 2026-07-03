@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core'
-import { md5 } from '../../lib/md5'
+import { md5 } from 'js-md5'
 import type { ExamLevel, WordDefinition, WordEntry, WordForm } from './types'
 
 const ICIBA_PATH = '/dictionary/word/query/web'

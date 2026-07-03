@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface TextSelectionState {
   text: string
-  rect: DOMRect
 }
 
 function isSelectionInside(container: HTMLElement, selection: Selection): boolean {
@@ -13,16 +12,9 @@ function isSelectionInside(container: HTMLElement, selection: Selection): boolea
   return Boolean(element && container.contains(element))
 }
 
-function getSelectionRect(selection: Selection): DOMRect | null {
-  if (!selection.rangeCount) return null
-  const range = selection.getRangeAt(0)
-  const rect = range.getBoundingClientRect()
-  if (rect.width === 0 && rect.height === 0) return null
-  return rect
-}
-
 export function useTextSelection(container: HTMLElement | null) {
   const [selection, setSelection] = useState<TextSelectionState | null>(null)
+  const lockingRef = useRef(false)
 
   const clearSelection = useCallback(() => {
     setSelection(null)
@@ -34,32 +26,38 @@ export function useTextSelection(container: HTMLElement | null) {
     if (!container) return
 
     function refresh() {
-      if (!container) return
+      if (!container || lockingRef.current) return
       const sel = window.getSelection()
       if (!sel || sel.isCollapsed || !sel.toString().trim()) {
         setSelection(null)
-        return
       }
-      if (!isSelectionInside(container, sel)) {
-        setSelection(null)
-        return
-      }
-      const rect = getSelectionRect(sel)
-      if (!rect) {
-        setSelection(null)
-        return
-      }
-      setSelection({ text: sel.toString().trim(), rect })
+    }
+
+    function captureSelection() {
+      setTimeout(() => {
+        if (!container || lockingRef.current) return
+        const sel = window.getSelection()
+        if (!sel || sel.isCollapsed || !sel.toString().trim()) return
+        if (!isSelectionInside(container, sel)) return
+
+        const text = sel.toString().trim()
+        lockingRef.current = true
+        sel.removeAllRanges()
+        setSelection({ text })
+        window.setTimeout(() => {
+          lockingRef.current = false
+        }, 80)
+      }, 320)
     }
 
     document.addEventListener('selectionchange', refresh)
-    container.addEventListener('mouseup', refresh)
-    container.addEventListener('touchend', refresh)
+    container.addEventListener('touchend', captureSelection)
+    container.addEventListener('mouseup', captureSelection)
 
     return () => {
       document.removeEventListener('selectionchange', refresh)
-      container.removeEventListener('mouseup', refresh)
-      container.removeEventListener('touchend', refresh)
+      container.removeEventListener('touchend', captureSelection)
+      container.removeEventListener('mouseup', captureSelection)
     }
   }, [container])
 
