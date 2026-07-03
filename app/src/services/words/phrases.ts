@@ -188,3 +188,78 @@ export async function getLemmaPhraseWordCount(): Promise<number> {
   const store = await readStore()
   return Object.values(store).filter((record) => record.items.length > 0).length
 }
+
+export async function exportPhraseStore(): Promise<Record<string, WordPhraseRecord>> {
+  return readStore()
+}
+
+function normalizePhraseRecord(raw: unknown, fallbackLemma: string): WordPhraseRecord | null {
+  if (!raw || typeof raw !== 'object') return null
+  const item = raw as Partial<WordPhraseRecord>
+  const lemma = typeof item.lemma === 'string' ? normalizeWordToken(item.lemma) : fallbackLemma
+  if (!lemma) return null
+
+  const items = Array.isArray(item.items)
+    ? item.items
+        .map((entry) => {
+          if (!entry || typeof entry !== 'object') return null
+          const row = entry as Partial<WordPhraseItem>
+          if (typeof row.phrase !== 'string' || typeof row.translation !== 'string') return null
+          return {
+            id: typeof row.id === 'string' && row.id ? row.id : createId(),
+            phrase: row.phrase.trim(),
+            translation: row.translation.trim(),
+            source: row.source === 'manual' ? 'manual' : 'network',
+            addedAt: typeof row.addedAt === 'number' ? row.addedAt : Date.now(),
+          } satisfies WordPhraseItem
+        })
+        .filter((entry): entry is WordPhraseItem => Boolean(entry))
+    : []
+
+  return {
+    lemma,
+    fetchedAt: typeof item.fetchedAt === 'number' ? item.fetchedAt : items.length ? Date.now() : null,
+    fetchSource: item.fetchSource === 'youdao' ? 'youdao' : undefined,
+    items,
+  }
+}
+
+export async function importPhraseStore(
+  incoming: Record<string, unknown>,
+): Promise<{ imported: number; merged: number }> {
+  const store = await readStore()
+  let imported = 0
+  let merged = 0
+
+  for (const [key, raw] of Object.entries(incoming)) {
+    const record = normalizePhraseRecord(raw, normalizeWordToken(key))
+    if (!record) continue
+
+    const existing = store[record.lemma]
+    if (!existing) {
+      store[record.lemma] = record
+      imported += 1
+      continue
+    }
+
+    const phraseKeys = new Set(existing.items.map((item) => normalizePhraseKey(item.phrase)))
+    const mergedItems = [...existing.items]
+    for (const item of record.items) {
+      const pk = normalizePhraseKey(item.phrase)
+      if (phraseKeys.has(pk)) continue
+      phraseKeys.add(pk)
+      mergedItems.push(item)
+    }
+
+    store[record.lemma] = {
+      lemma: record.lemma,
+      fetchedAt: existing.fetchedAt ?? record.fetchedAt ?? Date.now(),
+      fetchSource: existing.fetchSource ?? record.fetchSource,
+      items: mergedItems,
+    }
+    merged += 1
+  }
+
+  await writeStore(store)
+  return { imported, merged }
+}

@@ -51,3 +51,21 @@ export async function setBookDefaultNotebookId(
   }
   await writeMap(map)
 }
+
+export async function exportBookNotebookMap(): Promise<Record<string, string>> {
+  return readMap()
+}
+
+export async function importBookNotebookMap(incoming: Record<string, unknown>): Promise<number> {
+  const map = await readMap()
+  let added = 0
+  for (const [bookId, notebookId] of Object.entries(incoming)) {
+    if (!bookId || typeof notebookId !== 'string' || !notebookId) continue
+    if (!map[bookId]) {
+      map[bookId] = notebookId
+      added += 1
+    }
+  }
+  await writeMap(map)
+  return added
+}

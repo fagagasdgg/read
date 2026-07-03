@@ -1,4 +1,5 @@
 import type { NotebookEntryAnalysis } from '../notes/notebooks'
+import { DEEP_ANALYSIS_SYSTEM_PROMPT } from './analysisPrompt'
 import { parseAnalysisResponse } from './analysisParse'
 import {
   estimateDoubaoSelectionTooLong,
@@ -16,13 +17,7 @@ import {
 } from './zhipuSettings'
 import { zhipuChatCompletion } from './zhipuClient'
 
-const SYSTEM_PROMPT = `你是英语阅读学习助手。用户给出英文句子或段落，请仅输出一个 JSON 对象，不要 markdown 代码块，不要任何前后说明文字。
-
-JSON 字段（均为字符串）：
-- translation：自然流畅的中文翻译
-- collocations：重要搭配/词组，每条一行，格式「英文 — 中文」；没有则写「无」
-- slangs：俚语、习语、口语表达，每条一行；没有则写「无」
-- sentencePattern：句式结构简要分析（1-3 句中文）`
+const SYSTEM_PROMPT = DEEP_ANALYSIS_SYSTEM_PROMPT
 
 export async function hasActiveLlmApiKey(): Promise<boolean> {
   const { provider } = await loadLlmProviderSettings()

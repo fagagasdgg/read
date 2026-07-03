@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { normalizeAnalysisListField } from '../../services/llm/analysisParse'
 import {
   getNotebookDocument,
   getNotebookEntryById,
@@ -148,11 +149,21 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
             </section>
             <section className="notebook-entry-block">
               <h3>固定搭配</h3>
-              <p>{selectedEntry.analysis.collocations || '暂无内容'}</p>
+              <p>
+                {normalizeAnalysisListField(
+                  selectedEntry.analysis.collocations || '暂无内容',
+                  'collocations',
+                ) || '暂无内容'}
+              </p>
             </section>
             <section className="notebook-entry-block">
               <h3>俚语讲解</h3>
-              <p>{selectedEntry.analysis.slangs || '暂无内容'}</p>
+              <p>
+                {normalizeAnalysisListField(
+                  selectedEntry.analysis.slangs || '暂无内容',
+                  'slangs',
+                ) || '暂无内容'}
+              </p>
             </section>
             <section className="notebook-entry-block">
               <h3>句型分析</h3>

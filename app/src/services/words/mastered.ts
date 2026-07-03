@@ -81,3 +81,21 @@ export async function getMasteredWordCount(): Promise<number> {
   const set = await readSet()
   return set.size
 }
+
+export async function exportMasteredWordsList(): Promise<string[]> {
+  const set = await readSet()
+  return [...set].sort()
+}
+
+export async function importMasteredWordsList(words: string[]): Promise<number> {
+  const set = await readSet()
+  let added = 0
+  for (const raw of words) {
+    const lemma = normalizeWordToken(raw)
+    if (!lemma || set.has(lemma)) continue
+    set.add(lemma)
+    added += 1
+  }
+  await writeSet(set)
+  return added
+}

@@ -29,7 +29,8 @@ read/
 │   │   │   └── DictDebugPage.tsx    # 词典联调页
 │   │   │
 │   │   ├── components/bookshelf/
-│   │   │   └── BookshelfScreen.tsx  # 书架网格、分组、导入删除
+│   │   │   ├── BookshelfScreen.tsx  # 书架网格、分组、导入删除
+│   │   │   └── DataBackupSheet.tsx  # 学习数据 zip 导入导出
 │   │   ├── components/home/
 │   │   │   └── HomeShell.tsx        # 底部 Tab：书架 / 笔记 / 设置
 │   │   ├── components/notes/
@@ -82,6 +83,11 @@ read/
 │   │       ├── notes/
 │   │       │   ├── notebooks.ts     # 笔记本与句子条目结构化存储
 │   │       │   └── bookNotebook.ts  # 每本书默认保存笔记本
+│   │       ├── backup/
+│   │       │   ├── types.ts           # 备份包 manifest 与结构
+│   │       │   ├── collect.ts         # 汇总导出数据
+│   │       │   ├── package.ts         # zip 打包/解包
+│   │       │   └── userDataBackup.ts  # 导入导出编排
 │   │       ├── llm/
 │   │       │   ├── zhipuSettings.ts   # 智谱 API Key 本地存储
 │   │       │   ├── zhipuClient.ts     # chat/completions 调用

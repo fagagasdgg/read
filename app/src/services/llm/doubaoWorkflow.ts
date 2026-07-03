@@ -6,6 +6,7 @@ import {
   parseAnalysisResponse,
   READ_NOTE_EXPORT_MARKER,
 } from './analysisParse'
+import { buildDoubaoAnalysisFieldSection } from './analysisPrompt'
 
 export function buildDoubaoPrompt(sentence: string): string {
   const text = sentence.trim()
@@ -27,13 +28,7 @@ export function buildDoubaoPrompt(sentence: string): string {
 ${text}
 <<<SENTENCE_END>>>
 
-【JSON 字段 — 全部为字符串类型】
-- marker：固定填写「${READ_NOTE_EXPORT_MARKER}」（不得修改，用于导入校验）
-- sentence：必须与上方「原文」完全一致（含标点、空格、换行）
-- translation：自然流畅的中文翻译
-- collocations：重要搭配/词组；每条一行，格式「英文 — 中文」；若无则填「无」
-- slangs：俚语、习语、口语表达；每条一行；若无则填「无」
-- sentencePattern：句式结构简要分析（1-3 句中文）
+${buildDoubaoAnalysisFieldSection(READ_NOTE_EXPORT_MARKER)}
 
 请现在只输出 JSON，不要输出其他任何文字。`
 }

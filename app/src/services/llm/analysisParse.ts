@@ -18,6 +18,66 @@ function asText(value: unknown, fallback = ''): string {
   return fallback
 }
 
+const LIST_PLACEHOLDER = new Set(['无', '暂无', 'none', 'n/a'])
+
+/**
+ * 将搭配/俚语规范为多行展示。仅在较有把握时插入换行，避免误拆完整句子。
+ */
+export function normalizeAnalysisListField(
+  text: string,
+  kind: 'collocations' | 'slangs',
+): string {
+  let value = text.trim()
+  if (!value || LIST_PLACEHOLDER.has(value.toLowerCase())) return value
+
+  value = value.replace(/\\n/g, '\n')
+
+  if (/\n/.test(value)) {
+    return value
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join('\n')
+  }
+
+  const hasDash = /[—\-－–]/.test(value)
+
+  if (kind === 'collocations' || (kind === 'slangs' && hasDash)) {
+    // 中文释义结束后、下一条英文搭配开始前（该行含 —）
+    const afterChinese = value.replace(
+      /([\u4e00-\u9fff/）)】【])(?:\s*)(?=[A-Za-z"'](?:(?!\n)[\s\S]){0,96}[—\-－–])/g,
+      '$1\n',
+    )
+    if (afterChinese.includes('\n')) {
+      return afterChinese
+        .split(/\n+/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join('\n')
+    }
+
+    // 中文紧挨英文（如「烦我back off」）
+    const tightChinese = value.replace(/([\u4e00-\u9fff/)])(?=[A-Za-z])/g, '$1\n')
+    if (tightChinese.includes('\n')) {
+      return tightChinese
+        .split(/\n+/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join('\n')
+    }
+  }
+
+  if (kind === 'slangs' && /[;；]/.test(value)) {
+    return value
+      .split(/[;；]+/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join('\n')
+  }
+
+  return value
+}
+
 export function normalizeSentenceKey(text: string): string {
   return text.trim().replace(/\s+/g, ' ')
 }
@@ -98,8 +158,8 @@ function salvageFieldsFromText(raw: string): ParsedAnalysis | null {
 
   return {
     translation,
-    collocations: pick('collocations') || '无',
-    slangs: pick('slangs') || '无',
+    collocations: normalizeAnalysisListField(pick('collocations') || '无', 'collocations'),
+    slangs: normalizeAnalysisListField(pick('slangs') || '无', 'slangs'),
     sentencePattern: pick('sentencePattern') || '暂无',
   }
 }
@@ -152,10 +212,13 @@ export function extractJsonObject(raw: string): ParsedAnalysis {
 }
 
 export function normalizeAnalysis(parsed: ParsedAnalysis): NotebookEntryAnalysis {
+  const collocations = normalizeAnalysisListField(asText(parsed.collocations, '无'), 'collocations')
+  const slangs = normalizeAnalysisListField(asText(parsed.slangs, '无'), 'slangs')
+
   return {
     translation: asText(parsed.translation, '暂无'),
-    collocations: asText(parsed.collocations, '无'),
-    slangs: asText(parsed.slangs, '无'),
+    collocations,
+    slangs,
     sentencePattern: asText(parsed.sentencePattern, '暂无'),
   }
 }

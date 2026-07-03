@@ -339,3 +339,97 @@ export async function addNotebookEntry(
 
   return entry
 }
+
+export async function exportNotebooksBackup(): Promise<{
+  registry: NotebookMeta[]
+  documents: NotebookDocument[]
+}> {
+  const registry = await listNotebooks()
+  const documents: NotebookDocument[] = []
+
+  for (const meta of registry) {
+    const doc = await getNotebookDocument(meta.id)
+    documents.push(
+      doc ?? {
+        id: meta.id,
+        title: meta.title,
+        entries: [],
+        updatedAt: meta.updatedAt,
+      },
+    )
+  }
+
+  return { registry, documents }
+}
+
+function entryKey(sentence: string, createdAt: number): string {
+  return `${sentence.trim().replace(/\s+/g, ' ')}|${createdAt}`
+}
+
+export async function importNotebooksBackup(payload: {
+  registry: NotebookMeta[]
+  documents: NotebookDocument[]
+}): Promise<{ notebooks: number; entries: number; warnings: string[] }> {
+  const warnings: string[] = []
+  const currentRegistry = await readRegistry()
+  const registryMap = new Map(currentRegistry.map((item) => [item.id, item]))
+  let entriesAdded = 0
+
+  for (const rawMeta of payload.registry) {
+    if (!rawMeta || typeof rawMeta !== 'object' || typeof rawMeta.id !== 'string') {
+      warnings.push('跳过无效的笔记本元数据')
+      continue
+    }
+
+    const meta: NotebookMeta = {
+      id: rawMeta.id,
+      title: typeof rawMeta.title === 'string' && rawMeta.title.trim() ? rawMeta.title.trim() : '笔记本',
+      createdAt: typeof rawMeta.createdAt === 'number' ? rawMeta.createdAt : Date.now(),
+      updatedAt: typeof rawMeta.updatedAt === 'number' ? rawMeta.updatedAt : Date.now(),
+    }
+
+    const rawDoc = payload.documents.find((doc) => doc?.id === meta.id)
+    const normalizedDoc = normalizeDocument(rawDoc ?? null, meta.id)
+    const safeDoc: NotebookDocument = normalizedDoc ?? {
+      id: meta.id,
+      title: meta.title,
+      entries: [],
+      updatedAt: meta.updatedAt,
+    }
+
+    const existingMeta = registryMap.get(meta.id)
+    if (!existingMeta) {
+      registryMap.set(meta.id, meta)
+      await writeDocument(safeDoc)
+      entriesAdded += safeDoc.entries.length
+      continue
+    }
+
+    const existingDoc = await readDocument(meta.id)
+    const baseDoc = existingDoc ?? safeDoc
+    const seen = new Set(baseDoc.entries.map((entry) => entryKey(entry.sentence, entry.createdAt)))
+
+    for (const entry of safeDoc.entries) {
+      const key = entryKey(entry.sentence, entry.createdAt)
+      if (seen.has(key)) continue
+      seen.add(key)
+      baseDoc.entries.unshift(entry)
+      entriesAdded += 1
+    }
+
+    baseDoc.title = meta.title || baseDoc.title
+    baseDoc.updatedAt = Math.max(baseDoc.updatedAt, meta.updatedAt, safeDoc.updatedAt)
+    existingMeta.title = baseDoc.title
+    existingMeta.updatedAt = baseDoc.updatedAt
+    await writeDocument(baseDoc)
+  }
+
+  const mergedRegistry = [...registryMap.values()].sort((a, b) => b.updatedAt - a.updatedAt)
+  await writeRegistry(mergedRegistry)
+
+  return {
+    notebooks: payload.registry.length,
+    entries: entriesAdded,
+    warnings,
+  }
+}

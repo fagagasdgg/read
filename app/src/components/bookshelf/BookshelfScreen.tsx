@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AppToast } from '../common/AppToast'
+import { DataBackupSheet } from './DataBackupSheet'
 import {
   type BookGroup,
   type SavedBookMeta,
@@ -99,6 +100,7 @@ export function BookshelfScreen({ onOpenBook }: BookshelfScreenProps) {
   const [error, setError] = useState('')
   const [menuBookId, setMenuBookId] = useState<string | null>(null)
   const [menuMode, setMenuMode] = useState<BookMenuMode>('actions')
+  const [showBackupSheet, setShowBackupSheet] = useState(false)
   const native = isNativeApp()
 
   const refresh = useCallback(async () => {
@@ -234,15 +236,27 @@ export function BookshelfScreen({ onOpenBook }: BookshelfScreenProps) {
     <div className="bookshelf-screen">
       <header className="bookshelf-header">
         <h1>书架</h1>
-        <button
-          type="button"
-          className="bookshelf-import-btn"
-          disabled={loading}
-          onClick={() => void handleImport()}
-          aria-label="导入 EPUB"
-        >
-          +
-        </button>
+        <div className="bookshelf-header-actions">
+          <button
+            type="button"
+            className="bookshelf-import-btn bookshelf-backup-btn"
+            disabled={loading}
+            onClick={() => setShowBackupSheet(true)}
+            aria-label="导入导出学习数据"
+            title="导入导出学习数据"
+          >
+            ⇅
+          </button>
+          <button
+            type="button"
+            className="bookshelf-import-btn"
+            disabled={loading}
+            onClick={() => void handleImport()}
+            aria-label="导入 EPUB"
+          >
+            +
+          </button>
+        </div>
       </header>
 
       <div className="bookshelf-shelf">
@@ -376,6 +390,10 @@ export function BookshelfScreen({ onOpenBook }: BookshelfScreenProps) {
             )}
           </div>
         </div>
+      )}
+
+      {showBackupSheet && (
+        <DataBackupSheet onClose={() => setShowBackupSheet(false)} onDone={() => void refresh()} />
       )}
 
       {loading && <AppToast message={statusText || '处理中…'} />}

@@ -7,6 +7,7 @@ import {
   parseDoubaoClipboard,
   readClipboardText,
 } from '../../services/llm/doubaoWorkflow'
+import { normalizeAnalysisListField } from '../../services/llm/analysisParse'
 import { getBookDefaultNotebookId } from '../../services/notes/bookNotebook'
 import { addNotebookEntry, type NotebookEntryAnalysis } from '../../services/notes/notebooks'
 import { NotebookPickerSheet } from '../notes/NotebookPickerSheet'
@@ -238,11 +239,11 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
               </div>
               <div className="selection-analysis-block">
                 <h4>搭配</h4>
-                <p>{analysis.collocations}</p>
+                <p>{normalizeAnalysisListField(analysis.collocations, 'collocations')}</p>
               </div>
               <div className="selection-analysis-block">
                 <h4>俚语</h4>
-                <p>{analysis.slangs}</p>
+                <p>{normalizeAnalysisListField(analysis.slangs, 'slangs')}</p>
               </div>
               <div className="selection-analysis-block">
                 <h4>句式</h4>

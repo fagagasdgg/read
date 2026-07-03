@@ -129,3 +129,70 @@ export async function exportCachedWordsJson(): Promise<string> {
   const words = await listCachedWords()
   return JSON.stringify(words, null, 2)
 }
+
+export async function exportAllCachedRecords(): Promise<
+  Array<{ lemma: string; value: DictionaryCacheValue }>
+> {
+  const db = await getDb()
+  const keys = await db.getAllKeys(STORE)
+  const records: Array<{ lemma: string; value: DictionaryCacheValue }> = []
+
+  for (const key of keys) {
+    const value = await db.get(STORE, key)
+    if (!value) continue
+    const lemma = typeof key === 'string' ? key : String(key)
+    if (isWordEntry(value) || isWordNotFoundMarker(value)) {
+      records.push({ lemma, value })
+    }
+  }
+
+  return records
+}
+
+function isValidCacheValue(value: unknown): value is DictionaryCacheValue {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Record<string, unknown>
+  if (item.notFound === true) {
+    return typeof item.lemma === 'string' && typeof item.cachedAt === 'number'
+  }
+  return (
+    typeof item.lemma === 'string' &&
+    typeof item.cachedAt === 'number' &&
+    Array.isArray(item.definitions)
+  )
+}
+
+export async function importDictionaryRecords(
+  records: Array<{ lemma: string; value: unknown }>,
+): Promise<{ imported: number; skipped: number }> {
+  const db = await getDb()
+  let imported = 0
+  let skipped = 0
+
+  for (const item of records) {
+    const lemma = typeof item.lemma === 'string' ? item.lemma.trim() : ''
+    if (!lemma || !isValidCacheValue(item.value)) {
+      skipped += 1
+      continue
+    }
+
+    const existing = await db.get(STORE, lemma)
+    const incoming = item.value
+    if (!existing) {
+      await db.put(STORE, incoming, lemma)
+      imported += 1
+      continue
+    }
+
+    const existingAt =
+      'cachedAt' in existing && typeof existing.cachedAt === 'number' ? existing.cachedAt : 0
+    const incomingAt =
+      'cachedAt' in incoming && typeof incoming.cachedAt === 'number' ? incoming.cachedAt : 0
+    if (incomingAt >= existingAt) {
+      await db.put(STORE, incoming, lemma)
+      imported += 1
+    }
+  }
+
+  return { imported, skipped }
+}

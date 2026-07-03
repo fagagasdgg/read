@@ -1245,6 +1245,12 @@
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
+.bookshelf-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .bookshelf-import-btn {
   width: 40px;
   height: 40px;
@@ -1256,6 +1262,34 @@
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.bookshelf-backup-btn {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.data-backup-sheet {
+  max-width: 420px;
+}
+
+.data-backup-sheet-hint {
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.data-backup-sheet-message {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  color: #166534;
+  line-height: 1.45;
+}
+
+.data-backup-sheet-error {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  color: #dc2626;
+  line-height: 1.45;
 }
 
 .bookshelf-shelf {
@@ -1742,6 +1776,8 @@
   font-size: 0.9rem;
   line-height: 1.6;
   color: #374151;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .bookshelf-app {
