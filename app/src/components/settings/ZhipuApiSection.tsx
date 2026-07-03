@@ -5,12 +5,14 @@ import {
   maskApiKey,
   saveZhipuSettings,
   ZHIPU_DEFAULT_MODEL,
+  ZHIPU_FREE_MODELS,
   type ZhipuSettings,
 } from '../../services/llm/zhipuSettings'
 
 export function ZhipuApiSection() {
   const [settings, setSettings] = useState<ZhipuSettings | null>(null)
   const [apiKeyInput, setApiKeyInput] = useState('')
+  const [modelId, setModelId] = useState(ZHIPU_DEFAULT_MODEL)
   const [saving, setSaving] = useState(false)
   const [probing, setProbing] = useState(false)
   const [message, setMessage] = useState('')
@@ -20,6 +22,7 @@ export function ZhipuApiSection() {
     void loadZhipuSettings().then((loaded) => {
       setSettings(loaded)
       setApiKeyInput(loaded.apiKey)
+      setModelId(loaded.model)
     })
   }, [])
 
@@ -28,9 +31,10 @@ export function ZhipuApiSection() {
     setError('')
     setMessage('')
     try {
-      const next = await saveZhipuSettings({ apiKey: apiKeyInput })
+      const next = await saveZhipuSettings({ apiKey: apiKeyInput, model: modelId })
       setSettings(next)
-      setMessage('API Key 已保存')
+      setModelId(next.model)
+      setMessage('已保存')
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败')
     } finally {
@@ -45,9 +49,8 @@ export function ZhipuApiSection() {
     try {
       const key = apiKeyInput.trim()
       if (!key) throw new Error('请先填写 API Key')
-      const model = settings?.model ?? ZHIPU_DEFAULT_MODEL
-      await probeZhipuApiKey(key, model)
-      setMessage('连接成功，Key 可用')
+      await probeZhipuApiKey(key, modelId)
+      setMessage('连接成功，Key 与模型可用')
     } catch (err) {
       setError(err instanceof Error ? err.message : '连接失败')
     } finally {
@@ -55,11 +58,13 @@ export function ZhipuApiSection() {
     }
   }
 
+  const selectedModel = ZHIPU_FREE_MODELS.find((item) => item.id === modelId)
+
   return (
     <section className="settings-section">
       <h4 className="settings-section-title">深度解析（智谱 AI）</h4>
       <p className="settings-section-note">
-        选段「深度解析」使用智谱 GLM Flash 免费模型。请在{' '}
+        选段「深度解析」使用智谱免费 Flash 模型。请在{' '}
         <a href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank" rel="noreferrer">
           open.bigmodel.cn
         </a>{' '}
@@ -78,19 +83,33 @@ export function ZhipuApiSection() {
         />
       </label>
 
-      <p className="settings-section-note">
-        当前模型：<strong>{settings?.model ?? ZHIPU_DEFAULT_MODEL}</strong>
-        {settings?.apiKey ? (
-          <>
-            <br />
-            已保存：<strong>{maskApiKey(settings.apiKey)}</strong>
-          </>
-        ) : null}
-      </p>
+      <label className="reader-setting-row">
+        <span>模型</span>
+        <select
+          className="reader-level-select"
+          value={modelId}
+          onChange={(e) => setModelId(e.target.value)}
+        >
+          {ZHIPU_FREE_MODELS.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {selectedModel?.hint && (
+        <p className="settings-section-note">{selectedModel.hint}</p>
+      )}
+
+      {settings?.apiKey ? (
+        <p className="settings-section-note">
+          已保存 Key：<strong>{maskApiKey(settings.apiKey)}</strong>
+        </p>
+      ) : null}
 
       <div className="zhipu-key-actions">
         <button type="button" className="reader-backup-dir-btn" onClick={() => void handleSave()} disabled={saving}>
-          {saving ? '保存中…' : '保存 Key'}
+          {saving ? '保存中…' : '保存'}
         </button>
         <button
           type="button"

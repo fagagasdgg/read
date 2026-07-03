@@ -1881,7 +1881,8 @@
 .selection-panel {
   position: fixed;
   left: 50%;
-  bottom: calc(76px + env(safe-area-inset-bottom));
+  top: calc(52px + env(safe-area-inset-top));
+  bottom: auto;
   transform: translateX(-50%);
   z-index: 9999;
   width: min(92vw, 380px);

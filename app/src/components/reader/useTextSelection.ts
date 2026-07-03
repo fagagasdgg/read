@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface TextSelectionState {
   text: string
 }
+
+/** 选区稳定后再弹出工具面板，避免拖动手柄扩展选区时被挡住 */
+const SELECTION_CONFIRM_MS = 850
 
 function isSelectionInside(container: HTMLElement, selection: Selection): boolean {
   if (!selection.rangeCount) return false
@@ -12,30 +15,64 @@ function isSelectionInside(container: HTMLElement, selection: Selection): boolea
   return Boolean(element && container.contains(element))
 }
 
+function readSelectionText(container: HTMLElement): string | null {
+  const sel = window.getSelection()
+  if (!sel || sel.isCollapsed || !sel.toString().trim()) return null
+  if (!isSelectionInside(container, sel)) return null
+  return sel.toString().trim()
+}
+
 export function useTextSelection(container: HTMLElement | null) {
   const [selection, setSelection] = useState<TextSelectionState | null>(null)
+  const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const confirmedTextRef = useRef<string | null>(null)
+
+  const clearConfirmTimer = useCallback(() => {
+    if (confirmTimerRef.current) {
+      clearTimeout(confirmTimerRef.current)
+      confirmTimerRef.current = null
+    }
+  }, [])
 
   const clearSelection = useCallback(() => {
+    clearConfirmTimer()
+    confirmedTextRef.current = null
     setSelection(null)
     const sel = window.getSelection()
     if (sel && !sel.isCollapsed) sel.removeAllRanges()
-  }, [])
+  }, [clearConfirmTimer])
 
   useEffect(() => {
     if (!container) return
 
+    function scheduleConfirm() {
+      clearConfirmTimer()
+      confirmTimerRef.current = setTimeout(() => {
+        const text = readSelectionText(container!)
+        if (!text) {
+          confirmedTextRef.current = null
+          setSelection(null)
+          return
+        }
+        confirmedTextRef.current = text
+        setSelection({ text })
+      }, SELECTION_CONFIRM_MS)
+    }
+
     function refresh() {
-      if (!container) return
-      const sel = window.getSelection()
-      if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+      const text = readSelectionText(container!)
+      if (!text) {
+        clearConfirmTimer()
+        confirmedTextRef.current = null
         setSelection(null)
         return
       }
-      if (!isSelectionInside(container, sel)) {
+
+      if (confirmedTextRef.current !== text) {
         setSelection(null)
-        return
       }
-      setSelection({ text: sel.toString().trim() })
+
+      scheduleConfirm()
     }
 
     document.addEventListener('selectionchange', refresh)
@@ -43,11 +80,12 @@ export function useTextSelection(container: HTMLElement | null) {
     container.addEventListener('touchend', refresh)
 
     return () => {
+      clearConfirmTimer()
       document.removeEventListener('selectionchange', refresh)
       container.removeEventListener('mouseup', refresh)
       container.removeEventListener('touchend', refresh)
     }
-  }, [container])
+  }, [container, clearConfirmTimer])
 
   return { selection, clearSelection }
 }
