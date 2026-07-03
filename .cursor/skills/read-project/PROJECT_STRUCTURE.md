@@ -37,7 +37,8 @@ read/
 │   │   │   ├── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页）
 │   │   │   └── NotebookPickerSheet.tsx  # 保存笔记时选择笔记本
 │   │   ├── components/settings/
-│   │   │   ├── AppSettingsScreen.tsx    # 应用级设置（英语水平、备份、信源）
+│   │   │   ├── AppSettingsScreen.tsx    # 应用级设置（英语水平、智谱、备份、信源）
+│   │   │   ├── ZhipuApiSection.tsx      # 智谱 API Key 配置
 │   │   │   ├── DictionarySourcesSection.tsx
 │   │   │   └── BackupDirectorySection.tsx
 │   │   │
@@ -52,7 +53,7 @@ read/
 │   │   │   ├── SettingStepper.tsx   # 设置项步进器（防滚动误触）
 │   │   │   ├── TocPanel.tsx         # 目录/笔记侧栏
 │   │   │   ├── ReadingSettingsPanel.tsx # 排版、行间翻译、本书默认笔记本
-│   │   │   ├── SelectionToolbar.tsx   # 选段：复制、传统翻译、存笔记
+│   │   │   ├── SelectionToolbar.tsx   # 选段：复制、深度解析、存笔记
 │   │   │   ├── useTextSelection.ts    # 阅读区文本选区检测
 │   │   │   └── tokenize.ts          # 英文单词切分
 │   │   │
@@ -81,9 +82,10 @@ read/
 │   │       ├── notes/
 │   │       │   ├── notebooks.ts     # 笔记本与句子条目结构化存储
 │   │       │   └── bookNotebook.ts  # 每本书默认保存笔记本
-│   │       ├── translation/
-│   │       │   ├── traditionalTranslate.ts # 有道传统翻译
-│   │       │   └── formatTranslation.ts
+│   │       ├── llm/
+│   │       │   ├── zhipuSettings.ts   # 智谱 API Key 本地存储
+│   │       │   ├── zhipuClient.ts     # chat/completions 调用
+│   │       │   └── deepAnalysis.ts    # 选段深度解析 → NotebookEntry
 │   │       ├── epub/
 │   │       │   ├── groups.ts        # 书架分组 CRUD
 │   │       │   ├── parser.ts        # EPUB 解压、OPF/spine、插图 blob

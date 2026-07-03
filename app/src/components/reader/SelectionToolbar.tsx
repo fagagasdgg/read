@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { NotebookPickerSheet } from '../notes/NotebookPickerSheet'
+import { analyzeSentenceDeep } from '../../services/llm/deepAnalysis'
+import { hasZhipuApiKey } from '../../services/llm/zhipuSettings'
 import { getBookDefaultNotebookId } from '../../services/notes/bookNotebook'
-import { addNotebookEntry } from '../../services/notes/notebooks'
-import { translateTraditional } from '../../services/translation/traditionalTranslate'
+import { addNotebookEntry, type NotebookEntryAnalysis } from '../../services/notes/notebooks'
+import { NotebookPickerSheet } from '../notes/NotebookPickerSheet'
 import type { TextSelectionState } from './useTextSelection'
 
 interface SelectionToolbarProps {
@@ -22,8 +23,8 @@ function truncateText(text: string, max = 160): string {
 
 export function SelectionToolbar({ bookId, selection, onClose, onClear }: SelectionToolbarProps) {
   const [mode, setMode] = useState<ToolbarMode>('actions')
-  const [translation, setTranslation] = useState('')
-  const [translating, setTranslating] = useState(false)
+  const [analysis, setAnalysis] = useState<NotebookEntryAnalysis | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -40,29 +41,32 @@ export function SelectionToolbar({ bookId, selection, onClose, onClear }: Select
     }
   }
 
-  async function handleTraditionalTranslate() {
-    setTranslating(true)
+  async function handleDeepAnalysis() {
+    setAnalyzing(true)
     setError('')
     setMessage('')
     try {
-      const result = await translateTraditional(selection.text)
-      setTranslation(result)
+      const configured = await hasZhipuApiKey()
+      if (!configured) {
+        throw new Error('请先在首页「设置」中配置智谱 API Key')
+      }
+      const result = await analyzeSentenceDeep(selection.text)
+      setAnalysis(result)
       setMode('preview')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '翻译失败')
+      setError(err instanceof Error ? err.message : '深度解析失败')
     } finally {
-      setTranslating(false)
+      setAnalyzing(false)
     }
   }
 
   async function saveToNotebook(notebookId: string) {
+    if (!analysis) return
     setSaving(true)
     setError('')
     setMessage('')
     try {
-      await addNotebookEntry(notebookId, selection.text, {
-        translation: translation || '',
-      })
+      await addNotebookEntry(notebookId, selection.text, analysis)
       setMessage('已保存到笔记')
       setShowPicker(false)
       setTimeout(onClear, 800)
@@ -74,8 +78,8 @@ export function SelectionToolbar({ bookId, selection, onClose, onClear }: Select
   }
 
   async function handleSave() {
-    if (!translation) {
-      setError('请先完成翻译')
+    if (!analysis) {
+      setError('请先完成深度解析')
       return
     }
     const defaultId = await getBookDefaultNotebookId(bookId)
@@ -91,12 +95,7 @@ export function SelectionToolbar({ bookId, selection, onClose, onClear }: Select
       <div className="selection-panel" onMouseDown={(e) => e.preventDefault()}>
         <header className="selection-panel-header">
           <span className="selection-panel-title">选段工具</span>
-          <button
-            type="button"
-            className="selection-panel-close"
-            onClick={onClose}
-            aria-label="关闭"
-          >
+          <button type="button" className="selection-panel-close" onClick={onClose} aria-label="关闭">
             ×
           </button>
         </header>
@@ -108,29 +107,43 @@ export function SelectionToolbar({ bookId, selection, onClose, onClear }: Select
             <button type="button" onClick={() => void handleCopy()}>
               复制
             </button>
-            <button
-              type="button"
-              onClick={() => void handleTraditionalTranslate()}
-              disabled={translating}
-            >
-              {translating ? '翻译中…' : '传统翻译'}
-            </button>
-            <button type="button" className="selection-toolbar-disabled" disabled title="即将推出">
-              深度解析
+            <button type="button" onClick={() => void handleDeepAnalysis()} disabled={analyzing}>
+              {analyzing ? '解析中…' : '深度解析'}
             </button>
           </div>
         ) : (
-          <div className="selection-toolbar-preview">
-            <p className="selection-toolbar-translation">{translation}</p>
-            <div className="selection-toolbar-row">
-              <button type="button" onClick={() => setMode('actions')}>
-                返回
-              </button>
-              <button type="button" onClick={() => void handleSave()} disabled={saving}>
-                {saving ? '保存中…' : '存笔记'}
-              </button>
+          analysis && (
+            <div className="selection-analysis-preview">
+              <div className="selection-analysis-block">
+                <h4>翻译</h4>
+                <p>{analysis.translation}</p>
+              </div>
+              <div className="selection-analysis-block">
+                <h4>搭配</h4>
+                <p>{analysis.collocations}</p>
+              </div>
+              <div className="selection-analysis-block">
+                <h4>俚语</h4>
+                <p>{analysis.slangs}</p>
+              </div>
+              <div className="selection-analysis-block">
+                <h4>句式</h4>
+                <p>{analysis.sentencePattern}</p>
+              </div>
+              <div className="selection-toolbar-row">
+                <button type="button" onClick={() => setMode('actions')}>
+                  返回
+                </button>
+                <button type="button" onClick={() => void handleSave()} disabled={saving}>
+                  {saving ? '保存中…' : '存笔记'}
+                </button>
+              </div>
             </div>
-          </div>
+          )
+        )}
+
+        {mode === 'actions' && (
+          <p className="selection-panel-hint">快速翻译请使用系统选区菜单中的「翻译」</p>
         )}
 
         {message && <p className="selection-toolbar-message">{message}</p>}

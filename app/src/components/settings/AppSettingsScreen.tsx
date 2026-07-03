@@ -10,6 +10,7 @@ import {
 } from '../../services/settings/userSettings'
 import { BackupDirectorySection } from './BackupDirectorySection'
 import { DictionarySourcesSection } from './DictionarySourcesSection'
+import { ZhipuApiSection } from './ZhipuApiSection'
 
 export function AppSettingsScreen() {
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null)
@@ -76,6 +77,10 @@ export function AppSettingsScreen() {
             影响行间翻译显示阈值：仅对高于你所选水平的单词显示行间释义。
           </p>
         </section>
+
+        <div className="settings-section-divider" />
+
+        <ZhipuApiSection />
 
         <div className="settings-section-divider" />
 

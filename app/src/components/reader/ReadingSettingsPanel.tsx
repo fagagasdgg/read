@@ -265,7 +265,7 @@ export function ReadingSettingsPanel({
             </select>
           </label>
           <p className="reader-settings-note">
-            选段翻译或深度解析后存笔记时，将优先保存到此笔记本；未设置则每次弹出选择。
+            深度解析后存笔记时，将优先保存到此笔记本；未设置则每次弹出选择。
           </p>
 
           <div className="reader-settings-divider" />

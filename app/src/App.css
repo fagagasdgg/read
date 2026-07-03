@@ -1935,6 +1935,66 @@
   overflow: hidden;
 }
 
+.selection-panel-hint {
+  margin: 6px 12px 0;
+  font-size: 0.72rem;
+  color: #9ca3af;
+  line-height: 1.4;
+}
+
+.selection-analysis-preview {
+  padding: 0 10px 4px;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+
+.selection-analysis-block {
+  margin-bottom: 8px;
+}
+
+.selection-analysis-block h4 {
+  margin: 0 0 2px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #9ca3af;
+}
+
+.selection-analysis-block p {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #e5e7eb;
+  white-space: pre-wrap;
+}
+
+.zhipu-key-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.zhipu-key-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  box-sizing: border-box;
+}
+
+.zhipu-key-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.zhipu-key-error {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  color: #dc2626;
+}
+
 .selection-panel .selection-toolbar-row {
   padding: 0 10px;
 }
