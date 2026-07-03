@@ -1,7 +1,7 @@
 # 项目结构
 
 > 按 `xq/需求.md` §98.1 维护。每次新增/删除/重命名文件后更新本文档。
-> Last updated: 2026-07-02
+> Last updated: 2026-07-03
 
 ```
 read/
@@ -32,7 +32,9 @@ read/
 │   │   │   ├── BookshelfScreen.tsx  # 书架网格、分组、导入删除
 │   │   │   └── DataBackupSheet.tsx  # 学习数据 zip 导入导出
 │   │   ├── components/home/
-│   │   │   └── HomeShell.tsx        # 底部 Tab：书架 / 笔记 / 设置
+│   │   │   └── HomeShell.tsx        # 底部 Tab：书架 / 笔记 / 统计 / 设置
+│   │   ├── components/statistics/
+│   │   │   └── StatisticsScreen.tsx # 阅读时长 + 词汇统计（可展开收起）
 │   │   ├── components/notes/
 │   │   │   ├── NotesScreen.tsx      # 笔记本列表
 │   │   │   ├── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页）
@@ -87,7 +89,10 @@ read/
 │   │       │   ├── types.ts           # 备份包 manifest 与结构
 │   │       │   ├── collect.ts         # 汇总导出数据
 │   │       │   ├── package.ts         # zip 打包/解包
-│   │       │   └── userDataBackup.ts  # 导入导出编排
+│   │       │   ├── events.ts          # 导入后 UI 刷新事件
+│   │       │   └── userDataBackup.ts  # 导入导出编排（写入用户目录）
+│   │       ├── reading/
+│   │       │   └── readingTime.ts     # 阅读时长累计与统计
 │   │       ├── llm/
 │   │       │   ├── zhipuSettings.ts   # 智谱 API Key 本地存储
 │   │       │   ├── zhipuClient.ts     # chat/completions 调用

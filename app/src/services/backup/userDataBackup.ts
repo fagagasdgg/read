@@ -4,9 +4,14 @@ import { FilePicker } from '@capawesome/capacitor-file-picker'
 import { getDictionaryCacheStats, importDictionaryRecords } from '../dictionary/cache'
 import { importBookNotebookMap } from '../notes/bookNotebook'
 import { importNotebooksBackup } from '../notes/notebooks'
+import {
+  formatBackupDirectoryPathForDisplay,
+  loadBackupDirectorySettings,
+} from '../settings/backupDirectory'
 import { getMasteredWordCount, importMasteredWordsList } from '../words/mastered'
 import { getLemmaPhraseWordCount, importPhraseStore } from '../words/phrases'
 import { collectBackupPayload, summarizeBackupCounts } from './collect'
+import { notifyBackupDataChanged } from './events'
 import {
   blobToBase64,
   buildBackupZip,
@@ -53,6 +58,57 @@ async function readPickedZipBuffer(): Promise<ArrayBuffer> {
   throw new Error('无法读取所选备份文件')
 }
 
+async function saveNativeBackupZip(zipBlob: Blob, filename: string): Promise<string> {
+  const base64 = await blobToBase64(zipBlob)
+  const dir = await loadBackupDirectorySettings()
+
+  if (dir.nativePath) {
+    const tempPath = `read-export-${Date.now()}-${filename}`
+    await Filesystem.writeFile({
+      path: tempPath,
+      data: base64,
+      directory: Directory.Cache,
+      recursive: true,
+    })
+
+    const { uri } = await Filesystem.getUri({
+      path: tempPath,
+      directory: Directory.Cache,
+    })
+
+    const destPath = dir.nativePath.endsWith('/')
+      ? `${dir.nativePath}${filename}`
+      : `${dir.nativePath}/${filename}`
+
+    await FilePicker.copyFile({
+      from: uri,
+      to: destPath,
+      overwrite: true,
+    })
+
+    try {
+      await Filesystem.deleteFile({
+        path: tempPath,
+        directory: Directory.Cache,
+      })
+    } catch {
+      // 临时文件清理失败可忽略
+    }
+
+    const label = formatBackupDirectoryPathForDisplay(dir.nativePath)
+    return `${label}/${filename}`
+  }
+
+  const path = `read-backups/${filename}`
+  await Filesystem.writeFile({
+    path,
+    data: base64,
+    directory: Directory.Documents,
+    recursive: true,
+  })
+  return `Documents/${path}`
+}
+
 export async function exportUserDataBackup(): Promise<{
   filename: string
   summary: string
@@ -64,18 +120,11 @@ export async function exportUserDataBackup(): Promise<{
   const summary = summarizeBackupCounts(payload.manifest)
 
   if (Capacitor.isNativePlatform()) {
-    const base64 = await blobToBase64(zipBlob)
-    const path = `read-backups/${filename}`
-    await Filesystem.writeFile({
-      path,
-      data: base64,
-      directory: Directory.Documents,
-      recursive: true,
-    })
+    const savedPath = await saveNativeBackupZip(zipBlob, filename)
     return {
       filename,
       summary,
-      savedPath: `Documents/${path}`,
+      savedPath,
     }
   }
 
@@ -112,6 +161,8 @@ export async function importUserDataBackup(file?: File): Promise<ImportUserDataR
   if (bookNotebookAdded > 0) {
     warnings.push(`合并 ${bookNotebookAdded} 条书籍默认笔记本映射`)
   }
+
+  notifyBackupDataChanged()
 
   const stats = await getDictionaryCacheStats()
   const phraseLemmas = await getLemmaPhraseWordCount()

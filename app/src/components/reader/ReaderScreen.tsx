@@ -18,6 +18,7 @@ import {
   loadUserSettings,
   type UserSettings,
 } from '../../services/settings/userSettings'
+import { addReadingDuration } from '../../services/reading/readingTime'
 import { ChapterContent } from './ChapterContent'
 import { ReaderControlPanel } from './ReaderControlPanel'
 import { ReadingSettingsPanel } from './ReadingSettingsPanel'
@@ -87,6 +88,33 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
       setSelectionPanelOpen(true)
     }
   }, [selection?.text])
+
+  useEffect(() => {
+    let segmentStart = Date.now()
+    let accumulated = 0
+
+    const flushSegment = () => {
+      accumulated += Date.now() - segmentStart
+    }
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        flushSegment()
+      } else {
+        segmentStart = Date.now()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      flushSegment()
+      if (accumulated >= 3000) {
+        void addReadingDuration(accumulated)
+      }
+    }
+  }, [bookId])
 
   const chapter = book?.chapters[chapterIndex]
   const theme = getThemeById(readingSettings?.themeId ?? 'parchment')

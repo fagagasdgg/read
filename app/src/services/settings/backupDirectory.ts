@@ -21,9 +21,33 @@ const DEFAULT_SETTINGS: BackupDirectorySettings = {
   updatedAt: 0,
 }
 
+/** 将 Android content:// 树形 URI 转为可读路径 */
+export function formatBackupDirectoryPathForDisplay(rawPath: string): string {
+  if (!rawPath) return ''
+
+  try {
+    const decoded = decodeURIComponent(rawPath)
+    if (decoded.startsWith('content://')) {
+      const treeMatch = decoded.match(/\/tree\/([^/]+)/)
+      if (treeMatch?.[1]) {
+        const segment = treeMatch[1].replace(/^primary:/i, '内部存储/')
+        return segment.replace(/:/g, '/')
+      }
+      return decoded.replace(/^content:\/\/[^/]+\//, '')
+    }
+    return decoded
+  } catch {
+    return rawPath
+  }
+}
+
 export function formatBackupDirectoryLabel(settings: BackupDirectorySettings): string {
-  if (settings.displayPath) return settings.displayPath
-  return '未设置（后续导入/导出时将提示选择）'
+  const readable =
+    settings.displayPath && !settings.displayPath.startsWith('content://')
+      ? settings.displayPath
+      : formatBackupDirectoryPathForDisplay(settings.nativePath || settings.displayPath)
+  if (readable) return readable
+  return '未设置（导出时将保存到 Documents/read-backups）'
 }
 
 export async function loadBackupDirectorySettings(): Promise<BackupDirectorySettings> {
@@ -67,7 +91,7 @@ export async function pickBackupDirectory(): Promise<BackupDirectorySettings | n
       if (!result.path) return null
 
       const next: BackupDirectorySettings = {
-        displayPath: result.path,
+        displayPath: formatBackupDirectoryPathForDisplay(result.path),
         nativePath: result.path,
         webDirectoryName: '',
         updatedAt: Date.now(),

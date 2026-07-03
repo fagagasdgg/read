@@ -54,7 +54,7 @@ export function BackupDirectorySection() {
       </button>
       {dirMessage && <p className="reader-backup-dir-message">{dirMessage}</p>}
       <p className="settings-section-note">
-        导入/导出功能开发完成后，将在此目录读写词典、笔记、已掌握单词等数据。卸载重装后可通过导入恢复。
+        导出时将保存到此目录；未设置时默认保存到 Documents/read-backups。卸载重装后可通过导入恢复学习数据。
       </p>
     </section>
   )

@@ -4,7 +4,11 @@ import {
   isWordEntry,
   isWordNotFoundMarker,
   type DictionaryCacheValue,
+  type DictionarySourceId,
+  type ExamLevel,
+  type WordDefinition,
   type WordEntry,
+  type WordForm,
   type WordNotFoundMarker,
 } from './types'
 
@@ -149,35 +153,100 @@ export async function exportAllCachedRecords(): Promise<
   return records
 }
 
-function isValidCacheValue(value: unknown): value is DictionaryCacheValue {
-  if (!value || typeof value !== 'object') return false
-  const item = value as Record<string, unknown>
-  if (item.notFound === true) {
-    return typeof item.lemma === 'string' && typeof item.cachedAt === 'number'
+function normalizeDictionaryImportItem(item: unknown): { lemma: string; value: unknown } | null {
+  if (!item || typeof item !== 'object') return null
+  const row = item as Record<string, unknown>
+
+  if (typeof row.lemma === 'string' && 'value' in row) {
+    return { lemma: row.lemma, value: row.value }
   }
-  return (
-    typeof item.lemma === 'string' &&
-    typeof item.cachedAt === 'number' &&
-    Array.isArray(item.definitions)
-  )
+
+  if (typeof row.lemma === 'string') {
+    if (row.notFound === true || row.notFound === 'true' || Array.isArray(row.definitions)) {
+      return { lemma: row.lemma, value: row }
+    }
+    if ('phoneticUs' in row || 'phoneticUk' in row || 'source' in row) {
+      return { lemma: row.lemma, value: row }
+    }
+  }
+
+  return null
+}
+
+function normalizeCacheValue(value: unknown, fallbackLemma: string): DictionaryCacheValue | null {
+  if (!value || typeof value !== 'object') return null
+  const item = value as Record<string, unknown>
+  const lemma =
+    typeof item.lemma === 'string' && item.lemma.trim() ? item.lemma.trim() : fallbackLemma
+  if (!lemma) return null
+
+  const cachedAt = typeof item.cachedAt === 'number' ? item.cachedAt : Date.now()
+
+  if (item.notFound === true || item.notFound === 'true') {
+    const triedSources = Array.isArray(item.triedSources)
+      ? (item.triedSources.filter((id) => id === 'youdao' || id === 'iciba') as DictionarySourceId[])
+      : (['youdao'] as DictionarySourceId[])
+    return {
+      lemma,
+      notFound: true,
+      cachedAt,
+      triedSources: triedSources.length ? triedSources : ['youdao'],
+    }
+  }
+
+  const definitions = Array.isArray(item.definitions)
+    ? (item.definitions.filter(
+        (def) =>
+          def &&
+          typeof def === 'object' &&
+          typeof (def as WordDefinition).translation === 'string',
+      ) as WordDefinition[])
+    : []
+
+  const forms = Array.isArray(item.forms)
+    ? (item.forms.filter(
+        (form) =>
+          form &&
+          typeof form === 'object' &&
+          typeof (form as WordForm).label === 'string' &&
+          typeof (form as WordForm).value === 'string',
+      ) as WordForm[])
+    : []
+
+  return {
+    lemma,
+    phoneticUs: typeof item.phoneticUs === 'string' ? item.phoneticUs : '',
+    phoneticUk: typeof item.phoneticUk === 'string' ? item.phoneticUk : '',
+    usSpeechUrl: typeof item.usSpeechUrl === 'string' ? item.usSpeechUrl : '',
+    ukSpeechUrl: typeof item.ukSpeechUrl === 'string' ? item.ukSpeechUrl : '',
+    examLevels: Array.isArray(item.examLevels) ? (item.examLevels as ExamLevel[]) : [],
+    definitions,
+    forms,
+    cachedAt,
+    source: item.source === 'iciba' ? 'iciba' : 'youdao',
+  }
 }
 
 export async function importDictionaryRecords(
-  records: Array<{ lemma: string; value: unknown }>,
+  records: Array<{ lemma: string; value: unknown }> | unknown[],
 ): Promise<{ imported: number; skipped: number }> {
   const db = await getDb()
   let imported = 0
   let skipped = 0
 
-  for (const item of records) {
-    const lemma = typeof item.lemma === 'string' ? item.lemma.trim() : ''
-    if (!lemma || !isValidCacheValue(item.value)) {
+  const normalized = records
+    .map((item) => normalizeDictionaryImportItem(item))
+    .filter((item): item is { lemma: string; value: unknown } => item !== null)
+
+  for (const item of normalized) {
+    const lemma = item.lemma.trim()
+    const incoming = normalizeCacheValue(item.value, lemma)
+    if (!lemma || !incoming) {
       skipped += 1
       continue
     }
 
     const existing = await db.get(STORE, lemma)
-    const incoming = item.value
     if (!existing) {
       await db.put(STORE, incoming, lemma)
       imported += 1

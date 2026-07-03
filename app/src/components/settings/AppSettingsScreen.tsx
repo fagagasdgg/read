@@ -1,7 +1,4 @@
 import { useEffect, useState } from 'react'
-import { getDictionaryCacheStats } from '../../services/dictionary'
-import { getMasteredWordCount, subscribeMasteredWords } from '../../services/words/mastered'
-import { getLemmaPhraseWordCount } from '../../services/words/phrases'
 import {
   ENGLISH_LEVEL_OPTIONS,
   loadUserSettings,
@@ -14,30 +11,9 @@ import { DictionarySourcesSection } from './DictionarySourcesSection'
 
 export function AppSettingsScreen() {
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null)
-  const [cacheStats, setCacheStats] = useState({ wordCount: 0, notFoundCount: 0 })
-  const [masteredCount, setMasteredCount] = useState(0)
-  const [phraseWordCount, setPhraseWordCount] = useState(0)
 
   useEffect(() => {
     void loadUserSettings().then(setUserSettings)
-  }, [])
-
-  useEffect(() => {
-    async function refreshStats() {
-      const [cache, mastered, phraseWords] = await Promise.all([
-        getDictionaryCacheStats(),
-        getMasteredWordCount(),
-        getLemmaPhraseWordCount(),
-      ])
-      setCacheStats(cache)
-      setMasteredCount(mastered)
-      setPhraseWordCount(phraseWords)
-    }
-    void refreshStats()
-    const unsub = subscribeMasteredWords(() => {
-      void getMasteredWordCount().then(setMasteredCount)
-    })
-    return unsub
   }, [])
 
   function updateUser(partial: Partial<UserSettings>) {
@@ -89,21 +65,6 @@ export function AppSettingsScreen() {
         <div className="settings-section-divider" />
 
         <DictionarySourcesSection />
-
-        <div className="settings-section-divider" />
-
-        <section className="settings-section">
-          <h4 className="settings-section-title">词典缓存（调试）</h4>
-          <p className="reader-cache-stats">
-            已缓存词条：<strong>{cacheStats.wordCount}</strong>
-            <br />
-            查不到已标记：<strong>{cacheStats.notFoundCount}</strong>
-            <br />
-            已掌握单词：<strong>{masteredCount}</strong>
-            <br />
-            已添加词组的单词：<strong>{phraseWordCount}</strong>
-          </p>
-        </section>
       </div>
     </div>
   )

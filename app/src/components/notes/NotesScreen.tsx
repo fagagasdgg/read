@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AppToast, type AppToastVariant } from '../common/AppToast'
+import { BACKUP_DATA_CHANGED } from '../../services/backup/events'
 import {
   createNotebook,
   listNotebooks,
@@ -29,6 +30,14 @@ export function NotesScreen() {
 
   useEffect(() => {
     void refresh()
+  }, [refresh])
+
+  useEffect(() => {
+    const onBackupChanged = () => {
+      void refresh()
+    }
+    window.addEventListener(BACKUP_DATA_CHANGED, onBackupChanged)
+    return () => window.removeEventListener(BACKUP_DATA_CHANGED, onBackupChanged)
   }, [refresh])
 
   function showToast(message: string, variant: AppToastVariant = 'ok') {

@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { AppToast } from '../common/AppToast'
 import { analyzeSentenceDeep, estimateSelectionTooLongForActiveProvider, hasActiveLlmApiKey } from '../../services/llm/deepAnalysis'
 import {
   copyDoubaoPrompt,
@@ -44,6 +45,7 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
   const [error, setError] = useState('')
   const [showPicker, setShowPicker] = useState(false)
   const [lengthWarning, setLengthWarning] = useState('')
+  const [toast, setToast] = useState('')
 
   const applyImportedAnalysis = useCallback((result: NotebookEntryAnalysis) => {
     suspendDomSelection()
@@ -52,6 +54,8 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
     setDoubaoPending(false)
     setShowPasteSheet(false)
     setMessage('已导入解析结果')
+    setToast('已成功导入豆包解析结果')
+    setTimeout(() => setToast(''), 2800)
     setError('')
   }, [])
 
@@ -294,6 +298,8 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
           }}
         />
       )}
+
+      <AppToast message={toast} variant="ok" />
     </>,
     document.body,
   )

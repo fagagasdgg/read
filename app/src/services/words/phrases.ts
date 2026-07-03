@@ -227,6 +227,7 @@ function normalizePhraseRecord(raw: unknown, fallbackLemma: string): WordPhraseR
 export async function importPhraseStore(
   incoming: Record<string, unknown>,
 ): Promise<{ imported: number; merged: number }> {
+  cache = null
   const store = await readStore()
   let imported = 0
   let merged = 0

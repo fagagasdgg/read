@@ -424,11 +424,32 @@ export async function importNotebooksBackup(payload: {
     await writeDocument(baseDoc)
   }
 
+  for (const rawDoc of payload.documents) {
+    if (!rawDoc || typeof rawDoc !== 'object' || typeof rawDoc.id !== 'string') continue
+    if (registryMap.has(rawDoc.id)) continue
+
+    const normalizedDoc = normalizeDocument(rawDoc, rawDoc.id)
+    if (!normalizedDoc) {
+      warnings.push(`跳过无效的笔记本文档：${rawDoc.id}`)
+      continue
+    }
+
+    const meta: NotebookMeta = {
+      id: normalizedDoc.id,
+      title: normalizedDoc.title,
+      createdAt: Date.now(),
+      updatedAt: normalizedDoc.updatedAt,
+    }
+    registryMap.set(meta.id, meta)
+    await writeDocument(normalizedDoc)
+    entriesAdded += normalizedDoc.entries.length
+  }
+
   const mergedRegistry = [...registryMap.values()].sort((a, b) => b.updatedAt - a.updatedAt)
   await writeRegistry(mergedRegistry)
 
   return {
-    notebooks: payload.registry.length,
+    notebooks: mergedRegistry.length,
     entries: entriesAdded,
     warnings,
   }
