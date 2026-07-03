@@ -79,9 +79,13 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
 
   const { selection, clearSelection } = useTextSelection(contentEl)
   const [selectionPanelOpen, setSelectionPanelOpen] = useState(false)
+  const [sessionText, setSessionText] = useState<string | null>(null)
 
   useEffect(() => {
-    if (selection) setSelectionPanelOpen(true)
+    if (selection) {
+      setSessionText(selection.text)
+      setSelectionPanelOpen(true)
+    }
   }, [selection?.text])
 
   const chapter = book?.chapters[chapterIndex]
@@ -434,12 +438,16 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
         />
       )}
 
-      {selection && selectionPanelOpen && !overlay && !wordLookup && (
+      {sessionText && selectionPanelOpen && !overlay && !wordLookup && (
         <SelectionToolbar
           bookId={book.id}
-          selection={selection}
+          text={sessionText}
           onClose={() => setSelectionPanelOpen(false)}
-          onClear={clearSelection}
+          onClear={() => {
+            setSessionText(null)
+            setSelectionPanelOpen(false)
+            clearSelection()
+          }}
         />
       )}
 

@@ -1878,6 +1878,16 @@
 }
 
 /* Text selection panel — portal 到 body，层级高于阅读页，不干扰系统选区菜单 */
+.selection-action-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  border: none;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.45);
+  cursor: default;
+}
+
 .selection-panel {
   position: fixed;
   left: 50%;
@@ -1891,6 +1901,21 @@
   background: rgba(31, 41, 55, 0.98);
   color: #f9fafb;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.selection-panel-expanded {
+  left: 0;
+  right: 0;
+  top: auto;
+  bottom: 0;
+  transform: none;
+  width: 100%;
+  max-width: none;
+  max-height: min(88vh, 100%);
+  border-radius: 16px 16px 0 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
 }
 
 .selection-panel-header {
@@ -1943,10 +1968,36 @@
   line-height: 1.4;
 }
 
+.selection-panel-warn {
+  margin: 6px 12px 0;
+  font-size: 0.72rem;
+  color: #fbbf24;
+  line-height: 1.4;
+}
+
+.selection-panel-doubao-wait {
+  color: #93c5fd;
+}
+
+.selection-panel-snippet-expanded {
+  margin-top: 0;
+  max-height: 4.5em;
+  -webkit-line-clamp: 3;
+}
+
 .selection-analysis-preview {
-  padding: 0 10px 4px;
-  max-height: 42vh;
+  padding: 0 12px 4px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.selection-toolbar-row-sticky {
+  position: sticky;
+  bottom: 0;
+  padding: 8px 0 4px;
+  background: linear-gradient(180deg, rgba(31, 41, 55, 0), rgba(31, 41, 55, 0.98) 24%);
 }
 
 .selection-analysis-block {
@@ -1993,6 +2044,27 @@
 .zhipu-key-error {
   margin: 8px 0 0;
   font-size: 0.82rem;
+  color: #dc2626;
+}
+
+.zhipu-model-specs {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #4b5563;
+}
+
+.zhipu-model-specs p {
+  margin: 0 0 4px;
+}
+
+.zhipu-custom-model-block {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.zhipu-remove-model-btn {
   color: #dc2626;
 }
 

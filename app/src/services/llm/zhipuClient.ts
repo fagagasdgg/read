@@ -1,4 +1,5 @@
-import type { ZhipuSettings } from './zhipuSettings'
+import type { ZhipuModelOption, ZhipuSettings } from './zhipuSettings'
+import { getZhipuModelOption } from './zhipuSettings'
 
 const ZHIPU_API_URL = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
 
@@ -58,7 +59,6 @@ function extractMessageContent(message: ZhipuMessage | undefined): string {
     if (joined) return joined
   }
 
-  // 思考模式可能把输出放在 reasoning_content；深度解析应关闭 thinking，此处作兜底
   if (typeof message.reasoning_content === 'string' && message.reasoning_content.trim()) {
     return message.reasoning_content.trim()
   }
@@ -66,25 +66,46 @@ function extractMessageContent(message: ZhipuMessage | undefined): string {
   return ''
 }
 
+function resolveMaxTokens(
+  model: string,
+  customModels: ZhipuModelOption[],
+  requested?: number,
+): number {
+  const option = getZhipuModelOption(model, customModels)
+  const cap = option?.maxOutputTokens ?? 1024
+  const value = requested ?? cap
+  return Math.min(cap, Math.max(1, value))
+}
+
+function shouldUseThinking(
+  model: string,
+  customModels: ZhipuModelOption[],
+  thinkingEnabled?: boolean,
+): boolean {
+  if (thinkingEnabled !== undefined) return thinkingEnabled
+  return getZhipuModelOption(model, customModels)?.thinkingDefault ?? false
+}
+
 function buildRequestBody(
-  settings: Pick<ZhipuSettings, 'model'>,
+  settings: Pick<ZhipuSettings, 'model' | 'customModels'>,
   messages: ZhipuChatMessage[],
   options?: { temperature?: number; maxTokens?: number; thinkingEnabled?: boolean },
 ) {
+  const thinking = shouldUseThinking(settings.model, settings.customModels ?? [], options?.thinkingEnabled)
   return {
     model: settings.model,
     messages,
-    thinking: { type: options?.thinkingEnabled ? 'enabled' : 'disabled' },
+    thinking: { type: thinking ? 'enabled' : 'disabled' },
     temperature: options?.temperature ?? 0.3,
-    max_tokens: options?.maxTokens ?? 1200,
+    max_tokens: resolveMaxTokens(settings.model, settings.customModels ?? [], options?.maxTokens),
     stream: false,
   }
 }
 
 export async function zhipuChatCompletion(
-  settings: Pick<ZhipuSettings, 'apiKey' | 'model'>,
+  settings: Pick<ZhipuSettings, 'apiKey' | 'model' | 'customModels'>,
   messages: ZhipuChatMessage[],
-  options?: { temperature?: number; maxTokens?: number },
+  options?: { temperature?: number; maxTokens?: number; thinkingEnabled?: boolean },
 ): Promise<string> {
   const apiKey = settings.apiKey.trim()
   if (!apiKey) throw new Error('请先在「设置」中配置智谱 API Key')
@@ -117,21 +138,29 @@ export async function zhipuChatCompletion(
     return content
   }
 
+  const preferThinking = shouldUseThinking(
+    settings.model,
+    settings.customModels ?? [],
+    options?.thinkingEnabled,
+  )
   try {
-    return await requestOnce(false)
+    return await requestOnce(preferThinking)
   } catch (err) {
     const message = err instanceof Error ? err.message : ''
-    if (!message.includes('智谱未返回有效内容')) throw err
+    if (preferThinking || !message.includes('智谱未返回有效内容')) throw err
     return requestOnce(true)
   }
 }
 
-/** 发送极简请求以验证 Key 是否可用 */
-export async function probeZhipuApiKey(apiKey: string, model: string): Promise<string> {
-  const reply = await zhipuChatCompletion(
-    { apiKey, model },
-    [{ role: 'user', content: '请只回复 OK 两个字母' }],
-    { maxTokens: 64, temperature: 0.1 },
+export async function probeZhipuApiKey(
+  apiKey: string,
+  model: string,
+  customModels: ZhipuModelOption[] = [],
+): Promise<string> {
+  const option = getZhipuModelOption(model, customModels)
+  return zhipuChatCompletion(
+    { apiKey, model, customModels },
+    [{ role: 'user', content: '请只回复 OK' }],
+    { maxTokens: Math.min(32, option?.maxOutputTokens ?? 32), temperature: 0.1 },
   )
-  return reply
 }

@@ -217,7 +217,32 @@ export async function createNotebook(title?: string): Promise<NotebookMeta> {
 }
 
 export async function getNotebookDocument(id: string): Promise<NotebookDocument | null> {
-  return readDocument(id)
+  const doc = await readDocument(id)
+  if (doc) return doc
+  try {
+    return await ensureNotebookDocument(id)
+  } catch {
+    return null
+  }
+}
+
+/** 注册表有记录但文件缺失时自动修复（常见于早期版本或写入失败） */
+export async function ensureNotebookDocument(notebookId: string): Promise<NotebookDocument> {
+  const notebooks = await readRegistry()
+  const meta = notebooks.find((item) => item.id === notebookId)
+  if (!meta) throw new Error('笔记本不存在')
+
+  const existing = await readDocument(notebookId)
+  if (existing) return existing
+
+  const doc: NotebookDocument = {
+    id: meta.id,
+    title: meta.title,
+    entries: [],
+    updatedAt: Date.now(),
+  }
+  await writeDocument(doc)
+  return doc
 }
 
 export function listNotebookEntries(
@@ -267,8 +292,7 @@ export async function addNotebookEntry(
   sentence: string,
   analysis: Partial<NotebookEntryAnalysis> = {},
 ): Promise<NotebookEntry> {
-  const doc = await readDocument(notebookId)
-  if (!doc) throw new Error('笔记本不存在')
+  const doc = await ensureNotebookDocument(notebookId)
 
   const entry: NotebookEntry = {
     id: createEntryId(),
