@@ -59,16 +59,36 @@ export async function saveProgressAsync(
   bookId: string,
   chapterIndex: number,
   pageIndex = 0,
+  progressPercent?: number,
 ): Promise<void> {
   try {
     const all = await readAll()
-    all[bookId] = { bookId, chapterIndex, pageIndex, updatedAt: Date.now() }
+    const existing = all[bookId]
+    all[bookId] = {
+      bookId,
+      chapterIndex,
+      pageIndex,
+      updatedAt: Date.now(),
+      progressPercent:
+        typeof progressPercent === 'number'
+          ? Math.min(100, Math.max(0, Math.round(progressPercent)))
+          : existing?.progressPercent,
+    }
     await writeAll(all)
   } catch {
     // 开发阶段忽略存储失败
   }
 }
 
-export function saveProgress(bookId: string, chapterIndex: number, pageIndex = 0): void {
-  void saveProgressAsync(bookId, chapterIndex, pageIndex)
+export async function loadAllProgress(): Promise<Record<string, ReadingProgress>> {
+  return readAll()
+}
+
+export function saveProgress(
+  bookId: string,
+  chapterIndex: number,
+  pageIndex = 0,
+  progressPercent?: number,
+): void {
+  void saveProgressAsync(bookId, chapterIndex, pageIndex, progressPercent)
 }

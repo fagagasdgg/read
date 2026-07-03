@@ -1,13 +1,14 @@
 import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
-import { FilePicker } from '@capawesome/capacitor-file-picker'
+import { ScopedStorage, type FolderRef } from '@daniele-rolli/capacitor-scoped-storage'
 
 export interface BackupDirectorySettings {
-  /** 用于界面展示的路径或目录名 */
   displayPath: string
-  /** Android / iOS 由系统返回的目录路径 */
+  /** 兼容旧版 FilePicker 路径 */
   nativePath: string
-  /** 浏览器 File System Access API 目录名 */
+  /** ScopedStorage 文件夹引用 id（Android tree URI） */
+  folderId: string
+  folderName: string
   webDirectoryName: string
   updatedAt: number
 }
@@ -17,6 +18,8 @@ const STORAGE_KEY = 'read-backup-directory'
 const DEFAULT_SETTINGS: BackupDirectorySettings = {
   displayPath: '',
   nativePath: '',
+  folderId: '',
+  folderName: '',
   webDirectoryName: '',
   updatedAt: 0,
 }
@@ -42,12 +45,25 @@ export function formatBackupDirectoryPathForDisplay(rawPath: string): string {
 }
 
 export function formatBackupDirectoryLabel(settings: BackupDirectorySettings): string {
+  if (settings.folderName && !settings.folderName.startsWith('content://')) {
+    return settings.folderName
+  }
   const readable =
     settings.displayPath && !settings.displayPath.startsWith('content://')
       ? settings.displayPath
-      : formatBackupDirectoryPathForDisplay(settings.nativePath || settings.displayPath)
+      : formatBackupDirectoryPathForDisplay(settings.folderId || settings.nativePath)
   if (readable) return readable
   return '未设置（导出时将保存到 Documents/read-backups）'
+}
+
+export function resolveBackupFolder(settings: BackupDirectorySettings): FolderRef | null {
+  if (settings.folderId) {
+    return { id: settings.folderId, name: settings.folderName || settings.displayPath }
+  }
+  if (settings.nativePath.startsWith('content://')) {
+    return { id: settings.nativePath, name: settings.displayPath || settings.folderName }
+  }
+  return null
 }
 
 export async function loadBackupDirectorySettings(): Promise<BackupDirectorySettings> {
@@ -87,12 +103,19 @@ export async function clearBackupDirectorySettings(): Promise<BackupDirectorySet
 export async function pickBackupDirectory(): Promise<BackupDirectorySettings | null> {
   try {
     if (Capacitor.isNativePlatform()) {
-      const result = await FilePicker.pickDirectory()
-      if (!result.path) return null
+      const { folder } = await ScopedStorage.pickFolder()
+      if (!folder?.id) return null
+
+      const display =
+        folder.name?.trim() ||
+        formatBackupDirectoryPathForDisplay(folder.id) ||
+        '已选文件夹'
 
       const next: BackupDirectorySettings = {
-        displayPath: formatBackupDirectoryPathForDisplay(result.path),
-        nativePath: result.path,
+        displayPath: display,
+        nativePath: folder.id,
+        folderId: folder.id,
+        folderName: display,
         webDirectoryName: '',
         updatedAt: Date.now(),
       }
@@ -110,6 +133,8 @@ export async function pickBackupDirectory(): Promise<BackupDirectorySettings | n
       const next: BackupDirectorySettings = {
         displayPath: handle.name,
         nativePath: '',
+        folderId: '',
+        folderName: handle.name,
         webDirectoryName: handle.name,
         updatedAt: Date.now(),
       }

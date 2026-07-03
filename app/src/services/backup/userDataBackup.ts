@@ -1,12 +1,14 @@
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
+import { ScopedStorage } from '@daniele-rolli/capacitor-scoped-storage'
 import { FilePicker } from '@capawesome/capacitor-file-picker'
 import { getDictionaryCacheStats, importDictionaryRecords } from '../dictionary/cache'
 import { importBookNotebookMap } from '../notes/bookNotebook'
 import { importNotebooksBackup } from '../notes/notebooks'
 import {
-  formatBackupDirectoryPathForDisplay,
+  formatBackupDirectoryLabel,
   loadBackupDirectorySettings,
+  resolveBackupFolder,
 } from '../settings/backupDirectory'
 import { getMasteredWordCount, importMasteredWordsList } from '../words/mastered'
 import { getLemmaPhraseWordCount, importPhraseStore } from '../words/phrases'
@@ -61,42 +63,24 @@ async function readPickedZipBuffer(): Promise<ArrayBuffer> {
 async function saveNativeBackupZip(zipBlob: Blob, filename: string): Promise<string> {
   const base64 = await blobToBase64(zipBlob)
   const dir = await loadBackupDirectorySettings()
+  const folder = resolveBackupFolder(dir)
 
-  if (dir.nativePath) {
-    const tempPath = `read-export-${Date.now()}-${filename}`
-    await Filesystem.writeFile({
-      path: tempPath,
-      data: base64,
-      directory: Directory.Cache,
-      recursive: true,
-    })
-
-    const { uri } = await Filesystem.getUri({
-      path: tempPath,
-      directory: Directory.Cache,
-    })
-
-    const destPath = dir.nativePath.endsWith('/')
-      ? `${dir.nativePath}${filename}`
-      : `${dir.nativePath}/${filename}`
-
-    await FilePicker.copyFile({
-      from: uri,
-      to: destPath,
-      overwrite: true,
-    })
-
+  if (folder) {
     try {
-      await Filesystem.deleteFile({
-        path: tempPath,
-        directory: Directory.Cache,
+      await ScopedStorage.writeFile({
+        folder,
+        path: filename,
+        data: base64,
+        encoding: 'base64',
+        mimeType: 'application/zip',
       })
-    } catch {
-      // 临时文件清理失败可忽略
+      return `${formatBackupDirectoryLabel(dir)}/${filename}`
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      throw new Error(
+        `无法写入所选备份目录，请在设置中重新选择目录后重试。${message.includes('Permission') ? '（目录访问权限已失效）' : ''}`,
+      )
     }
-
-    const label = formatBackupDirectoryPathForDisplay(dir.nativePath)
-    return `${label}/${filename}`
   }
 
   const path = `read-backups/${filename}`

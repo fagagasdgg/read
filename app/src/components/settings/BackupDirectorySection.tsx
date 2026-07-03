@@ -34,6 +34,8 @@ export function BackupDirectorySection() {
   const emptyDir: BackupDirectorySettings = {
     displayPath: '',
     nativePath: '',
+    folderId: '',
+    folderName: '',
     webDirectoryName: '',
     updatedAt: 0,
   }
@@ -54,7 +56,7 @@ export function BackupDirectorySection() {
       </button>
       {dirMessage && <p className="reader-backup-dir-message">{dirMessage}</p>}
       <p className="settings-section-note">
-        导出时将保存到此目录；未设置时默认保存到 Documents/read-backups。卸载重装后可通过导入恢复学习数据。
+        导出时将保存到此目录（需使用系统文件夹选择器授权）。若导出报权限错误，请重新选择目录。
       </p>
     </section>
   )

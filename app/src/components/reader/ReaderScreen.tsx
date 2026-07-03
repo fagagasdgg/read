@@ -18,7 +18,7 @@ import {
   loadUserSettings,
   type UserSettings,
 } from '../../services/settings/userSettings'
-import { addReadingDuration } from '../../services/reading/readingTime'
+import { addBookReadingSession } from '../../services/reading/readingTime'
 import { ChapterContent } from './ChapterContent'
 import { ReaderControlPanel } from './ReaderControlPanel'
 import { ReadingSettingsPanel } from './ReadingSettingsPanel'
@@ -90,31 +90,48 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
   }, [selection?.text])
 
   useEffect(() => {
-    let segmentStart = Date.now()
+    if (!book) return
+
+    let segmentStart: number | null = document.hidden ? null : Date.now()
     let accumulated = 0
 
-    const flushSegment = () => {
+    const pause = () => {
+      if (segmentStart === null) return
       accumulated += Date.now() - segmentStart
+      segmentStart = null
     }
 
-    const onVisibility = () => {
-      if (document.hidden) {
-        flushSegment()
-      } else {
+    const resume = () => {
+      if (!document.hidden && segmentStart === null) {
         segmentStart = Date.now()
       }
     }
 
+    const flushSession = () => {
+      pause()
+      if (accumulated >= 5000) {
+        void addBookReadingSession(book.id, book.title, accumulated)
+      }
+      accumulated = 0
+      resume()
+    }
+
+    const onVisibility = () => {
+      if (document.hidden) flushSession()
+      else resume()
+    }
+
     document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('blur', flushSession)
+    window.addEventListener('focus', resume)
 
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
-      flushSegment()
-      if (accumulated >= 3000) {
-        void addReadingDuration(accumulated)
-      }
+      window.removeEventListener('blur', flushSession)
+      window.removeEventListener('focus', resume)
+      flushSession()
     }
-  }, [bookId])
+  }, [book?.id, book?.title])
 
   const chapter = book?.chapters[chapterIndex]
   const theme = getThemeById(readingSettings?.themeId ?? 'parchment')
@@ -148,12 +165,14 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
   const persistPage = useCallback(
     (nextPageIndex: number) => {
       if (!book) return
+      const fraction = pageCount > 0 ? (nextPageIndex + 1) / pageCount : 0
+      const percent = Math.round(((chapterIndex + fraction) / book.chapters.length) * 100)
       if (progressSaveTimer.current) clearTimeout(progressSaveTimer.current)
       progressSaveTimer.current = setTimeout(() => {
-        saveProgress(book.id, chapterIndex, nextPageIndex)
+        saveProgress(book.id, chapterIndex, nextPageIndex, percent)
       }, 200)
     },
-    [book, chapterIndex],
+    [book, chapterIndex, pageCount],
   )
 
   const flushProgress = useCallback(async () => {
@@ -162,8 +181,8 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
       clearTimeout(progressSaveTimer.current)
       progressSaveTimer.current = null
     }
-    await saveProgressAsync(book.id, chapterIndex, pageIndex)
-  }, [book, chapterIndex, pageIndex])
+    await saveProgressAsync(book.id, chapterIndex, pageIndex, progressPercent)
+  }, [book, chapterIndex, pageIndex, progressPercent])
 
   useEffect(() => () => {
     void flushProgress()
@@ -284,7 +303,9 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     chapterLandRef.current = { mode: 'start' }
     chapterLandAppliedRef.current = true
     setPageIndex(targetPage)
-    void saveProgressAsync(book.id, chapterIndex, targetPage)
+    const fraction = pageCount > 0 ? (targetPage + 1) / pageCount : 0
+    const percent = Math.round(((chapterIndex + fraction) / book.chapters.length) * 100)
+    void saveProgressAsync(book.id, chapterIndex, targetPage, percent)
   }, [
     pageCount,
     pageHeight,
@@ -340,7 +361,9 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
 
     if (chapterIndex < book.chapters.length - 1) {
       chapterLandRef.current = { mode: 'start' }
-      saveProgress(book.id, chapterIndex + 1, 0)
+      const nextChapter = chapterIndex + 1
+      const percent = Math.round((nextChapter / book.chapters.length) * 100)
+      saveProgress(book.id, nextChapter, 0, percent)
       setChapterIndex((i) => i + 1)
     }
   }

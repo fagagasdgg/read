@@ -203,6 +203,34 @@ export async function listNotebooks(): Promise<NotebookMeta[]> {
   return notebooks.sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
+export async function countNotebookEntries(options?: {
+  from?: number
+  to?: number
+}): Promise<number> {
+  const notebooks = await readRegistry()
+  let total = 0
+
+  for (const meta of notebooks) {
+    const doc = await readDocument(meta.id)
+    if (!doc?.entries.length) continue
+
+    if (!options?.from && !options?.to) {
+      total += doc.entries.length
+      continue
+    }
+
+    const from = options.from ?? 0
+    const to = options.to ?? Number.MAX_SAFE_INTEGER
+    for (const entry of doc.entries) {
+      if (entry.createdAt >= from && entry.createdAt <= to) {
+        total += 1
+      }
+    }
+  }
+
+  return total
+}
+
 export async function createNotebook(title?: string): Promise<NotebookMeta> {
   const notebooks = await readRegistry()
   const now = Date.now()

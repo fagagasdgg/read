@@ -19,6 +19,7 @@
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/preferences": "^8.0.1",
     "@capawesome/capacitor-file-picker": "^8.0.3",
+    "@daniele-rolli/capacitor-scoped-storage": "^0.0.3",
     "compromise": "^14.15.1",
     "idb": "^8.0.3",
     "js-md5": "^0.8.3",

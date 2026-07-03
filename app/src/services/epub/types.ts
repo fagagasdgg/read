@@ -23,4 +23,6 @@ export interface ReadingProgress {
   /** @deprecated 视口分页后改用 pageIndex */
   scrollTop?: number
   updatedAt: number
+  /** 全书阅读进度 0–100，用于统计「读完」 */
+  progressPercent?: number
 }

@@ -46,6 +46,7 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
   const [showPicker, setShowPicker] = useState(false)
   const [lengthWarning, setLengthWarning] = useState('')
   const [toast, setToast] = useState('')
+  const [importSuccess, setImportSuccess] = useState(false)
 
   const applyImportedAnalysis = useCallback((result: NotebookEntryAnalysis) => {
     suspendDomSelection()
@@ -53,9 +54,13 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
     setMode('preview')
     setDoubaoPending(false)
     setShowPasteSheet(false)
-    setMessage('已导入解析结果')
+    setImportSuccess(true)
+    setMessage('')
     setToast('已成功导入豆包解析结果')
-    setTimeout(() => setToast(''), 2800)
+    setTimeout(() => {
+      setToast('')
+      setImportSuccess(false)
+    }, 3200)
     setError('')
   }, [])
 
@@ -191,6 +196,17 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
 
         {mode === 'actions' ? (
           <>
+            {importSuccess && (
+              <div className="selection-import-success" role="status">
+                <span className="selection-import-success-icon" aria-hidden>
+                  ✓
+                </span>
+                <div>
+                  <strong>导入成功</strong>
+                  <p>豆包解析结果已就绪，可预览并存入笔记</p>
+                </div>
+              </div>
+            )}
             <div className="selection-action-grid">
               <button
                 type="button"
@@ -236,6 +252,14 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
         ) : (
           analysis && (
             <div className="selection-analysis-preview">
+              {importSuccess && (
+                <div className="selection-import-success selection-import-success-inline" role="status">
+                  <span className="selection-import-success-icon" aria-hidden>
+                    ✓
+                  </span>
+                  <strong>已成功导入豆包解析结果</strong>
+                </div>
+              )}
               <p className="selection-panel-snippet selection-panel-snippet-expanded">{text}</p>
               <div className="selection-analysis-block">
                 <h4>翻译</h4>
@@ -299,7 +323,7 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
         />
       )}
 
-      <AppToast message={toast} variant="ok" />
+      <AppToast message={toast} variant="ok" className="app-toast-reader" />
     </>,
     document.body,
   )

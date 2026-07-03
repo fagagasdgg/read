@@ -3,40 +3,34 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Open book left page -->
+    <!-- 左侧书页 -->
     <path
-        android:fillColor="#FFF8EB"
-        android:pathData="M24,28 L52,24 L52,80 L24,76 Z" />
-    <!-- Open book right page -->
+        android:fillColor="#FFF9F0"
+        android:pathData="M20,24 C20,22 22,20 26,20 L50,20 L50,84 L24,84 C21,84 20,82 20,80 Z" />
+    <!-- 右侧书页 -->
     <path
-        android:fillColor="#FAF0E0"
-        android:pathData="M56,24 L84,28 L84,76 L56,80 Z" />
-    <!-- Spine -->
-    <path
-        android:fillColor="#8B6914"
-        android:pathData="M50,24 L58,24 L58,80 L50,80 Z" />
-    <!-- Page lines left -->
-    <path
-        android:strokeColor="#D4C4A8"
-        android:strokeWidth="1.2"
-        android:pathData="M30,38 L46,36 M30,46 L46,44 M30,54 L44,52 M30,62 L46,60" />
-    <!-- Page lines right -->
-    <path
-        android:strokeColor="#D4C4A8"
-        android:strokeWidth="1.2"
-        android:pathData="M62,36 L78,38 M62,44 L78,46 M64,52 L78,54 M62,60 L78,62" />
-    <!-- Cover shadow -->
+        android:fillColor="#F5EBDD"
+        android:pathData="M58,20 L82,20 C86,20 88,22 88,24 L88,80 C88,82 86,84 83,84 L58,84 Z" />
+    <!-- 书脊与封面 -->
     <path
         android:fillColor="#6B4E3D"
-        android:pathData="M22,76 L86,76 L86,82 C58,88 50,88 22,82 Z" />
-    <!-- EPUB badge -->
+        android:pathData="M48,18 L60,18 L60,86 L48,86 Z" />
     <path
-        android:fillColor="#4A7C9B"
-        android:pathData="M62,14 L82,14 A6,6 0 0,1 88,20 L88,32 A6,6 0 0,1 82,38 L62,38 Z" />
+        android:fillColor="#8B6238"
+        android:pathData="M18,22 C18,18 22,16 28,16 L80,16 C86,16 90,18 90,22 L90,82 C90,86 86,88 80,88 L28,88 C22,88 18,86 18,82 Z"
+        android:fillAlpha="0.15" />
+    <!-- 左页文字线 -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M67,22 L67,30 L71,30 C73.2,30 75,28.2 75,26 C75,23.8 73.2,22 71,22 Z M69,24 L71,24 C72.1,24 73,24.9 73,26 C73,27.1 72.1,28 71,28 L69,28 Z" />
+        android:strokeColor="#D8C8B0"
+        android:strokeWidth="1.4"
+        android:pathData="M28,34 L44,34 M28,42 L44,42 M28,50 L42,50 M28,58 L44,58 M28,66 L40,66" />
+    <!-- 右页文字线 -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M76,22 L78,22 L78,30 L76,30 Z M80,22 L84,22 L84,24 L82,24 L82,25 L84,25 L84,27 L82,27 L82,30 L80,30 Z" />
+        android:strokeColor="#D8C8B0"
+        android:strokeWidth="1.4"
+        android:pathData="M64,34 L80,34 M64,42 L80,42 M64,50 L78,50 M64,58 L80,58 M64,66 L76,66" />
+    <!-- 书签 -->
+    <path
+        android:fillColor="#C45C3E"
+        android:pathData="M54,16 L58,16 L58,38 L56,36 L54,38 Z" />
 </vector>

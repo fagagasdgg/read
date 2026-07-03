@@ -1,21 +1,36 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { BACKUP_DATA_CHANGED } from '../../services/backup/events'
+import { getBookCoverDataUrl } from '../../services/epub/library'
 import { getDictionaryCacheStats } from '../../services/dictionary'
 import { listNotebooks } from '../../services/notes/notebooks'
 import {
+  formatCompareText,
   formatReadingDuration,
-  getReadingTimeStats,
-  type ReadingTimeStats,
+  getReadingHistoryStats,
+  shiftReadingPeriod,
+  type PeriodMode,
+  type ReadingHistoryStats,
 } from '../../services/reading/readingTime'
 import { getMasteredWordCount, subscribeMasteredWords } from '../../services/words/mastered'
 import { getLemmaPhraseWordCount } from '../../services/words/phrases'
 
-interface CollapsibleSectionProps {
-  title: string
-  summary: string
-  expanded: boolean
-  onToggle: () => void
-  children: ReactNode
+const PERIOD_TABS: Array<{ id: PeriodMode; label: string }> = [
+  { id: 'week', label: '周' },
+  { id: 'month', label: '月' },
+  { id: 'year', label: '年' },
+]
+
+function DigitBoxes({ value, pad = 2 }: { value: number; pad?: number }) {
+  const text = String(value).padStart(pad, '0')
+  return (
+    <span className="yueli-digits">
+      {text.split('').map((digit, index) => (
+        <span key={`${digit}-${index}`} className="yueli-digit-box">
+          {digit}
+        </span>
+      ))}
+    </span>
+  )
 }
 
 function CollapsibleSection({
@@ -24,7 +39,13 @@ function CollapsibleSection({
   expanded,
   onToggle,
   children,
-}: CollapsibleSectionProps) {
+}: {
+  title: string
+  summary: string
+  expanded: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
   return (
     <section className={`stats-section${expanded ? ' stats-section-expanded' : ''}`}>
       <button type="button" className="stats-section-header" onClick={onToggle}>
@@ -36,7 +57,6 @@ function CollapsibleSection({
           {expanded ? '▾' : '▸'}
         </span>
       </button>
-
       {expanded && (
         <div className="stats-section-body">
           {children}
@@ -50,98 +70,199 @@ function CollapsibleSection({
 }
 
 export function StatisticsScreen() {
-  const [readingExpanded, setReadingExpanded] = useState(false)
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('week')
+  const [anchor, setAnchor] = useState(() => new Date())
+  const [history, setHistory] = useState<ReadingHistoryStats | null>(null)
+  const [coverUrl, setCoverUrl] = useState<string | null>(null)
   const [vocabExpanded, setVocabExpanded] = useState(false)
-  const [readingStats, setReadingStats] = useState<ReadingTimeStats | null>(null)
   const [cacheStats, setCacheStats] = useState({ wordCount: 0, notFoundCount: 0 })
   const [masteredCount, setMasteredCount] = useState(0)
   const [phraseWordCount, setPhraseWordCount] = useState(0)
   const [notebookCount, setNotebookCount] = useState(0)
+  const [activeBar, setActiveBar] = useState<number | null>(null)
 
   const refresh = useCallback(async () => {
-    const [reading, cache, mastered, phraseWords, notebooks] = await Promise.all([
-      getReadingTimeStats(),
+    const [hist, cache, mastered, phraseWords, notebooks] = await Promise.all([
+      getReadingHistoryStats(periodMode, anchor),
       getDictionaryCacheStats(),
       getMasteredWordCount(),
       getLemmaPhraseWordCount(),
       listNotebooks(),
     ])
-    setReadingStats(reading)
+    setHistory(hist)
     setCacheStats(cache)
     setMasteredCount(mastered)
     setPhraseWordCount(phraseWords)
     setNotebookCount(notebooks.length)
-  }, [])
+    setActiveBar(null)
+
+    if (hist.longestBook?.bookId) {
+      const url = await getBookCoverDataUrl(hist.longestBook.bookId)
+      setCoverUrl(url)
+    } else {
+      setCoverUrl(null)
+    }
+  }, [anchor, periodMode])
 
   useEffect(() => {
     void refresh()
-    const unsubMastered = subscribeMasteredWords(() => {
+    const unsub = subscribeMasteredWords(() => {
       void getMasteredWordCount().then(setMasteredCount)
     })
-    const onBackupChanged = () => {
+    const onBackup = () => {
       void refresh()
     }
-    window.addEventListener(BACKUP_DATA_CHANGED, onBackupChanged)
+    window.addEventListener(BACKUP_DATA_CHANGED, onBackup)
     return () => {
-      unsubMastered()
-      window.removeEventListener(BACKUP_DATA_CHANGED, onBackupChanged)
+      unsub()
+      window.removeEventListener(BACKUP_DATA_CHANGED, onBackup)
     }
   }, [refresh])
 
-  const readingSummary = readingStats
-    ? `今日 ${formatReadingDuration(readingStats.todayMs)}`
-    : '加载中…'
-
   const vocabSummary = `词条 ${cacheStats.wordCount} · 笔记本 ${notebookCount} 本`
+  const chartMaxLabel =
+    history && history.distributionMaxMs > 0
+      ? formatReadingDuration(history.distributionMaxMs)
+      : '0 分钟'
 
   return (
-    <div className="statistics-screen">
-      <header className="statistics-header">
-        <h1>统计</h1>
-        <p className="statistics-subtitle">阅读与学习数据一览</p>
+    <div className="statistics-screen yueli-screen">
+      <header className="yueli-header">
+        <div className="yueli-header-top">
+          <h1>阅历</h1>
+          <div className="yueli-period-tabs" role="tablist" aria-label="统计周期">
+            {PERIOD_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={periodMode === tab.id}
+                className={`yueli-period-tab${periodMode === tab.id ? ' active' : ''}`}
+                onClick={() => setPeriodMode(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="yueli-period-nav">
+          <button
+            type="button"
+            className="yueli-period-arrow"
+            aria-label="上一周期"
+            onClick={() => setAnchor((d) => shiftReadingPeriod(periodMode, d, -1))}
+          >
+            ◀
+          </button>
+          <span className="yueli-period-label">{history?.periodLabel ?? '…'}</span>
+          <button
+            type="button"
+            className="yueli-period-arrow"
+            aria-label="下一周期"
+            onClick={() => setAnchor((d) => shiftReadingPeriod(periodMode, d, 1))}
+          >
+            ▶
+          </button>
+        </div>
       </header>
 
-      <div className="statistics-body">
-        <CollapsibleSection
-          title="阅读时长统计"
-          summary={readingSummary}
-          expanded={readingExpanded}
-          onToggle={() => setReadingExpanded((v) => !v)}
-        >
-          <div className="stats-metric-grid">
-            <div className="stats-metric-card">
-              <span className="stats-metric-label">今日</span>
-              <strong className="stats-metric-value">
-                {formatReadingDuration(readingStats?.todayMs ?? 0)}
-              </strong>
+      <div className="statistics-body yueli-body">
+        <section className="yueli-hero-card">
+          <div className="yueli-hero-time">
+            {history && history.hours > 0 && (
+              <>
+                <DigitBoxes value={history.hours} />
+                <span className="yueli-time-unit">小时</span>
+              </>
+            )}
+            <DigitBoxes value={history?.minutes ?? 0} pad={history && history.hours > 0 ? 2 : 2} />
+            <span className="yueli-time-unit">分钟</span>
+          </div>
+          <p className="yueli-compare-text">
+            {history ? formatCompareText(history) : '加载中…'}
+          </p>
+
+          <div className="yueli-summary-grid">
+            <div className="yueli-summary-item">
+              <strong>{history?.daysRead ?? 0}</strong>
+              <span>天已读</span>
             </div>
-            <div className="stats-metric-card">
-              <span className="stats-metric-label">近 7 天</span>
-              <strong className="stats-metric-value">
-                {formatReadingDuration(readingStats?.weekMs ?? 0)}
-              </strong>
+            <div className="yueli-summary-item">
+              <strong>{history?.booksFinished ?? 0}</strong>
+              <span>本读完</span>
             </div>
-            <div className="stats-metric-card stats-metric-card-wide">
-              <span className="stats-metric-label">累计</span>
-              <strong className="stats-metric-value">
-                {formatReadingDuration(readingStats?.totalMs ?? 0)}
-              </strong>
+            <div className="yueli-summary-item">
+              <strong>{history?.booksRead ?? 0}</strong>
+              <span>本读过</span>
+            </div>
+            <div className="yueli-summary-item">
+              <strong>{history?.noteCount ?? 0}</strong>
+              <span>条笔记</span>
             </div>
           </div>
+        </section>
 
-          {readingStats && readingStats.recentDays.length > 0 ? (
-            <ul className="stats-day-list">
-              {readingStats.recentDays.map((day) => (
-                <li key={day.date} className="stats-day-item">
-                  <span>{day.date}</span>
-                  <span>{formatReadingDuration(day.totalMs)}</span>
-                </li>
-              ))}
-            </ul>
+        <section className="yueli-card">
+          <h3 className="yueli-card-title">阅读分布</h3>
+          <div className="yueli-chart-wrap">
+            <span className="yueli-chart-max">{chartMaxLabel}</span>
+            <div className={`yueli-chart yueli-chart-${periodMode}`}>
+              {history?.distribution.map((item, index) => {
+                const height =
+                  history.distributionMaxMs > 0
+                    ? Math.max(4, Math.round((item.ms / history.distributionMaxMs) * 100))
+                    : 4
+                return (
+                  <div key={`${item.dateKey}-${index}`} className="yueli-chart-col">
+                    <button
+                      type="button"
+                      className={`yueli-chart-bar${activeBar === index ? ' active' : ''}`}
+                      style={{ height: `${height}%` }}
+                      onClick={() => setActiveBar((v) => (v === index ? null : index))}
+                      aria-label={`${item.label} ${formatReadingDuration(item.ms)}`}
+                    />
+                    <span className="yueli-chart-label">{item.label}</span>
+                    {activeBar === index && item.tooltip && (
+                      <span className="yueli-chart-tip">{item.tooltip}</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section className="yueli-card">
+          <h3 className="yueli-card-title">阅读最久</h3>
+          {history?.longestBook ? (
+            <div className="yueli-longest">
+              <div
+                className="yueli-longest-cover"
+                style={
+                  coverUrl
+                    ? undefined
+                    : { background: 'linear-gradient(145deg, #c4a882, #8f6238)' }
+                }
+              >
+                {coverUrl ? (
+                  <img src={coverUrl} alt={history.longestBook.title} />
+                ) : (
+                  <span aria-hidden>📖</span>
+                )}
+              </div>
+              <div className="yueli-longest-meta">
+                <p className="yueli-longest-time">
+                  {formatReadingDuration(history.longestBook.totalMs)}
+                  <span className="yueli-longest-chevron">›</span>
+                </p>
+                <p className="yueli-longest-title">{history.longestBook.title}</p>
+              </div>
+            </div>
           ) : (
-            <p className="stats-empty-hint">开始阅读后，将在此记录每日阅读时长。</p>
+            <p className="yueli-empty">本周期暂无阅读记录</p>
           )}
-        </CollapsibleSection>
+        </section>
 
         <CollapsibleSection
           title="词汇统计"
@@ -172,7 +293,7 @@ export function StatisticsScreen() {
             </div>
           </div>
           <p className="stats-section-note">
-            数据来自本地词典缓存与学习记录；可通过书架「数据备份」导入导出。
+            阅读时长仅在应用前台阅读时累计；切到后台不会计入。
           </p>
         </CollapsibleSection>
       </div>
