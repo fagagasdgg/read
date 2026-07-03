@@ -1,13 +1,11 @@
 import { Capacitor } from '@capacitor/core'
+import { Clipboard } from '@capacitor/clipboard'
 import type { NotebookEntryAnalysis } from '../notes/notebooks'
 import {
   normalizeSentenceKey,
   parseAnalysisResponse,
   READ_NOTE_EXPORT_MARKER,
 } from './analysisParse'
-
-/** 豆包 Android 包名（国内版） */
-const DOUBAO_ANDROID_PACKAGES = ['com.larus.nova', 'com.larus.boom']
 
 export function buildDoubaoPrompt(sentence: string): string {
   const text = sentence.trim()
@@ -42,33 +40,32 @@ ${text}
 
 export async function copyDoubaoPrompt(sentence: string): Promise<string> {
   const prompt = buildDoubaoPrompt(sentence)
-  await navigator.clipboard.writeText(prompt)
+  if (Capacitor.isNativePlatform()) {
+    await Clipboard.write({ string: prompt })
+  } else {
+    await navigator.clipboard.writeText(prompt)
+  }
   return prompt
 }
 
-export function tryOpenDoubaoApp(): boolean {
-  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') {
-    return false
+export async function readClipboardText(): Promise<string> {
+  if (Capacitor.isNativePlatform()) {
+    const { value } = await Clipboard.read()
+    if (!value?.trim()) throw new Error('剪贴板为空')
+    return value
   }
-
-  for (const pkg of DOUBAO_ANDROID_PACKAGES) {
-    try {
-      window.location.href =
-        `intent:#Intent;action=android.intent.action.MAIN;` +
-        `category=android.intent.category.LAUNCHER;package=${pkg};end`
-      return true
-    } catch {
-      // try next package
-    }
+  if (!navigator.clipboard?.readText) {
+    throw new Error('当前环境无法读取剪贴板')
   }
-  return false
+  const value = await navigator.clipboard.readText()
+  if (!value.trim()) throw new Error('剪贴板为空')
+  return value
 }
 
-export async function readClipboardText(): Promise<string> {
-  if (!navigator.clipboard?.readText) {
-    throw new Error('当前环境无法读取剪贴板，请使用「导入剪贴板」并授予权限')
-  }
-  return navigator.clipboard.readText()
+export function isClipboardReadDeniedError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  const msg = err.message.toLowerCase()
+  return msg.includes('permission') || msg.includes('denied') || msg.includes('notallowed')
 }
 
 export function parseDoubaoClipboard(
@@ -76,29 +73,16 @@ export function parseDoubaoClipboard(
   expectedSentence: string,
 ): NotebookEntryAnalysis {
   const trimmed = clipboardText.trim()
-  if (!trimmed) throw new Error('剪贴板为空')
+  if (!trimmed) throw new Error('内容为空')
 
-  // 若用户误复制了完整 prompt，拒绝导入
   if (trimmed.includes('<<<SENTENCE_START>>>') || trimmed.includes('【硬性规则')) {
-    throw new Error('剪贴板仍是发送给豆包的指令，请复制豆包的回复后再导入')
+    throw new Error('仍是发送给豆包的指令，请粘贴豆包的回复')
   }
 
   return parseAnalysisResponse(trimmed, {
     expectedSentence,
     requireMarker: true,
   })
-}
-
-/** 静默检测：仅当 marker + sentence 均匹配时返回结果，否则 null */
-export function tryParseDoubaoClipboard(
-  clipboardText: string,
-  expectedSentence: string,
-): NotebookEntryAnalysis | null {
-  try {
-    return parseDoubaoClipboard(clipboardText, expectedSentence)
-  } catch {
-    return null
-  }
 }
 
 export function getExpectedSentenceKey(sentence: string): string {

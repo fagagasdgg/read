@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core'
-import { Directory, Filesystem } from '@capacitor/filesystem'
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem'
 import { Preferences } from '@capacitor/preferences'
 
 export interface NotebookMeta {
@@ -97,6 +97,21 @@ async function writeRegistry(notebooks: NotebookMeta[]): Promise<void> {
   localStorage.setItem(REGISTRY_KEY, payload)
 }
 
+async function notebookFileExists(id: string): Promise<boolean> {
+  if (!Capacitor.isNativePlatform()) {
+    return Boolean(localStorage.getItem(`read-notebook-doc-${id}`))
+  }
+  try {
+    await Filesystem.stat({
+      path: notebookPath(id),
+      directory: Directory.Data,
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function writeDocument(doc: NotebookDocument): Promise<void> {
   const payload = JSON.stringify(doc)
   if (Capacitor.isNativePlatform()) {
@@ -104,6 +119,7 @@ async function writeDocument(doc: NotebookDocument): Promise<void> {
       path: notebookPath(doc.id),
       data: payload,
       directory: Directory.Data,
+      encoding: Encoding.UTF8,
       recursive: true,
     })
     return
@@ -155,6 +171,7 @@ async function readDocument(id: string): Promise<NotebookDocument | null> {
       const { data } = await Filesystem.readFile({
         path: notebookPath(id),
         directory: Directory.Data,
+        encoding: Encoding.UTF8,
       })
       if (typeof data !== 'string' || !data) return null
       return normalizeDocument(JSON.parse(data) as NotebookDocument, id)
@@ -235,6 +252,10 @@ export async function ensureNotebookDocument(notebookId: string): Promise<Notebo
   const existing = await readDocument(notebookId)
   if (existing) return existing
 
+  if (await notebookFileExists(notebookId)) {
+    throw new Error('笔记本文件无法读取，请尝试重启应用或新建笔记本')
+  }
+
   const doc: NotebookDocument = {
     id: meta.id,
     title: meta.title,
@@ -310,5 +331,11 @@ export async function addNotebookEntry(
   doc.updatedAt = Date.now()
   await writeDocument(doc)
   await touchNotebook(notebookId)
+
+  const verified = await readDocument(notebookId)
+  if (!verified?.entries.some((item) => item.id === entry.id)) {
+    throw new Error('笔记保存失败，请重试')
+  }
+
   return entry
 }

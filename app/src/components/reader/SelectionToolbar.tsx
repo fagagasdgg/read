@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { analyzeSentenceDeep } from '../../services/llm/deepAnalysis'
 import {
   copyDoubaoPrompt,
+  isClipboardReadDeniedError,
   parseDoubaoClipboard,
   readClipboardText,
-  tryOpenDoubaoApp,
-  tryParseDoubaoClipboard,
 } from '../../services/llm/doubaoWorkflow'
 import {
   estimateSelectionTooLong,
@@ -16,6 +15,7 @@ import {
 import { getBookDefaultNotebookId } from '../../services/notes/bookNotebook'
 import { addNotebookEntry, type NotebookEntryAnalysis } from '../../services/notes/notebooks'
 import { NotebookPickerSheet } from '../notes/NotebookPickerSheet'
+import { DoubaoPasteSheet } from './DoubaoPasteSheet'
 
 interface SelectionToolbarProps {
   bookId: string
@@ -43,6 +43,7 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
   const [doubaoPending, setDoubaoPending] = useState(false)
+  const [showPasteSheet, setShowPasteSheet] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [showPicker, setShowPicker] = useState(false)
@@ -53,39 +54,24 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
     setAnalysis(result)
     setMode('preview')
     setDoubaoPending(false)
-    setMessage('已从豆包导入解析结果')
+    setShowPasteSheet(false)
+    setMessage('已导入解析结果')
     setError('')
   }, [])
 
-  const tryAutoImportClipboard = useCallback(async () => {
-    if (!doubaoPending || mode === 'preview') return
-    try {
-      const clip = await readClipboardText()
-      const result = tryParseDoubaoClipboard(clip, text)
-      if (result) applyImportedAnalysis(result)
-    } catch {
-      // 自动导入失败时静默，用户可手动点「导入剪贴板」
-    }
-  }, [applyImportedAnalysis, doubaoPending, mode, text])
-
-  useEffect(() => {
-    if (!doubaoPending) return
-
-    function onVisible() {
-      if (document.visibilityState === 'visible') {
-        void tryAutoImportClipboard()
-      }
-    }
-
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [doubaoPending, tryAutoImportClipboard])
+  const importDoubaoText = useCallback(
+    (raw: string) => {
+      const result = parseDoubaoClipboard(raw, text)
+      applyImportedAnalysis(result)
+    },
+    [applyImportedAnalysis, text],
+  )
 
   async function handleCopy() {
     setError('')
     try {
       await navigator.clipboard.writeText(text)
-      setMessage('已复制')
+      setMessage('已复制选段')
       setTimeout(onClear, 600)
     } catch {
       setError('复制失败')
@@ -122,13 +108,8 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
     setMessage('')
     try {
       await copyDoubaoPrompt(text)
-      const opened = tryOpenDoubaoApp()
       setDoubaoPending(true)
-      setMessage(
-        opened
-          ? '已复制指令并尝试打开豆包，发送后复制回复，切回阅读器将自动导入'
-          : '已复制指令，请打开豆包粘贴发送；复制回复后可点「导入剪贴板」或切回自动导入',
-      )
+      setMessage('已复制豆包指令，请打开豆包粘贴发送，复制回复后点「导入豆包回复」')
     } catch (err) {
       setError(err instanceof Error ? err.message : '复制指令失败')
     }
@@ -140,10 +121,14 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
     setMessage('')
     try {
       const clip = await readClipboardText()
-      const result = parseDoubaoClipboard(clip, text)
-      applyImportedAnalysis(result)
+      importDoubaoText(clip)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '导入失败')
+      if (isClipboardReadDeniedError(err)) {
+        setShowPasteSheet(true)
+        setMessage('无法读取剪贴板，请手动粘贴豆包回复')
+      } else {
+        setError(err instanceof Error ? err.message : '导入失败')
+      }
     } finally {
       setImporting(false)
     }
@@ -207,32 +192,44 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
 
         {mode === 'actions' ? (
           <>
-            <div className="selection-toolbar-row">
-              <button type="button" onClick={() => void handleCopy()}>
-                复制
-              </button>
-              <button type="button" onClick={() => void handleDeepAnalysis()} disabled={analyzing}>
-                {analyzing ? '解析中…' : '深度解析'}
-              </button>
-            </div>
-            <div className="selection-toolbar-row">
-              <button type="button" onClick={() => void handleSendToDoubao()}>
-                发给豆包
+            <div className="selection-action-grid">
+              <button
+                type="button"
+                className="selection-action-btn selection-action-btn-secondary"
+                onClick={() => void handleCopy()}
+              >
+                复制选段
               </button>
               <button
                 type="button"
+                className="selection-action-btn selection-action-btn-primary"
+                onClick={() => void handleDeepAnalysis()}
+                disabled={analyzing}
+              >
+                {analyzing ? '解析中…' : '智谱解析'}
+              </button>
+              <button
+                type="button"
+                className="selection-action-btn selection-action-btn-accent"
+                onClick={() => void handleSendToDoubao()}
+              >
+                复制豆包指令
+              </button>
+              <button
+                type="button"
+                className="selection-action-btn selection-action-btn-accent"
                 onClick={() => void handleImportClipboard()}
                 disabled={importing}
               >
-                {importing ? '导入中…' : '导入剪贴板'}
+                {importing ? '导入中…' : '导入豆包回复'}
               </button>
             </div>
             <p className="selection-panel-hint">
-              快速翻译请用系统选区「翻译」；豆包流程：发给豆包 → 复制回复 → 导入或切回自动识别
+              系统「翻译」可快速查词；豆包：复制指令 → 豆包发送 → 复制回复 → 导入
             </p>
             {doubaoPending && (
               <p className="selection-panel-warn selection-panel-doubao-wait">
-                等待豆包回复中…切回阅读器将尝试自动导入（需含校验标记且句子匹配）
+                等待豆包回复…复制后点「导入豆包回复」，或用手动粘贴
               </p>
             )}
             {lengthWarning && <p className="selection-panel-warn">{lengthWarning}</p>}
@@ -257,11 +254,20 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
                 <h4>句式</h4>
                 <p>{analysis.sentencePattern}</p>
               </div>
-              <div className="selection-toolbar-row selection-toolbar-row-sticky">
-                <button type="button" onClick={() => setMode('actions')}>
+              <div className="selection-action-grid selection-action-grid-preview">
+                <button
+                  type="button"
+                  className="selection-action-btn selection-action-btn-secondary"
+                  onClick={() => setMode('actions')}
+                >
                   返回
                 </button>
-                <button type="button" onClick={() => void handleSave()} disabled={saving}>
+                <button
+                  type="button"
+                  className="selection-action-btn selection-action-btn-primary"
+                  onClick={() => void handleSave()}
+                  disabled={saving}
+                >
                   {saving ? '保存中…' : '存笔记'}
                 </button>
               </div>
@@ -278,6 +284,19 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
           title="保存到哪个笔记本？"
           onClose={() => setShowPicker(false)}
           onSelect={(id) => void saveToNotebook(id)}
+        />
+      )}
+
+      {showPasteSheet && (
+        <DoubaoPasteSheet
+          onClose={() => setShowPasteSheet(false)}
+          onConfirm={(raw) => {
+            try {
+              importDoubaoText(raw)
+            } catch (err) {
+              setError(err instanceof Error ? err.message : '导入失败')
+            }
+          }}
         />
       )}
     </>,

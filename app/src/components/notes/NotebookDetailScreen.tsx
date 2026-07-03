@@ -20,17 +20,29 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    getNotebookDocument(notebookId)
-      .then((next) => {
-        if (!cancelled) setDoc(next)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
 
+    async function loadDoc() {
+      setLoading(true)
+      try {
+        const next = await getNotebookDocument(notebookId)
+        if (!cancelled) setDoc(next)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void loadDoc()
+
+    function onVisible() {
+      if (document.visibilityState === 'visible') {
+        void loadDoc()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       cancelled = true
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [notebookId])
 
