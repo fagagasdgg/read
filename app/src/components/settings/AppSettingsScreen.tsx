@@ -9,8 +9,8 @@ import {
   type UserSettings,
 } from '../../services/settings/userSettings'
 import { BackupDirectorySection } from './BackupDirectorySection'
+import { DeepAnalysisSettings } from './DeepAnalysisSettings'
 import { DictionarySourcesSection } from './DictionarySourcesSection'
-import { ZhipuApiSection } from './ZhipuApiSection'
 
 export function AppSettingsScreen() {
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null)
@@ -80,7 +80,7 @@ export function AppSettingsScreen() {
 
         <div className="settings-section-divider" />
 
-        <ZhipuApiSection />
+        <DeepAnalysisSettings />
 
         <div className="settings-section-divider" />
 

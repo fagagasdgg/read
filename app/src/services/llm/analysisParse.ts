@@ -26,33 +26,32 @@ export function sentencesMatch(a: string, b: string): boolean {
   return normalizeSentenceKey(a) === normalizeSentenceKey(b)
 }
 
-export function extractJsonObject(raw: string): ParsedAnalysis {
-  const trimmed = raw.trim()
+function stripAnalysisNoise(text: string): string {
+  return text
+    .replace(/[\s\S]*?<\/think>/gi, '')
+    .replace(/[\s\S]*?<\/redacted_reasoning>/gi, '')
+    .replace(/```(?:json)?\s*([\s\S]*?)```/gi, '$1')
+    .replace(/[""]/g, '"')
+    .replace(/['']/g, "'")
+    .trim()
+}
 
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  if (fenced?.[1]) {
-    try {
-      return JSON.parse(fenced[1].trim()) as ParsedAnalysis
-    } catch {
-      // fall through
-    }
-  }
+function scoreParsedAnalysis(parsed: ParsedAnalysis): number {
+  let score = 0
+  if (asText(parsed.translation)) score += 4
+  if (asText(parsed.collocations)) score += 2
+  if (asText(parsed.slangs)) score += 1
+  if (asText(parsed.sentencePattern)) score += 2
+  return score
+}
 
-  try {
-    return JSON.parse(trimmed) as ParsedAnalysis
-  } catch {
-    // fall through
-  }
-
-  const start = trimmed.indexOf('{')
-  if (start < 0) throw new Error('无法解析返回内容：未找到 JSON 对象')
-
+function extractBalancedJsonSlice(raw: string, start: number): string | null {
   let depth = 0
   let inString = false
   let escaped = false
 
-  for (let i = start; i < trimmed.length; i += 1) {
-    const ch = trimmed[i]
+  for (let i = start; i < raw.length; i += 1) {
+    const ch = raw[i]
 
     if (inString) {
       if (escaped) {
@@ -73,12 +72,83 @@ export function extractJsonObject(raw: string): ParsedAnalysis {
     if (ch === '}') {
       depth -= 1
       if (depth === 0) {
-        return JSON.parse(trimmed.slice(start, i + 1)) as ParsedAnalysis
+        return raw.slice(start, i + 1)
       }
     }
   }
 
-  throw new Error('无法解析返回内容：JSON 不完整')
+  return null
+}
+
+function salvageFieldsFromText(raw: string): ParsedAnalysis | null {
+  const pick = (key: string): string => {
+    const match = raw.match(new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, 's'))
+    if (!match?.[1]) return ''
+    return match[1]
+      .replace(/\\n/g, '\n')
+      .replace(/\\r/g, '\r')
+      .replace(/\\t/g, '\t')
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\')
+      .trim()
+  }
+
+  const translation = pick('translation')
+  if (!translation) return null
+
+  return {
+    translation,
+    collocations: pick('collocations') || '无',
+    slangs: pick('slangs') || '无',
+    sentencePattern: pick('sentencePattern') || '暂无',
+  }
+}
+
+export function scoreAnalysisText(raw: string): number {
+  try {
+    const parsed = extractJsonObject(raw)
+    return scoreParsedAnalysis(parsed)
+  } catch {
+    return 0
+  }
+}
+
+export function extractJsonObject(raw: string): ParsedAnalysis {
+  const trimmed = stripAnalysisNoise(raw)
+  if (!trimmed) throw new Error('无法解析 AI 返回的内容：响应为空')
+
+  try {
+    const direct = JSON.parse(trimmed) as ParsedAnalysis
+    if (scoreParsedAnalysis(direct) > 0) return direct
+  } catch {
+    // fall through
+  }
+
+  let best: ParsedAnalysis | null = null
+  let bestScore = 0
+
+  for (let i = 0; i < trimmed.length; i += 1) {
+    if (trimmed[i] !== '{') continue
+    const slice = extractBalancedJsonSlice(trimmed, i)
+    if (!slice) continue
+    try {
+      const parsed = JSON.parse(slice) as ParsedAnalysis
+      const score = scoreParsedAnalysis(parsed)
+      if (score > bestScore) {
+        bestScore = score
+        best = parsed
+      }
+    } catch {
+      // try next candidate
+    }
+  }
+
+  if (best && bestScore > 0) return best
+
+  const salvaged = salvageFieldsFromText(trimmed)
+  if (salvaged) return salvaged
+
+  throw new Error('无法解析 AI 返回的内容，请换模型或缩短选段后重试')
 }
 
 export function normalizeAnalysis(parsed: ParsedAnalysis): NotebookEntryAnalysis {

@@ -21,6 +21,7 @@ export interface ZhipuSettings {
   apiKey: string
   model: string
   customModels: ZhipuModelOption[]
+  hiddenModelIds: string[]
   updatedAt: number
 }
 
@@ -90,25 +91,43 @@ const DEFAULT_SETTINGS: ZhipuSettings = {
   apiKey: '',
   model: ZHIPU_DEFAULT_MODEL,
   customModels: [],
+  hiddenModelIds: [],
   updatedAt: 0,
 }
 
-function isBuiltInModel(id: string): boolean {
-  return ZHIPU_FREE_MODELS.some((item) => item.id === id)
+function normalizeHiddenModelIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const item of value) {
+    if (typeof item !== 'string') continue
+    const id = normalizeZhipuModel(item)
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    result.push(id)
+  }
+  return result
 }
 
-export function getAllZhipuModels(customModels: ZhipuModelOption[] = []): ZhipuModelOption[] {
+export function getAllZhipuModels(
+  customModels: ZhipuModelOption[] = [],
+  hiddenModelIds: string[] = [],
+): ZhipuModelOption[] {
+  const hidden = new Set(hiddenModelIds.map((id) => normalizeZhipuModel(id)))
   const builtinIds = new Set(ZHIPU_FREE_MODELS.map((item) => item.id))
   const extras = customModels.filter((item) => !builtinIds.has(item.id))
-  return [...ZHIPU_FREE_MODELS, ...extras]
+  return [...ZHIPU_FREE_MODELS, ...extras].filter((item) => !hidden.has(item.id))
 }
 
 export function getZhipuModelOption(
   modelId: string,
   customModels: ZhipuModelOption[] = [],
+  hiddenModelIds: string[] = [],
 ): ZhipuModelOption | undefined {
   const normalized = normalizeZhipuModel(modelId)
-  return getAllZhipuModels(customModels).find((item) => item.id === normalized)
+  return getAllZhipuModels(customModels, hiddenModelIds).find((item) => item.id === normalized)
+    ?? ZHIPU_FREE_MODELS.find((item) => item.id === normalized)
+    ?? customModels.find((item) => item.id === normalized)
 }
 
 export function isCustomZhipuModel(modelId: string, customModels: ZhipuModelOption[]): boolean {
@@ -166,10 +185,12 @@ async function readSettings(): Promise<ZhipuSettings> {
     if (!raw) return { ...DEFAULT_SETTINGS }
     const parsed = JSON.parse(raw) as Partial<ZhipuSettings> & { customModels?: unknown }
     const customModels = normalizeCustomModels(parsed.customModels)
+    const hiddenModelIds = normalizeHiddenModelIds(parsed.hiddenModelIds)
     return {
       apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey.trim() : '',
       model: normalizeZhipuModel(typeof parsed.model === 'string' ? parsed.model : ''),
       customModels,
+      hiddenModelIds,
       updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : 0,
     }
   } catch {
@@ -200,6 +221,10 @@ export async function saveZhipuSettings(partial: Partial<ZhipuSettings>): Promis
       partial.customModels !== undefined
         ? normalizeCustomModels(partial.customModels)
         : current.customModels,
+    hiddenModelIds:
+      partial.hiddenModelIds !== undefined
+        ? normalizeHiddenModelIds(partial.hiddenModelIds)
+        : current.hiddenModelIds,
     updatedAt: Date.now(),
   }
   await writeSettings(next)
@@ -255,11 +280,39 @@ export async function removeCustomZhipuModel(modelId: string): Promise<ZhipuSett
   const id = normalizeZhipuModel(modelId)
   const current = await readSettings()
   const customModels = current.customModels.filter((item) => item.id !== id)
+  const hiddenModelIds = current.hiddenModelIds.filter((item) => item !== id)
+  const visible = getAllZhipuModels(customModels, hiddenModelIds)
   const model =
     current.model === id
-      ? customModels[0]?.id ?? ZHIPU_DEFAULT_MODEL
+      ? visible[0]?.id ?? ZHIPU_DEFAULT_MODEL
       : current.model
-  return saveZhipuSettings({ customModels, model })
+  return saveZhipuSettings({ customModels, hiddenModelIds, model })
+}
+
+export async function hideZhipuModel(modelId: string): Promise<ZhipuSettings> {
+  const id = normalizeZhipuModel(modelId)
+  const current = await readSettings()
+  if (current.hiddenModelIds.includes(id)) return current
+
+  const hiddenModelIds = [...current.hiddenModelIds, id]
+  const visible = getAllZhipuModels(current.customModels, hiddenModelIds)
+  const model = current.model === id ? visible[0]?.id ?? ZHIPU_DEFAULT_MODEL : current.model
+  return saveZhipuSettings({ hiddenModelIds, model })
+}
+
+export async function unhideZhipuModel(modelId: string): Promise<ZhipuSettings> {
+  const id = normalizeZhipuModel(modelId)
+  const current = await readSettings()
+  const hiddenModelIds = current.hiddenModelIds.filter((item) => item !== id)
+  return saveZhipuSettings({ hiddenModelIds })
+}
+
+function isBuiltInModel(id: string): boolean {
+  return isBuiltInZhipuModel(id)
+}
+
+export function isBuiltInZhipuModel(modelId: string): boolean {
+  return ZHIPU_FREE_MODELS.some((item) => item.id === normalizeZhipuModel(modelId))
 }
 
 export async function getZhipuApiKey(): Promise<string> {

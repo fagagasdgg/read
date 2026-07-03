@@ -1,17 +1,12 @@
 import { useCallback, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { analyzeSentenceDeep } from '../../services/llm/deepAnalysis'
+import { analyzeSentenceDeep, estimateSelectionTooLongForActiveProvider, hasActiveLlmApiKey } from '../../services/llm/deepAnalysis'
 import {
   copyDoubaoPrompt,
   isClipboardReadDeniedError,
   parseDoubaoClipboard,
   readClipboardText,
 } from '../../services/llm/doubaoWorkflow'
-import {
-  estimateSelectionTooLong,
-  hasZhipuApiKey,
-  loadZhipuSettings,
-} from '../../services/llm/zhipuSettings'
 import { getBookDefaultNotebookId } from '../../services/notes/bookNotebook'
 import { addNotebookEntry, type NotebookEntryAnalysis } from '../../services/notes/notebooks'
 import { NotebookPickerSheet } from '../notes/NotebookPickerSheet'
@@ -85,12 +80,11 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
     setLengthWarning('')
     setDoubaoPending(false)
     try {
-      const configured = await hasZhipuApiKey()
+      const configured = await hasActiveLlmApiKey()
       if (!configured) {
-        throw new Error('请先在首页「设置」中配置智谱 API Key')
+        throw new Error('请先在首页「设置」中配置 AI API Key')
       }
-      const settings = await loadZhipuSettings()
-      const warn = estimateSelectionTooLong(text, settings.model, settings.customModels)
+      const warn = await estimateSelectionTooLongForActiveProvider(text)
       if (warn) setLengthWarning(warn)
 
       const result = await analyzeSentenceDeep(text)
@@ -206,7 +200,7 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
                 onClick={() => void handleDeepAnalysis()}
                 disabled={analyzing}
               >
-                {analyzing ? '解析中…' : '智谱解析'}
+                {analyzing ? '解析中…' : '深度解析'}
               </button>
               <button
                 type="button"

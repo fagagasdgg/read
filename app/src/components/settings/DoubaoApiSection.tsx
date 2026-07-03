@@ -1,35 +1,35 @@
 import { useEffect, useState } from 'react'
-import { probeZhipuApiKey } from '../../services/llm/zhipuClient'
+import { probeDoubaoApiKey } from '../../services/llm/doubaoClient'
 import {
-  addCustomZhipuModel,
-  getAllZhipuModels,
-  getZhipuModelOption,
-  hideZhipuModel,
-  isBuiltInZhipuModel,
-  isCustomZhipuModel,
-  loadZhipuSettings,
+  addCustomDoubaoModel,
+  DOUBAO_BUILTIN_MODELS,
+  DOUBAO_DEFAULT_MODEL,
+  getAllDoubaoModels,
+  getDoubaoModelOption,
+  hideDoubaoModel,
+  isBuiltInDoubaoModel,
+  isCustomDoubaoModel,
+  loadDoubaoSettings,
   maskApiKey,
-  removeCustomZhipuModel,
-  saveZhipuSettings,
-  unhideZhipuModel,
-  ZHIPU_DEFAULT_MODEL,
-  ZHIPU_FREE_MODELS,
-  type ZhipuSettings,
-} from '../../services/llm/zhipuSettings'
+  removeCustomDoubaoModel,
+  saveDoubaoSettings,
+  unhideDoubaoModel,
+  type DoubaoSettings,
+} from '../../services/llm/doubaoSettings'
 
 function formatTokenCount(value: number): string {
   if (value >= 10_000) return `${Math.round(value / 1000)}K tokens`
   return `${value} tokens`
 }
 
-interface ZhipuApiSectionProps {
+interface DoubaoApiSectionProps {
   embedded?: boolean
 }
 
-export function ZhipuApiSection({ embedded = false }: ZhipuApiSectionProps) {
-  const [settings, setSettings] = useState<ZhipuSettings | null>(null)
+export function DoubaoApiSection({ embedded = false }: DoubaoApiSectionProps) {
+  const [settings, setSettings] = useState<DoubaoSettings | null>(null)
   const [apiKeyInput, setApiKeyInput] = useState('')
-  const [modelId, setModelId] = useState(ZHIPU_DEFAULT_MODEL)
+  const [modelId, setModelId] = useState(DOUBAO_DEFAULT_MODEL)
   const [newModelId, setNewModelId] = useState('')
   const [newModelLabel, setNewModelLabel] = useState('')
   const [saving, setSaving] = useState(false)
@@ -40,7 +40,7 @@ export function ZhipuApiSection({ embedded = false }: ZhipuApiSectionProps) {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    void loadZhipuSettings().then((loaded) => {
+    void loadDoubaoSettings().then((loaded) => {
       setSettings(loaded)
       setApiKeyInput(loaded.apiKey)
       setModelId(loaded.model)
@@ -49,9 +49,9 @@ export function ZhipuApiSection({ embedded = false }: ZhipuApiSectionProps) {
 
   const customModels = settings?.customModels ?? []
   const hiddenModelIds = settings?.hiddenModelIds ?? []
-  const allModels = getAllZhipuModels(customModels, hiddenModelIds)
-  const selectedModel = getZhipuModelOption(modelId, customModels, hiddenModelIds)
-  const hiddenModels = [...ZHIPU_FREE_MODELS, ...customModels].filter((item) =>
+  const allModels = getAllDoubaoModels(customModels, hiddenModelIds)
+  const selectedModel = getDoubaoModelOption(modelId, customModels, hiddenModelIds)
+  const hiddenModels = [...DOUBAO_BUILTIN_MODELS, ...customModels].filter((item) =>
     hiddenModelIds.includes(item.id),
   )
 
@@ -60,7 +60,7 @@ export function ZhipuApiSection({ embedded = false }: ZhipuApiSectionProps) {
     setError('')
     setMessage('')
     try {
-      const next = await saveZhipuSettings({ apiKey: apiKeyInput, model: modelId })
+      const next = await saveDoubaoSettings({ apiKey: apiKeyInput, model: modelId })
       setSettings(next)
       setModelId(next.model)
       setMessage('已保存')
@@ -78,7 +78,7 @@ export function ZhipuApiSection({ embedded = false }: ZhipuApiSectionProps) {
     try {
       const key = apiKeyInput.trim()
       if (!key) throw new Error('请先填写 API Key')
-      await probeZhipuApiKey(key, modelId, customModels, hiddenModelIds)
+      await probeDoubaoApiKey(key, modelId, customModels, hiddenModelIds)
       setMessage('连接成功，Key 与模型可用')
     } catch (err) {
       setError(err instanceof Error ? err.message : '连接失败')
@@ -92,7 +92,7 @@ export function ZhipuApiSection({ embedded = false }: ZhipuApiSectionProps) {
     setError('')
     setMessage('')
     try {
-      const next = await addCustomZhipuModel(newModelId, newModelLabel)
+      const next = await addCustomDoubaoModel(newModelId, newModelLabel)
       setSettings(next)
       setModelId(next.model)
       setNewModelId('')
@@ -109,9 +109,9 @@ export function ZhipuApiSection({ embedded = false }: ZhipuApiSectionProps) {
     setRemovingModelId(id)
     setError('')
     setMessage('')
-    const wasCustom = isCustomZhipuModel(id, customModels)
     try {
-      const next = wasCustom ? await removeCustomZhipuModel(id) : await hideZhipuModel(id)
+      const wasCustom = isCustomDoubaoModel(id, customModels)
+      const next = wasCustom ? await removeCustomDoubaoModel(id) : await hideDoubaoModel(id)
       setSettings(next)
       setModelId(next.model)
       setMessage(wasCustom ? '已删除自定义模型' : '已从列表移除')
@@ -126,7 +126,7 @@ export function ZhipuApiSection({ embedded = false }: ZhipuApiSectionProps) {
     setError('')
     setMessage('')
     try {
-      const next = await unhideZhipuModel(id)
+      const next = await unhideDoubaoModel(id)
       setSettings(next)
       setMessage('已恢复模型')
     } catch (err) {
@@ -136,13 +136,13 @@ export function ZhipuApiSection({ embedded = false }: ZhipuApiSectionProps) {
 
   const content = (
     <>
-      {!embedded && <h4 className="settings-section-title">深度解析（智谱 AI）</h4>}
+      {!embedded && <h4 className="settings-section-title">深度解析（豆包 API）</h4>}
       <p className="settings-section-note">
-        请在{' '}
-        <a href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank" rel="noreferrer">
-          open.bigmodel.cn
+        使用火山引擎方舟豆包大模型。请在{' '}
+        <a href="https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey" target="_blank" rel="noreferrer">
+          火山方舟控制台
         </a>{' '}
-        创建 API Key。Key 仅保存在本机。
+        创建 API Key；模型 ID 可为预设名或接入点 ep-xxx。Key 仅保存在本机。
       </p>
 
       <label className="reader-setting-row zhipu-key-row">
@@ -151,7 +151,7 @@ export function ZhipuApiSection({ embedded = false }: ZhipuApiSectionProps) {
           className="zhipu-key-input"
           type="password"
           autoComplete="off"
-          placeholder="粘贴智谱 API Key"
+          placeholder="粘贴豆包 API Key"
           value={apiKeyInput}
           onChange={(e) => setApiKeyInput(e.target.value)}
         />
@@ -168,7 +168,7 @@ export function ZhipuApiSection({ embedded = false }: ZhipuApiSectionProps) {
             <option key={item.id} value={item.id}>
               {item.label}
               {item.verified ? ' ✓' : ''}
-              {isCustomZhipuModel(item.id, customModels) ? ' ·自定义' : ''}
+              {isCustomDoubaoModel(item.id, customModels) ? ' ·自定义' : ''}
             </option>
           ))}
         </select>
@@ -197,7 +197,7 @@ export function ZhipuApiSection({ embedded = false }: ZhipuApiSectionProps) {
               <li key={item.id} className="llm-model-manager-item">
                 <span className="llm-model-manager-label">
                   {item.label}
-                  {isBuiltInZhipuModel(item.id) ? ' ·内置' : ' ·自定义'}
+                  {isBuiltInDoubaoModel(item.id) ? ' ·内置' : ' ·自定义'}
                 </span>
                 <button
                   type="button"
@@ -234,14 +234,14 @@ export function ZhipuApiSection({ embedded = false }: ZhipuApiSectionProps) {
       )}
 
       <div className="zhipu-custom-model-block">
-        <p className="settings-section-note">添加自定义模型 ID</p>
+        <p className="settings-section-note">添加自定义模型/接入点 ID</p>
         <label className="reader-setting-row zhipu-key-row">
           <span>模型 ID</span>
           <input
             className="zhipu-key-input"
             type="text"
             autoComplete="off"
-            placeholder="例如 glm-4-flash-250414"
+            placeholder="例如 ep-20250117xxxx 或 doubao-pro-32k"
             value={newModelId}
             onChange={(e) => setNewModelId(e.target.value)}
           />
