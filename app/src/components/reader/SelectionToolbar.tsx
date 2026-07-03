@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { NotebookPickerSheet } from '../notes/NotebookPickerSheet'
 import { getBookDefaultNotebookId } from '../../services/notes/bookNotebook'
 import { addNotebookEntry } from '../../services/notes/notebooks'
@@ -8,17 +9,18 @@ import type { TextSelectionState } from './useTextSelection'
 interface SelectionToolbarProps {
   bookId: string
   selection: TextSelectionState
+  onClose: () => void
   onClear: () => void
 }
 
 type ToolbarMode = 'actions' | 'preview'
 
-function truncateText(text: string, max = 120): string {
+function truncateText(text: string, max = 160): string {
   if (text.length <= max) return text
   return `${text.slice(0, max)}…`
 }
 
-export function SelectionToolbar({ bookId, selection, onClear }: SelectionToolbarProps) {
+export function SelectionToolbar({ bookId, selection, onClose, onClear }: SelectionToolbarProps) {
   const [mode, setMode] = useState<ToolbarMode>('actions')
   const [translation, setTranslation] = useState('')
   const [translating, setTranslating] = useState(false)
@@ -84,17 +86,22 @@ export function SelectionToolbar({ bookId, selection, onClear }: SelectionToolba
     setShowPicker(true)
   }
 
-  return (
+  return createPortal(
     <>
-      <button
-        type="button"
-        className="selection-action-backdrop"
-        aria-label="关闭选段菜单"
-        onClick={onClear}
-      />
+      <div className="selection-panel" onMouseDown={(e) => e.preventDefault()}>
+        <header className="selection-panel-header">
+          <span className="selection-panel-title">选段工具</span>
+          <button
+            type="button"
+            className="selection-panel-close"
+            onClick={onClose}
+            aria-label="关闭"
+          >
+            ×
+          </button>
+        </header>
 
-      <div className="selection-action-bar" onMouseDown={(e) => e.preventDefault()}>
-        <p className="selection-action-snippet">{truncateText(selection.text)}</p>
+        <p className="selection-panel-snippet">{truncateText(selection.text)}</p>
 
         {mode === 'actions' ? (
           <div className="selection-toolbar-row">
@@ -110,9 +117,6 @@ export function SelectionToolbar({ bookId, selection, onClear }: SelectionToolba
             </button>
             <button type="button" className="selection-toolbar-disabled" disabled title="即将推出">
               深度解析
-            </button>
-            <button type="button" className="selection-action-close" onClick={onClear}>
-              关闭
             </button>
           </div>
         ) : (
@@ -140,6 +144,7 @@ export function SelectionToolbar({ bookId, selection, onClear }: SelectionToolba
           onSelect={(id) => void saveToNotebook(id)}
         />
       )}
-    </>
+    </>,
+    document.body,
   )
 }

@@ -78,6 +78,11 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
   )
 
   const { selection, clearSelection } = useTextSelection(contentEl)
+  const [selectionPanelOpen, setSelectionPanelOpen] = useState(false)
+
+  useEffect(() => {
+    if (selection) setSelectionPanelOpen(true)
+  }, [selection?.text])
 
   const chapter = book?.chapters[chapterIndex]
   const theme = getThemeById(readingSettings?.themeId ?? 'parchment')
@@ -429,10 +434,11 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
         />
       )}
 
-      {selection && !overlay && !wordLookup && (
+      {selection && selectionPanelOpen && !overlay && !wordLookup && (
         <SelectionToolbar
           bookId={book.id}
           selection={selection}
+          onClose={() => setSelectionPanelOpen(false)}
           onClear={clearSelection}
         />
       )}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 export interface TextSelectionState {
   text: string
@@ -14,7 +14,6 @@ function isSelectionInside(container: HTMLElement, selection: Selection): boolea
 
 export function useTextSelection(container: HTMLElement | null) {
   const [selection, setSelection] = useState<TextSelectionState | null>(null)
-  const lockingRef = useRef(false)
 
   const clearSelection = useCallback(() => {
     setSelection(null)
@@ -26,38 +25,27 @@ export function useTextSelection(container: HTMLElement | null) {
     if (!container) return
 
     function refresh() {
-      if (!container || lockingRef.current) return
+      if (!container) return
       const sel = window.getSelection()
       if (!sel || sel.isCollapsed || !sel.toString().trim()) {
         setSelection(null)
+        return
       }
-    }
-
-    function captureSelection() {
-      setTimeout(() => {
-        if (!container || lockingRef.current) return
-        const sel = window.getSelection()
-        if (!sel || sel.isCollapsed || !sel.toString().trim()) return
-        if (!isSelectionInside(container, sel)) return
-
-        const text = sel.toString().trim()
-        lockingRef.current = true
-        sel.removeAllRanges()
-        setSelection({ text })
-        window.setTimeout(() => {
-          lockingRef.current = false
-        }, 80)
-      }, 320)
+      if (!isSelectionInside(container, sel)) {
+        setSelection(null)
+        return
+      }
+      setSelection({ text: sel.toString().trim() })
     }
 
     document.addEventListener('selectionchange', refresh)
-    container.addEventListener('touchend', captureSelection)
-    container.addEventListener('mouseup', captureSelection)
+    container.addEventListener('mouseup', refresh)
+    container.addEventListener('touchend', refresh)
 
     return () => {
       document.removeEventListener('selectionchange', refresh)
-      container.removeEventListener('touchend', captureSelection)
-      container.removeEventListener('mouseup', captureSelection)
+      container.removeEventListener('mouseup', refresh)
+      container.removeEventListener('touchend', refresh)
     }
   }, [container])
 

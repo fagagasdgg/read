@@ -1877,43 +1877,75 @@
   cursor: pointer;
 }
 
-/* Text selection action bar — fixed above reader nav, avoids system selection menu overlap */
-.selection-action-backdrop {
+/* Text selection panel — portal 到 body，层级高于阅读页，不干扰系统选区菜单 */
+.selection-panel {
   position: fixed;
-  inset: 0;
-  z-index: 110;
-  border: none;
-  padding: 0;
-  background: rgba(0, 0, 0, 0.12);
-  cursor: default;
-}
-
-.selection-action-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: calc(68px + env(safe-area-inset-bottom));
-  z-index: 120;
-  padding: 10px 12px 12px;
-  border-radius: 14px 14px 0 0;
-  background: rgba(31, 41, 55, 0.97);
+  left: 50%;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 9999;
+  width: min(92vw, 380px);
+  padding: 0 0 12px;
+  border-radius: 14px;
+  background: rgba(31, 41, 55, 0.98);
   color: #f9fafb;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 
-.selection-action-snippet {
-  margin: 0 0 8px;
+.selection-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.selection-panel-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.selection-panel-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f9fafb;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.selection-panel-close:active {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.selection-panel-snippet {
+  margin: 8px 12px;
   font-size: 0.78rem;
-  line-height: 1.4;
+  line-height: 1.45;
   color: #d1d5db;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.selection-action-close {
-  opacity: 0.85;
+.selection-panel .selection-toolbar-row {
+  padding: 0 10px;
+}
+
+.selection-panel .selection-toolbar-preview {
+  padding: 0 10px;
+}
+
+.selection-panel .selection-toolbar-message,
+.selection-panel .selection-toolbar-error {
+  padding: 0 12px;
 }
 
 .selection-toolbar {
