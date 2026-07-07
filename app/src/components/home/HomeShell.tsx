@@ -3,8 +3,9 @@ import { BookshelfScreen } from '../bookshelf/BookshelfScreen'
 import { NotesScreen } from '../notes/NotesScreen'
 import { AppSettingsScreen } from '../settings/AppSettingsScreen'
 import { StatisticsScreen } from '../statistics/StatisticsScreen'
+import { ToolsScreen } from '../tools/ToolsScreen'
 
-export type HomeTab = 'bookshelf' | 'notes' | 'statistics' | 'settings'
+export type HomeTab = 'bookshelf' | 'notes' | 'statistics' | 'tools' | 'settings'
 
 interface HomeShellProps {
   onOpenBook: (bookId: string) => void
@@ -25,6 +26,9 @@ export function HomeShell({ onOpenBook }: HomeShellProps) {
           </section>
           <section className="home-panel" aria-hidden={tab !== 'statistics'}>
             <StatisticsScreen isActive={tab === 'statistics'} />
+          </section>
+          <section className="home-panel" aria-hidden={tab !== 'tools'}>
+            <ToolsScreen />
           </section>
           <section className="home-panel" aria-hidden={tab !== 'settings'}>
             <AppSettingsScreen />
@@ -62,6 +66,16 @@ export function HomeShell({ onOpenBook }: HomeShellProps) {
             📊
           </span>
           <span>统计</span>
+        </button>
+        <button
+          type="button"
+          className={`home-tab-btn${tab === 'tools' ? ' active' : ''}`}
+          onClick={() => setTab('tools')}
+        >
+          <span className="home-tab-icon" aria-hidden>
+            🧰
+          </span>
+          <span>工具</span>
         </button>
         <button
           type="button"
