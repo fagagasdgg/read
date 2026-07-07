@@ -1,7 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
 import { loadAllProgress } from '../epub/progress'
-import { listSavedBooks } from '../epub/library'
 import { countNotebookEntries } from '../notes/notebooks'
 
 const STORAGE_KEY = 'read-reading-time-v2'
@@ -40,6 +39,12 @@ export interface ReadingTimeStats {
   recentDays: ReadingDayRecord[]
 }
 
+export interface ReadingBookRank {
+  bookId: string
+  title: string
+  totalMs: number
+}
+
 export interface ReadingHistoryStats {
   totalMs: number
   hours: number
@@ -53,7 +58,9 @@ export interface ReadingHistoryStats {
   noteCount: number
   distribution: Array<{ label: string; ms: number; dateKey: string; tooltip?: string }>
   distributionMaxMs: number
-  longestBook: { bookId: string; title: string; totalMs: number } | null
+  /** @deprecated 使用 topBooks */
+  longestBook: ReadingBookRank | null
+  topBooks: ReadingBookRank[]
   periodLabel: string
 }
 
@@ -140,6 +147,24 @@ function shiftAnchor(mode: PeriodMode, anchor: Date, delta: number): Date {
 
 export function shiftReadingPeriod(mode: PeriodMode, anchor: Date, delta: number): Date {
   return shiftAnchor(mode, anchor, delta)
+}
+
+export function isCurrentReadingPeriod(
+  mode: PeriodMode,
+  anchor: Date,
+  now = new Date(),
+): boolean {
+  if (mode === 'year') return anchor.getFullYear() === now.getFullYear()
+  if (mode === 'month') {
+    return anchor.getFullYear() === now.getFullYear() && anchor.getMonth() === now.getMonth()
+  }
+  return dateKey(startOfWeek(anchor)) === dateKey(startOfWeek(now))
+}
+
+export function currentPeriodResetLabel(mode: PeriodMode): string {
+  if (mode === 'year') return '回到今年'
+  if (mode === 'month') return '回到本月'
+  return '回到本周'
 }
 
 async function readStore(): Promise<ReadingStore> {
@@ -409,27 +434,19 @@ export async function getReadingHistoryStats(
   const distribution = buildDistribution(mode, anchor, store)
   const distributionMaxMs = Math.max(...distribution.map((d) => d.ms), 1)
 
-  let longestBook: ReadingHistoryStats['longestBook'] = null
-  let longestMs = 0
-  for (const [bookId, ms] of Object.entries(bookTotals)) {
-    if (ms > longestMs) {
-      longestMs = ms
+  const topBooks: ReadingBookRank[] = Object.entries(bookTotals)
+    .filter(([, ms]) => ms > 0)
+    .map(([bookId, ms]) => {
       const meta = store.books[bookId]
-      longestBook = {
+      return {
         bookId,
         title: meta?.title ?? '未知书籍',
         totalMs: ms,
       }
-    }
-  }
+    })
+    .sort((a, b) => b.totalMs - a.totalMs)
 
-  if (!longestBook) {
-    const saved = await listSavedBooks()
-    const recent = saved[0]
-    if (recent) {
-      longestBook = { bookId: recent.id, title: recent.title, totalMs: 0 }
-    }
-  }
+  const longestBook = topBooks[0] ?? null
 
   return {
     totalMs,
@@ -445,6 +462,7 @@ export async function getReadingHistoryStats(
     distribution,
     distributionMaxMs,
     longestBook,
+    topBooks,
     periodLabel: formatPeriodLabel(mode, anchor),
   }
 }

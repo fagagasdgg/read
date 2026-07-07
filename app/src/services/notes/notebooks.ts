@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem'
 import { Preferences } from '@capacitor/preferences'
+import { listSavedBooks } from '../epub/library'
 
 export interface NotebookMeta {
   id: string
@@ -24,11 +25,32 @@ export interface NotebookEntryAnalysis {
   sentencePattern: string
 }
 
+export interface NotebookEntrySource {
+  bookId: string
+  bookTitle: string
+  notebookId: string
+  notebookTitle: string
+}
+
 export interface NotebookEntry {
   id: string
   sentence: string
   createdAt: number
   analysis: NotebookEntryAnalysis
+  /** 仅 base_sentence 总笔记本中的镜像条目带有来源信息 */
+  source?: NotebookEntrySource
+}
+
+export const BASE_SENTENCE_NOTEBOOK_ID = 'base_sentence'
+export const BASE_SENTENCE_NOTEBOOK_TITLE = 'base_sentence'
+
+export function isBaseSentenceNotebook(id: string): boolean {
+  return id === BASE_SENTENCE_NOTEBOOK_ID
+}
+
+export interface AddNotebookEntryOptions {
+  bookId?: string
+  bookTitle?: string
 }
 
 const REGISTRY_KEY = 'read-notebook-registry'
@@ -127,6 +149,18 @@ async function writeDocument(doc: NotebookDocument): Promise<void> {
   localStorage.setItem(`read-notebook-doc-${doc.id}`, payload)
 }
 
+function normalizeSource(raw: unknown): NotebookEntrySource | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const item = raw as Record<string, unknown>
+  if (typeof item.notebookId !== 'string' || !item.notebookId) return undefined
+  return {
+    bookId: typeof item.bookId === 'string' ? item.bookId : '',
+    bookTitle: typeof item.bookTitle === 'string' ? item.bookTitle : '未知书籍',
+    notebookId: item.notebookId,
+    notebookTitle: typeof item.notebookTitle === 'string' ? item.notebookTitle : '未知笔记本',
+  }
+}
+
 function normalizeEntry(raw: unknown): NotebookEntry | null {
   if (!raw || typeof raw !== 'object') return null
   const item = raw as Record<string, unknown>
@@ -148,6 +182,7 @@ function normalizeEntry(raw: unknown): NotebookEntry | null {
       sentencePattern:
         typeof analysisRaw.sentencePattern === 'string' ? analysisRaw.sentencePattern : '',
     },
+    source: normalizeSource(item.source),
   }
 }
 
@@ -198,9 +233,34 @@ async function deleteDocument(id: string): Promise<void> {
   localStorage.removeItem(`read-notebook-doc-${id}`)
 }
 
-export async function listNotebooks(): Promise<NotebookMeta[]> {
+export async function ensureBaseSentenceNotebook(): Promise<NotebookMeta> {
   const notebooks = await readRegistry()
-  return notebooks.sort((a, b) => b.updatedAt - a.updatedAt)
+  let meta = notebooks.find((item) => item.id === BASE_SENTENCE_NOTEBOOK_ID)
+  const now = Date.now()
+
+  if (!meta) {
+    meta = {
+      id: BASE_SENTENCE_NOTEBOOK_ID,
+      title: BASE_SENTENCE_NOTEBOOK_TITLE,
+      createdAt: now,
+      updatedAt: now,
+    }
+    notebooks.unshift(meta)
+    await writeRegistry(notebooks)
+  }
+
+  await ensureNotebookDocument(BASE_SENTENCE_NOTEBOOK_ID)
+  return meta
+}
+
+export async function listNotebooks(): Promise<NotebookMeta[]> {
+  await ensureBaseSentenceNotebook()
+  const notebooks = await readRegistry()
+  return notebooks.sort((a, b) => {
+    if (isBaseSentenceNotebook(a.id)) return -1
+    if (isBaseSentenceNotebook(b.id)) return 1
+    return b.updatedAt - a.updatedAt
+  })
 }
 
 export async function countNotebookEntries(options?: {
@@ -211,6 +271,7 @@ export async function countNotebookEntries(options?: {
   let total = 0
 
   for (const meta of notebooks) {
+    if (isBaseSentenceNotebook(meta.id)) continue
     const doc = await readDocument(meta.id)
     if (!doc?.entries.length) continue
 
@@ -239,6 +300,10 @@ export async function createNotebook(title?: string): Promise<NotebookMeta> {
 
   if (trimmed && (await isNotebookTitleTaken(resolvedTitle))) {
     throw new Error(`笔记本「${resolvedTitle}」已存在，请使用其他名称`)
+  }
+
+  if (normalizeTitleKey(resolvedTitle) === normalizeTitleKey(BASE_SENTENCE_NOTEBOOK_TITLE)) {
+    throw new Error(`「${BASE_SENTENCE_NOTEBOOK_TITLE}」为系统总笔记本，请使用其他名称`)
   }
 
   const meta: NotebookMeta = {
@@ -322,6 +387,9 @@ export function getNotebookEntryById(
 }
 
 export async function removeNotebook(id: string): Promise<void> {
+  if (isBaseSentenceNotebook(id)) {
+    throw new Error('总笔记本 base_sentence 不可删除')
+  }
   const notebooks = (await readRegistry()).filter((item) => item.id !== id)
   await writeRegistry(notebooks)
   await deleteDocument(id)
@@ -332,15 +400,102 @@ export async function touchNotebook(id: string): Promise<void> {
   const item = notebooks.find((nb) => nb.id === id)
   if (!item) return
   item.updatedAt = Date.now()
-  notebooks.sort((a, b) => b.updatedAt - a.updatedAt)
+  notebooks.sort((a, b) => {
+    if (isBaseSentenceNotebook(a.id)) return -1
+    if (isBaseSentenceNotebook(b.id)) return 1
+    return b.updatedAt - a.updatedAt
+  })
   await writeRegistry(notebooks)
+}
+
+function sourceMirrorKey(entry: NotebookEntry, sourceNotebookId: string): string {
+  return `${entry.sentence.trim().replace(/\s+/g, ' ')}|${sourceNotebookId}|${entry.createdAt}`
+}
+
+async function removeMirrorFromBaseSentence(
+  entry: NotebookEntry,
+  sourceNotebookId: string,
+): Promise<void> {
+  const baseDoc = await readDocument(BASE_SENTENCE_NOTEBOOK_ID)
+  if (!baseDoc) return
+
+  const key = sourceMirrorKey(entry, sourceNotebookId)
+  const nextEntries = baseDoc.entries.filter((item) => mirrorEntryKey(item) !== key)
+  if (nextEntries.length === baseDoc.entries.length) return
+
+  baseDoc.entries = nextEntries
+  baseDoc.updatedAt = Date.now()
+  await writeDocument(baseDoc)
+}
+
+export async function removeNotebookEntry(
+  notebookId: string,
+  entryId: string,
+): Promise<{ totalAfter: number }> {
+  const doc = await ensureNotebookDocument(notebookId)
+  const entry = doc.entries.find((item) => item.id === entryId)
+  if (!entry) throw new Error('笔记条目不存在')
+
+  doc.entries = doc.entries.filter((item) => item.id !== entryId)
+  doc.updatedAt = Date.now()
+  await writeDocument(doc)
+  await touchNotebook(notebookId)
+
+  if (!isBaseSentenceNotebook(notebookId)) {
+    await removeMirrorFromBaseSentence(entry, notebookId)
+  }
+
+  return { totalAfter: doc.entries.length }
+}
+
+function mirrorEntryKey(entry: NotebookEntry): string {
+  const notebookId = entry.source?.notebookId ?? ''
+  return `${entry.sentence.trim().replace(/\s+/g, ' ')}|${notebookId}|${entry.createdAt}`
+}
+
+async function resolveBookTitle(bookId: string, fallback?: string): Promise<string> {
+  if (fallback?.trim()) return fallback.trim()
+  const books = await listSavedBooks()
+  return books.find((book) => book.id === bookId)?.title ?? '未知书籍'
+}
+
+async function mirrorEntryToBaseSentence(
+  entry: NotebookEntry,
+  sourceNotebookId: string,
+  options?: AddNotebookEntryOptions,
+): Promise<void> {
+  const notebooks = await readRegistry()
+  const sourceMeta = notebooks.find((item) => item.id === sourceNotebookId)
+  const baseDoc = await ensureNotebookDocument(BASE_SENTENCE_NOTEBOOK_ID)
+
+  const mirror: NotebookEntry = {
+    ...entry,
+    id: createEntryId(),
+    source: {
+      bookId: options?.bookId ?? '',
+      bookTitle: await resolveBookTitle(options?.bookId ?? '', options?.bookTitle),
+      notebookId: sourceNotebookId,
+      notebookTitle: sourceMeta?.title ?? '未知笔记本',
+    },
+  }
+
+  const key = mirrorEntryKey(mirror)
+  const exists = baseDoc.entries.some((item) => mirrorEntryKey(item) === key)
+  if (exists) return
+
+  baseDoc.entries.unshift(mirror)
+  baseDoc.updatedAt = Date.now()
+  await writeDocument(baseDoc)
+  await touchNotebook(BASE_SENTENCE_NOTEBOOK_ID)
 }
 
 export async function addNotebookEntry(
   notebookId: string,
   sentence: string,
   analysis: Partial<NotebookEntryAnalysis> = {},
+  options?: AddNotebookEntryOptions,
 ): Promise<NotebookEntry> {
+  await ensureBaseSentenceNotebook()
   const doc = await ensureNotebookDocument(notebookId)
 
   const entry: NotebookEntry = {
@@ -363,6 +518,10 @@ export async function addNotebookEntry(
   const verified = await readDocument(notebookId)
   if (!verified?.entries.some((item) => item.id === entry.id)) {
     throw new Error('笔记保存失败，请重试')
+  }
+
+  if (!isBaseSentenceNotebook(notebookId)) {
+    await mirrorEntryToBaseSentence(entry, notebookId, options)
   }
 
   return entry
@@ -411,7 +570,12 @@ export async function importNotebooksBackup(payload: {
 
     const meta: NotebookMeta = {
       id: rawMeta.id,
-      title: typeof rawMeta.title === 'string' && rawMeta.title.trim() ? rawMeta.title.trim() : '笔记本',
+      title:
+        isBaseSentenceNotebook(rawMeta.id)
+          ? BASE_SENTENCE_NOTEBOOK_TITLE
+          : typeof rawMeta.title === 'string' && rawMeta.title.trim()
+            ? rawMeta.title.trim()
+            : '笔记本',
       createdAt: typeof rawMeta.createdAt === 'number' ? rawMeta.createdAt : Date.now(),
       updatedAt: typeof rawMeta.updatedAt === 'number' ? rawMeta.updatedAt : Date.now(),
     }
@@ -473,8 +637,13 @@ export async function importNotebooksBackup(payload: {
     entriesAdded += normalizedDoc.entries.length
   }
 
-  const mergedRegistry = [...registryMap.values()].sort((a, b) => b.updatedAt - a.updatedAt)
+  const mergedRegistry = [...registryMap.values()].sort((a, b) => {
+    if (isBaseSentenceNotebook(a.id)) return -1
+    if (isBaseSentenceNotebook(b.id)) return 1
+    return b.updatedAt - a.updatedAt
+  })
   await writeRegistry(mergedRegistry)
+  await ensureBaseSentenceNotebook()
 
   return {
     notebooks: mergedRegistry.length,

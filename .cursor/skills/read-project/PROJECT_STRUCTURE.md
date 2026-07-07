@@ -1,7 +1,7 @@
 # 项目结构
 
 > 按 `xq/需求.md` §98.1 维护。每次新增/删除/重命名文件后更新本文档。
-> Last updated: 2026-07-03
+> Last updated: 2026-07-07
 
 ```
 read/
@@ -84,6 +84,7 @@ read/
 │   │       │   └── phrases.ts       # 按 lemma 存储词组（联网+手动）
 │   │       ├── notes/
 │   │       │   ├── notebooks.ts     # 笔记本与句子条目结构化存储
+│   │       │   ├── notebookUiSettings.ts # 笔记列表分页与每页条数偏好
 │   │       │   └── bookNotebook.ts  # 每本书默认保存笔记本
 │   │       ├── backup/
 │   │       │   ├── types.ts           # 备份包 manifest 与结构

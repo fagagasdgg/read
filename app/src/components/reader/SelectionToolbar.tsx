@@ -16,6 +16,7 @@ import { DoubaoPasteSheet } from './DoubaoPasteSheet'
 
 interface SelectionToolbarProps {
   bookId: string
+  bookTitle?: string
   text: string
   onClose: () => void
   onClear: () => void
@@ -33,7 +34,7 @@ function truncateText(value: string, max = 160): string {
   return `${value.slice(0, max)}…`
 }
 
-export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionToolbarProps) {
+export function SelectionToolbar({ bookId, bookTitle, text, onClose, onClear }: SelectionToolbarProps) {
   const [mode, setMode] = useState<ToolbarMode>('actions')
   const [analysis, setAnalysis] = useState<NotebookEntryAnalysis | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
@@ -144,7 +145,7 @@ export function SelectionToolbar({ bookId, text, onClose, onClear }: SelectionTo
     setError('')
     setMessage('')
     try {
-      await addNotebookEntry(notebookId, text, analysis)
+      await addNotebookEntry(notebookId, text, analysis, { bookId, bookTitle })
       setMessage('已保存到笔记')
       setShowPicker(false)
       setTimeout(onClear, 800)

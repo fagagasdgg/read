@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { BACKUP_DATA_CHANGED } from '../../services/backup/events'
 import { getBookCoverDataUrl } from '../../services/epub/library'
 import { getDictionaryCacheStats } from '../../services/dictionary'
 import { listNotebooks } from '../../services/notes/notebooks'
 import {
+  currentPeriodResetLabel,
   formatCompareText,
   formatReadingDuration,
   getReadingHistoryStats,
+  isCurrentReadingPeriod,
   shiftReadingPeriod,
   type PeriodMode,
+  type ReadingBookRank,
   type ReadingHistoryStats,
 } from '../../services/reading/readingTime'
 import { getMasteredWordCount, subscribeMasteredWords } from '../../services/words/mastered'
@@ -19,6 +22,9 @@ const PERIOD_TABS: Array<{ id: PeriodMode; label: string }> = [
   { id: 'month', label: '月' },
   { id: 'year', label: '年' },
 ]
+
+const LONGEST_COLLAPSED_COUNT = 3
+const LONGEST_PAGE_SIZE = 10
 
 function DigitBoxes({ value, pad = 2 }: { value: number; pad?: number }) {
   const text = String(value).padStart(pad, '0')
@@ -69,17 +75,174 @@ function CollapsibleSection({
   )
 }
 
-export function StatisticsScreen() {
+function LongestBookRow({
+  book,
+  coverUrl,
+}: {
+  book: ReadingBookRank
+  coverUrl: string | null
+}) {
+  return (
+    <div className="yueli-longest">
+      <div
+        className="yueli-longest-cover"
+        style={
+          coverUrl ? undefined : { background: 'linear-gradient(145deg, #c4a882, #8f6238)' }
+        }
+      >
+        {coverUrl ? <img src={coverUrl} alt={book.title} /> : <span aria-hidden>📖</span>}
+      </div>
+      <div className="yueli-longest-meta">
+        <p className="yueli-longest-time">
+          {formatReadingDuration(book.totalMs)}
+          <span className="yueli-longest-chevron">›</span>
+        </p>
+        <p className="yueli-longest-title">{book.title}</p>
+      </div>
+    </div>
+  )
+}
+
+function LongestBooksSection({ books }: { books: ReadingBookRank[] }) {
+  const [expanded, setExpanded] = useState(false)
+  const [page, setPage] = useState(1)
+  const [covers, setCovers] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    setExpanded(false)
+    setPage(1)
+  }, [books])
+
+  const visibleBooks = useMemo(() => {
+    if (!expanded) return books.slice(0, LONGEST_COLLAPSED_COUNT)
+    const start = (page - 1) * LONGEST_PAGE_SIZE
+    return books.slice(start, start + LONGEST_PAGE_SIZE)
+  }, [books, expanded, page])
+
+  const totalPages = Math.max(1, Math.ceil(books.length / LONGEST_PAGE_SIZE))
+  const canExpand = books.length > LONGEST_COLLAPSED_COUNT
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadCovers() {
+      const pairs = await Promise.all(
+        visibleBooks.map(async (book) => {
+          const url = await getBookCoverDataUrl(book.bookId)
+          return [book.bookId, url] as const
+        }),
+      )
+      if (cancelled) return
+      setCovers((prev) => {
+        const next = { ...prev }
+        for (const [id, url] of pairs) {
+          if (url) next[id] = url
+        }
+        return next
+      })
+    }
+
+    void loadCovers()
+    return () => {
+      cancelled = true
+    }
+  }, [visibleBooks])
+
+  if (books.length === 0) {
+    return <p className="yueli-empty">本周期暂无阅读记录</p>
+  }
+
+  return (
+    <div className="yueli-longest-section">
+      <div className="yueli-longest-list">
+        {visibleBooks.map((book) => (
+          <LongestBookRow key={book.bookId} book={book} coverUrl={covers[book.bookId] ?? null} />
+        ))}
+      </div>
+
+      {canExpand && !expanded && (
+        <button
+          type="button"
+          className="yueli-longest-more-btn"
+          onClick={() => {
+            setExpanded(true)
+            setPage(1)
+          }}
+        >
+          展示更多（共 {books.length} 本）
+        </button>
+      )}
+
+      {expanded && (
+        <>
+          {totalPages > 1 && (
+            <div className="yueli-longest-pager">
+              <button
+                type="button"
+                className="yueli-longest-pager-btn"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                上一页
+              </button>
+              <span className="yueli-longest-pager-meta">
+                第 {page} / {totalPages} 页
+              </span>
+              <button
+                type="button"
+                className="yueli-longest-pager-btn"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                下一页
+              </button>
+            </div>
+          )}
+          <button
+            type="button"
+            className="yueli-longest-collapse-btn"
+            onClick={() => {
+              setExpanded(false)
+              setPage(1)
+            }}
+          >
+            收起
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+interface StatisticsScreenProps {
+  isActive?: boolean
+}
+
+export function StatisticsScreen({ isActive = true }: StatisticsScreenProps) {
   const [periodMode, setPeriodMode] = useState<PeriodMode>('week')
   const [anchor, setAnchor] = useState(() => new Date())
   const [history, setHistory] = useState<ReadingHistoryStats | null>(null)
-  const [coverUrl, setCoverUrl] = useState<string | null>(null)
   const [vocabExpanded, setVocabExpanded] = useState(false)
   const [cacheStats, setCacheStats] = useState({ wordCount: 0, notFoundCount: 0 })
   const [masteredCount, setMasteredCount] = useState(0)
   const [phraseWordCount, setPhraseWordCount] = useState(0)
   const [notebookCount, setNotebookCount] = useState(0)
   const [activeBar, setActiveBar] = useState<number | null>(null)
+
+  const resetToCurrentPeriod = useCallback(() => {
+    setAnchor(new Date())
+    setActiveBar(null)
+  }, [])
+
+  useEffect(() => {
+    if (isActive) {
+      resetToCurrentPeriod()
+    }
+  }, [isActive, resetToCurrentPeriod])
+
+  useEffect(() => {
+    resetToCurrentPeriod()
+  }, [periodMode, resetToCurrentPeriod])
 
   const refresh = useCallback(async () => {
     const [hist, cache, mastered, phraseWords, notebooks] = await Promise.all([
@@ -95,13 +258,6 @@ export function StatisticsScreen() {
     setPhraseWordCount(phraseWords)
     setNotebookCount(notebooks.length)
     setActiveBar(null)
-
-    if (hist.longestBook?.bookId) {
-      const url = await getBookCoverDataUrl(hist.longestBook.bookId)
-      setCoverUrl(url)
-    } else {
-      setCoverUrl(null)
-    }
   }, [anchor, periodMode])
 
   useEffect(() => {
@@ -119,6 +275,7 @@ export function StatisticsScreen() {
     }
   }, [refresh])
 
+  const showResetPeriod = !isCurrentReadingPeriod(periodMode, anchor)
   const vocabSummary = `词条 ${cacheStats.wordCount} · 笔记本 ${notebookCount} 本`
   const chartMaxLabel =
     history && history.distributionMaxMs > 0
@@ -165,6 +322,12 @@ export function StatisticsScreen() {
             ▶
           </button>
         </div>
+
+        {showResetPeriod && (
+          <button type="button" className="yueli-reset-period-btn" onClick={resetToCurrentPeriod}>
+            {currentPeriodResetLabel(periodMode)}
+          </button>
+        )}
       </header>
 
       <div className="statistics-body yueli-body">
@@ -235,33 +398,7 @@ export function StatisticsScreen() {
 
         <section className="yueli-card">
           <h3 className="yueli-card-title">阅读最久</h3>
-          {history?.longestBook ? (
-            <div className="yueli-longest">
-              <div
-                className="yueli-longest-cover"
-                style={
-                  coverUrl
-                    ? undefined
-                    : { background: 'linear-gradient(145deg, #c4a882, #8f6238)' }
-                }
-              >
-                {coverUrl ? (
-                  <img src={coverUrl} alt={history.longestBook.title} />
-                ) : (
-                  <span aria-hidden>📖</span>
-                )}
-              </div>
-              <div className="yueli-longest-meta">
-                <p className="yueli-longest-time">
-                  {formatReadingDuration(history.longestBook.totalMs)}
-                  <span className="yueli-longest-chevron">›</span>
-                </p>
-                <p className="yueli-longest-title">{history.longestBook.title}</p>
-              </div>
-            </div>
-          ) : (
-            <p className="yueli-empty">本周期暂无阅读记录</p>
-          )}
+          <LongestBooksSection books={history?.topBooks ?? []} />
         </section>
 
         <CollapsibleSection

@@ -24,7 +24,7 @@ export function HomeShell({ onOpenBook }: HomeShellProps) {
             <NotesScreen />
           </section>
           <section className="home-panel" aria-hidden={tab !== 'statistics'}>
-            <StatisticsScreen />
+            <StatisticsScreen isActive={tab === 'statistics'} />
           </section>
           <section className="home-panel" aria-hidden={tab !== 'settings'}>
             <AppSettingsScreen />

@@ -492,6 +492,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
       {sessionText && selectionPanelOpen && !overlay && !wordLookup && (
         <SelectionToolbar
           bookId={book.id}
+          bookTitle={book.title}
           text={sessionText}
           onClose={() => setSelectionPanelOpen(false)}
           onClear={() => {

@@ -3,6 +3,7 @@ import { AppToast, type AppToastVariant } from '../common/AppToast'
 import { BACKUP_DATA_CHANGED } from '../../services/backup/events'
 import {
   createNotebook,
+  isBaseSentenceNotebook,
   listNotebooks,
   removeNotebook,
   touchNotebook,
@@ -66,10 +67,18 @@ export function NotesScreen() {
   }
 
   async function handleRemove(id: string, title: string) {
+    if (isBaseSentenceNotebook(id)) {
+      showToast('总笔记本 base_sentence 不可删除', 'error')
+      return
+    }
     if (!window.confirm(`确定删除笔记本「${title}」？`)) return
-    await removeNotebook(id)
-    if (openNotebookId === id) setOpenNotebookId(null)
-    await refresh()
+    try {
+      await removeNotebook(id)
+      if (openNotebookId === id) setOpenNotebookId(null)
+      await refresh()
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '删除失败', 'error')
+    }
   }
 
   async function handleOpen(id: string) {
@@ -104,39 +113,42 @@ export function NotesScreen() {
       </header>
 
       <div className="bookshelf-shelf notes-shelf">
-        {notebooks.length === 0 ? (
+        {notebooks.filter((n) => !isBaseSentenceNotebook(n.id)).length === 0 ? (
           <div className="bookshelf-empty">
-            <p>还没有笔记本</p>
-            <p className="bookshelf-empty-hint">点击右上角 + 创建空白笔记本</p>
-            <p className="bookshelf-empty-hint">后续可将阅读中的句子解析保存到这里</p>
+            <p>还没有自定义笔记本</p>
+            <p className="bookshelf-empty-hint">点击右上角 + 创建；保存的句子会自动汇总到 base_sentence</p>
           </div>
-        ) : (
-          <ul className="bookshelf-grid">
-            {notebooks.map((notebook) => (
+        ) : null}
+        <ul className="bookshelf-grid">
+          {notebooks.map((notebook) => (
               <li key={notebook.id} className="bookshelf-book">
                 <button
                   type="button"
-                  className="bookshelf-cover notes-cover"
+                  className={`bookshelf-cover notes-cover${isBaseSentenceNotebook(notebook.id) ? ' notes-cover-base' : ''}`}
                   style={{ background: notebookColor(notebook.id) }}
                   onClick={() => void handleOpen(notebook.id)}
                 >
                   <span className="notes-cover-icon" aria-hidden>
-                    📒
+                    {isBaseSentenceNotebook(notebook.id) ? '📚' : '📒'}
                   </span>
                   <span className="notes-cover-title">{notebook.title}</span>
+                  {isBaseSentenceNotebook(notebook.id) && (
+                    <span className="notes-cover-badge">总笔记本</span>
+                  )}
                 </button>
-                <button
-                  type="button"
-                  className="bookshelf-book-delete"
-                  onClick={() => void handleRemove(notebook.id, notebook.title)}
-                  aria-label="删除笔记本"
-                >
-                  ×
-                </button>
+                {!isBaseSentenceNotebook(notebook.id) && (
+                  <button
+                    type="button"
+                    className="bookshelf-book-delete"
+                    onClick={() => void handleRemove(notebook.id, notebook.title)}
+                    aria-label="删除笔记本"
+                  >
+                    ×
+                  </button>
+                )}
               </li>
             ))}
-          </ul>
-        )}
+        </ul>
       </div>
 
       <AppToast message={statusText} variant={statusVariant} />
