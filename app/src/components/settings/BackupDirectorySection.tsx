@@ -6,7 +6,7 @@ import {
   type BackupDirectorySettings,
 } from '../../services/settings/backupDirectory'
 
-export function BackupDirectorySection() {
+export function BackupDirectorySection({ embedded = false }: { embedded?: boolean }) {
   const [backupDir, setBackupDir] = useState<BackupDirectorySettings | null>(null)
   const [pickingDir, setPickingDir] = useState(false)
   const [dirMessage, setDirMessage] = useState('')
@@ -40,9 +40,8 @@ export function BackupDirectorySection() {
     updatedAt: 0,
   }
 
-  return (
-    <section className="settings-section">
-      <h4 className="settings-section-title">数据备份目录</h4>
+  const body = (
+    <>
       <p className="reader-backup-dir-path">
         当前目录：<strong>{formatBackupDirectoryLabel(backupDir ?? emptyDir)}</strong>
       </p>
@@ -58,6 +57,15 @@ export function BackupDirectorySection() {
       <p className="settings-section-note">
         导出时将保存到此目录（需使用系统文件夹选择器授权）。若导出报权限错误，请重新选择目录。
       </p>
+    </>
+  )
+
+  if (embedded) return body
+
+  return (
+    <section className="settings-section">
+      <h4 className="settings-section-title">数据备份目录</h4>
+      {body}
     </section>
   )
 }

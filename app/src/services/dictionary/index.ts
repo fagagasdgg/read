@@ -35,7 +35,7 @@ export {
   subscribeDictionarySourceStatus,
 } from './sourceStatus'
 export type { SourceHealth, SourceStatusView } from './sourceStatus'
-export { playSpeech, playSpeechWord } from './speech'
+export { playSpeech, playSpeechWord, playSpeechWithFallback } from './speech'
 
 async function cacheVariantForms(entry: WordEntry): Promise<void> {
   const tasks = entry.forms.map(async (form) => {

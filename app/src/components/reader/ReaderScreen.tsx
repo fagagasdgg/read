@@ -78,7 +78,10 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     userSettings,
   )
 
-  const { selection, clearSelection } = useTextSelection(contentEl)
+  const { selection, clearSelection } = useTextSelection(
+    contentEl,
+    userSettings?.selectionToolbarDelayMs ?? 850,
+  )
   const [selectionPanelOpen, setSelectionPanelOpen] = useState(false)
   const [sessionText, setSessionText] = useState<string | null>(null)
 

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { BACKUP_DATA_CHANGED } from '../../services/backup/events'
 import { getBookCoverDataUrl } from '../../services/epub/library'
 import { getDictionaryCacheStats } from '../../services/dictionary'
-import { listNotebooks } from '../../services/notes/notebooks'
+import { countNotebookEntries, listNotebooks } from '../../services/notes/notebooks'
+import { NOTEBOOK_DATA_CHANGED } from '../../services/notes/events'
 import {
   currentPeriodResetLabel,
   formatCompareText,
@@ -227,6 +228,7 @@ export function StatisticsScreen({ isActive = true }: StatisticsScreenProps) {
   const [masteredCount, setMasteredCount] = useState(0)
   const [phraseWordCount, setPhraseWordCount] = useState(0)
   const [notebookCount, setNotebookCount] = useState(0)
+  const [noteEntryCount, setNoteEntryCount] = useState(0)
   const [activeBar, setActiveBar] = useState<number | null>(null)
 
   const resetToCurrentPeriod = useCallback(() => {
@@ -245,18 +247,20 @@ export function StatisticsScreen({ isActive = true }: StatisticsScreenProps) {
   }, [periodMode, resetToCurrentPeriod])
 
   const refresh = useCallback(async () => {
-    const [hist, cache, mastered, phraseWords, notebooks] = await Promise.all([
+    const [hist, cache, mastered, phraseWords, notebooks, entryCount] = await Promise.all([
       getReadingHistoryStats(periodMode, anchor),
       getDictionaryCacheStats(),
       getMasteredWordCount(),
       getLemmaPhraseWordCount(),
       listNotebooks(),
+      countNotebookEntries(),
     ])
     setHistory(hist)
     setCacheStats(cache)
     setMasteredCount(mastered)
     setPhraseWordCount(phraseWords)
     setNotebookCount(notebooks.length)
+    setNoteEntryCount(entryCount)
     setActiveBar(null)
   }, [anchor, periodMode])
 
@@ -268,15 +272,20 @@ export function StatisticsScreen({ isActive = true }: StatisticsScreenProps) {
     const onBackup = () => {
       void refresh()
     }
+    const onNotebookChanged = () => {
+      void refresh()
+    }
     window.addEventListener(BACKUP_DATA_CHANGED, onBackup)
+    window.addEventListener(NOTEBOOK_DATA_CHANGED, onNotebookChanged)
     return () => {
       unsub()
       window.removeEventListener(BACKUP_DATA_CHANGED, onBackup)
+      window.removeEventListener(NOTEBOOK_DATA_CHANGED, onNotebookChanged)
     }
   }, [refresh])
 
   const showResetPeriod = !isCurrentReadingPeriod(periodMode, anchor)
-  const vocabSummary = `词条 ${cacheStats.wordCount} · 笔记本 ${notebookCount} 本`
+  const vocabSummary = `词条 ${cacheStats.wordCount} · 笔记本 ${notebookCount} 本 · 笔记 ${noteEntryCount} 条`
   const chartMaxLabel =
     history && history.distributionMaxMs > 0
       ? formatReadingDuration(history.distributionMaxMs)
@@ -428,9 +437,13 @@ export function StatisticsScreen({ isActive = true }: StatisticsScreenProps) {
               <span className="stats-vocab-label">笔记本数量</span>
               <strong>{notebookCount}</strong>
             </div>
+            <div className="stats-vocab-item stats-vocab-item-wide">
+              <span className="stats-vocab-label">笔记条数</span>
+              <strong>{noteEntryCount}</strong>
+            </div>
           </div>
           <p className="stats-section-note">
-            阅读时长仅在应用前台阅读时累计；切到后台不会计入。
+            阅读时长仅在应用前台阅读时累计；切到后台不会计入。跨设备同步阅历数据请使用书架「学习数据备份」导出/导入。
           </p>
         </CollapsibleSection>
       </div>

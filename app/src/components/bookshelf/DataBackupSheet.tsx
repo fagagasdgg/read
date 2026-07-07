@@ -31,7 +31,7 @@ export function DataBackupSheet({ onClose, onDone }: DataBackupSheetProps) {
   }
 
   async function handleImport(file?: File) {
-    if (!window.confirm('导入将与现有数据合并（词典、词组、笔记、已掌握单词）。是否继续？')) {
+    if (!window.confirm('导入将与现有数据合并（词典、词组、笔记、已掌握单词、阅读时长）。是否继续？')) {
       return
     }
 
@@ -43,7 +43,7 @@ export function DataBackupSheet({ onClose, onDone }: DataBackupSheetProps) {
       const warn =
         result.warnings.length > 0 ? `（${result.warnings.slice(0, 2).join('；')}）` : ''
       setMessage(
-        `导入完成：词条 ${result.dictionaryWords}、未找到 ${result.dictionaryNotFound}、词组单词 ${result.phraseLemmas}、已掌握 ${result.masteredWords}、笔记新增 ${result.notebookEntries} 条${warn}`,
+        `导入完成：词条 ${result.dictionaryWords}、未找到 ${result.dictionaryNotFound}、词组单词 ${result.phraseLemmas}、已掌握 ${result.masteredWords}、笔记新增 ${result.notebookEntries} 条、阅读 ${result.readingTotalMinutes} 分钟${warn}`,
       )
       onDone?.()
     } catch (err) {
@@ -58,7 +58,7 @@ export function DataBackupSheet({ onClose, onDone }: DataBackupSheetProps) {
       <div className="bookshelf-sheet data-backup-sheet" onClick={(e) => e.stopPropagation()}>
         <h3 className="bookshelf-sheet-title">学习数据备份</h3>
         <p className="bookshelf-sheet-hint data-backup-sheet-hint">
-          一键导出/导入：词典缓存（含查不到的标记）、用户词组、笔记本、已掌握单词。格式为 zip 压缩包，不含 EPUB 书籍文件。
+          一键导出/导入：词典缓存（含查不到的标记）、用户词组、笔记本、已掌握单词、阅历阅读时长。格式为 zip 压缩包，不含 EPUB 书籍文件。
         </p>
 
         <div className="bookshelf-sheet-actions">

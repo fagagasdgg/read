@@ -21,6 +21,11 @@ interface BookRecord {
   updatedAt: number
 }
 
+export interface ReadingTimeBackup {
+  days: Record<string, DayRecord>
+  books: Record<string, BookRecord>
+}
+
 interface ReadingStore {
   days: Record<string, DayRecord>
   books: Record<string, BookRecord>
@@ -186,6 +191,67 @@ async function readStore(): Promise<ReadingStore> {
   } catch {
     return { days: {}, books: {} }
   }
+}
+
+export async function getReadingStoreSnapshot(): Promise<ReadingTimeBackup> {
+  return readStore()
+}
+
+export async function exportReadingTimeBackup(): Promise<ReadingTimeBackup> {
+  return readStore()
+}
+
+export async function importReadingTimeBackup(
+  incoming: ReadingTimeBackup | null | undefined,
+): Promise<{ daysMerged: number; booksMerged: number }> {
+  if (!incoming?.days) {
+    return { daysMerged: 0, booksMerged: 0 }
+  }
+
+  const store = await readStore()
+  let daysMerged = 0
+  let booksMerged = 0
+
+  for (const [key, day] of Object.entries(incoming.days)) {
+    if (!day?.date || !Number.isFinite(day.totalMs) || day.totalMs <= 0) continue
+
+    const existing = store.days[key] ?? { date: key, totalMs: 0, byBook: {} }
+    existing.totalMs += day.totalMs
+
+    for (const [bookId, ms] of Object.entries(day.byBook ?? {})) {
+      if (!Number.isFinite(ms) || ms <= 0) continue
+      existing.byBook[bookId] = (existing.byBook[bookId] ?? 0) + ms
+    }
+
+    store.days[key] = existing
+    daysMerged += 1
+  }
+
+  for (const [bookId, book] of Object.entries(incoming.books ?? {})) {
+    if (!book?.bookId || !Number.isFinite(book.totalMs) || book.totalMs <= 0) continue
+
+    const existing = store.books[bookId] ?? {
+      bookId,
+      title: book.title?.trim() || '未知书籍',
+      totalMs: 0,
+      updatedAt: 0,
+    }
+
+    existing.totalMs += book.totalMs
+    if ((book.updatedAt ?? 0) >= existing.updatedAt) {
+      existing.title = book.title?.trim() || existing.title
+      existing.updatedAt = book.updatedAt ?? existing.updatedAt
+    }
+
+    store.books[bookId] = existing
+    booksMerged += 1
+  }
+
+  if (daysMerged > 0 || booksMerged > 0) {
+    await writeStore(store)
+  }
+
+  return { daysMerged, booksMerged }
 }
 
 async function migrateLegacyStore(): Promise<ReadingStore> {

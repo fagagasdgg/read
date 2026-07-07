@@ -33,7 +33,7 @@ function mergeSourceViews(staticSources: typeof DICTIONARY_SOURCES, dynamic: Sou
   })
 }
 
-export function DictionarySourcesSection() {
+export function DictionarySourcesSection({ embedded = false }: { embedded?: boolean }) {
   const [sourceViews, setSourceViews] = useState<SourceStatusView[]>([])
   const [probing, setProbing] = useState(false)
 
@@ -62,10 +62,10 @@ export function DictionarySourcesSection() {
     }
   }
 
-  return (
-    <section className="settings-section">
+  const body = (
+    <>
       <div className="settings-section-header">
-        <h4 className="settings-section-title">查词信源</h4>
+        {!embedded && <h4 className="settings-section-title">查词信源</h4>}
         <button
           type="button"
           className="reader-dict-probe-btn"
@@ -115,6 +115,14 @@ export function DictionarySourcesSection() {
       <p className="settings-section-note">
         阅读时自动累计各信源状态；有道未命中时自动尝试金山词霸。
       </p>
+    </>
+  )
+
+  if (embedded) return body
+
+  return (
+    <section className="settings-section">
+      {body}
     </section>
   )
 }

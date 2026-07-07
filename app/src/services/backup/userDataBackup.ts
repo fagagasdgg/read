@@ -5,6 +5,7 @@ import { FilePicker } from '@capawesome/capacitor-file-picker'
 import { getDictionaryCacheStats, importDictionaryRecords } from '../dictionary/cache'
 import { importBookNotebookMap } from '../notes/bookNotebook'
 import { importNotebooksBackup } from '../notes/notebooks'
+import { getReadingTimeStats, importReadingTimeBackup } from '../reading/readingTime'
 import {
   formatBackupDirectoryLabel,
   loadBackupDirectorySettings,
@@ -146,11 +147,19 @@ export async function importUserDataBackup(file?: File): Promise<ImportUserDataR
     warnings.push(`合并 ${bookNotebookAdded} 条书籍默认笔记本映射`)
   }
 
+  const readingResult = await importReadingTimeBackup(payload.readingTime)
+  if (readingResult.daysMerged > 0 || readingResult.booksMerged > 0) {
+    warnings.push(
+      `合并阅读时长：${readingResult.daysMerged} 天、${readingResult.booksMerged} 本书`,
+    )
+  }
+
   notifyBackupDataChanged()
 
   const stats = await getDictionaryCacheStats()
   const phraseLemmas = await getLemmaPhraseWordCount()
   const masteredTotal = await getMasteredWordCount()
+  const readingStats = await getReadingTimeStats()
 
   return {
     dictionaryWords: stats.wordCount,
@@ -159,6 +168,9 @@ export async function importUserDataBackup(file?: File): Promise<ImportUserDataR
     masteredWords: masteredTotal,
     notebooks: notebookResult.notebooks,
     notebookEntries: notebookResult.entries,
+    readingDaysMerged: readingResult.daysMerged,
+    readingBooksMerged: readingResult.booksMerged,
+    readingTotalMinutes: Math.round(readingStats.totalMs / 60_000),
     warnings,
   }
 }

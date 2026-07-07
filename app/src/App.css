@@ -2672,6 +2672,91 @@
   line-height: 1.45;
 }
 
+.settings-section-collapsible {
+  padding: 0;
+  overflow: hidden;
+}
+
+.settings-section-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.settings-section-toggle-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-section-summary {
+  margin: 4px 0 0;
+  font-size: 0.76rem;
+  color: #9ca3af;
+  line-height: 1.4;
+}
+
+.settings-section-chevron {
+  flex-shrink: 0;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+.settings-section-content {
+  padding: 0 16px 14px;
+}
+
+.settings-inline-stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-inline-stepper input {
+  width: 88px;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+.settings-inline-unit {
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.yueli-export-btn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 248, 235, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff8eb;
+  font-size: 0.82rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.yueli-export-btn:disabled {
+  opacity: 0.6;
+}
+
+.yueli-export-message {
+  margin: 8px 0 0;
+  font-size: 0.74rem;
+  color: rgba(255, 248, 235, 0.88);
+  line-height: 1.45;
+}
+
 /* Statistics screen */
 .statistics-screen {
   min-height: 100%;

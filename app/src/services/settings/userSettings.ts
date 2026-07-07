@@ -43,6 +43,8 @@ export interface UserSettings {
   inlineGlossOffsetX: number
   /** 行间翻译垂直偏移（px），正值向上 */
   inlineGlossOffsetY: number
+  /** 选段工具栏弹出延迟（毫秒） */
+  selectionToolbarDelayMs: number
 }
 
 type LegacyUserSettings = Partial<UserSettings> & {
@@ -60,6 +62,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   inlineGlossColor: DEFAULT_INLINE_GLOSS_COLOR,
   inlineGlossOffsetX: 0,
   inlineGlossOffsetY: 0,
+  selectionToolbarDelayMs: 850,
 }
 
 function clampCount(value: number, fallback: number): number {
@@ -124,6 +127,11 @@ function normalizeGlossColor(color: string): string {
   return best
 }
 
+function clampSelectionDelay(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return Math.min(3000, Math.max(200, Math.round(value)))
+}
+
 function normalizeUserSettings(partial: LegacyUserSettings): UserSettings {
   const migrated = migrateLegacySettings(partial)
   const merged = { ...DEFAULT_SETTINGS, ...migrated }
@@ -136,6 +144,10 @@ function normalizeUserSettings(partial: LegacyUserSettings): UserSettings {
     inlineGlossColor: normalizeGlossColor(merged.inlineGlossColor || DEFAULT_INLINE_GLOSS_COLOR),
     inlineGlossOffsetX: clampOffset(merged.inlineGlossOffsetX, DEFAULT_SETTINGS.inlineGlossOffsetX),
     inlineGlossOffsetY: clampOffset(merged.inlineGlossOffsetY, DEFAULT_SETTINGS.inlineGlossOffsetY),
+    selectionToolbarDelayMs: clampSelectionDelay(
+      merged.selectionToolbarDelayMs,
+      DEFAULT_SETTINGS.selectionToolbarDelayMs,
+    ),
   }
 }
 

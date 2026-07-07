@@ -125,11 +125,13 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
         {loading && <p className="notebook-detail-placeholder">加载中…</p>}
         {!loading && !selectedEntry && (
           <>
-            <p className="notebook-detail-placeholder">
-              {isBaseSentenceNotebook(notebookId)
-                ? '所有保存到各笔记本的句子都会自动汇总到这里，并标注来源书籍与笔记本。'
-                : '这里会展示句子笔记列表。后续阅读时保存的句子解析会按条目收纳，避免单个大文件混乱。'}
-            </p>
+            {pageData.total === 0 && (
+              <p className="notebook-detail-placeholder">
+                {isBaseSentenceNotebook(notebookId)
+                  ? '所有保存到各笔记本的句子都会自动汇总到这里，并标注来源书籍与笔记本。'
+                  : '这里会展示句子笔记列表。阅读时保存的句子解析会按条目收纳。'}
+              </p>
+            )}
 
             <div className="notebook-detail-toolbar">
               <p className="notebook-detail-meta">条目数：{pageData.total}</p>

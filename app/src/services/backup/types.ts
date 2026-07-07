@@ -1,5 +1,6 @@
 import type { DictionaryCacheValue } from '../dictionary/types'
 import type { NotebookDocument, NotebookMeta } from '../notes/notebooks'
+import type { ReadingTimeBackup } from '../reading/readingTime'
 import type { WordPhraseRecord } from '../words/phrases'
 
 export const BACKUP_FORMAT = 'read-user-data'
@@ -12,6 +13,9 @@ export interface BackupManifestCounts {
   masteredWords: number
   notebooks: number
   notebookEntries: number
+  readingDays: number
+  readingBooks: number
+  readingTotalMinutes: number
 }
 
 export interface BackupManifest {
@@ -32,6 +36,7 @@ export interface BackupPayload {
     documents: NotebookDocument[]
   }
   bookNotebooks: Record<string, string>
+  readingTime: ReadingTimeBackup
 }
 
 export interface ImportUserDataResult {
@@ -41,5 +46,8 @@ export interface ImportUserDataResult {
   masteredWords: number
   notebooks: number
   notebookEntries: number
+  readingDaysMerged: number
+  readingBooksMerged: number
+  readingTotalMinutes: number
   warnings: string[]
 }

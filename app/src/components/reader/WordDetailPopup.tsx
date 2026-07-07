@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { extractVariantLookupWord } from '../../lib/variantToken'
 import {
   lookupWord,
-  playSpeech,
+  playSpeechWithFallback,
   playSpeechWord,
   getDictionarySourceLabel,
 } from '../../services/dictionary'
@@ -109,8 +109,11 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
                     className="popup-audio-btn"
                     aria-label="播放美音"
                     onClick={() => {
-                      if (entry.source === 'iciba' && entry.usSpeechUrl) playSpeech(entry.usSpeechUrl)
-                      else playSpeechWord(entry.lemma, 2)
+                      if (entry.source === 'iciba' && entry.usSpeechUrl) {
+                        playSpeechWithFallback(entry.usSpeechUrl, entry.lemma, 2)
+                      } else {
+                        playSpeechWord(entry.lemma, 2)
+                      }
                     }}
                   >
                     🔊
@@ -125,8 +128,11 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
                   className="popup-audio-btn"
                   aria-label="播放英音"
                   onClick={() => {
-                    if (entry.source === 'iciba' && entry.ukSpeechUrl) playSpeech(entry.ukSpeechUrl)
-                    else playSpeechWord(entry.lemma, 1)
+                    if (entry.source === 'iciba' && entry.ukSpeechUrl) {
+                      playSpeechWithFallback(entry.ukSpeechUrl, entry.lemma, 1)
+                    } else {
+                      playSpeechWord(entry.lemma, 1)
+                    }
                   }}
                 >
                   🔊

@@ -116,6 +116,16 @@ const EXCHANGE_LABELS: Record<string, string> = {
   word_est: '最高级',
 }
 
+function normalizeIcibaSpeechUrl(url: string | undefined): string {
+  const trimmed = url?.trim()
+  if (!trimmed) return ''
+
+  if (trimmed.startsWith('//')) return `https:${trimmed}`
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  if (trimmed.startsWith('/')) return `https://res.iciba.com${trimmed}`
+  return `https://res.iciba.com/${trimmed}`
+}
+
 function parseForms(message: IcibaMessage): WordForm[] {
   const forms: WordForm[] = []
   const exchange = message.baesInfo?.exchange
@@ -167,8 +177,8 @@ export async function fetchFromIciba(lemma: string): Promise<WordEntry | null> {
     lemma,
     phoneticUs: symbols?.ph_am ?? '',
     phoneticUk: symbols?.ph_en ?? '',
-    usSpeechUrl: symbols?.ph_am_mp3_bk ?? symbols?.ph_tts_mp3_bk ?? '',
-    ukSpeechUrl: symbols?.ph_en_mp3_bk ?? symbols?.ph_tts_mp3_bk ?? '',
+    usSpeechUrl: normalizeIcibaSpeechUrl(symbols?.ph_am_mp3_bk ?? symbols?.ph_tts_mp3_bk),
+    ukSpeechUrl: normalizeIcibaSpeechUrl(symbols?.ph_en_mp3_bk ?? symbols?.ph_tts_mp3_bk),
     examLevels: parseExamLevels(message),
     definitions,
     forms: parseForms(message),

@@ -5,7 +5,7 @@ export interface TextSelectionState {
 }
 
 /** 选区稳定后再弹出工具面板，避免拖动手柄扩展选区时被挡住 */
-const SELECTION_CONFIRM_MS = 850
+const DEFAULT_SELECTION_CONFIRM_MS = 850
 
 function isSelectionInside(container: HTMLElement, selection: Selection): boolean {
   if (!selection.rangeCount) return false
@@ -22,7 +22,10 @@ function readSelectionText(container: HTMLElement): string | null {
   return sel.toString().trim()
 }
 
-export function useTextSelection(container: HTMLElement | null) {
+export function useTextSelection(
+  container: HTMLElement | null,
+  confirmMs = DEFAULT_SELECTION_CONFIRM_MS,
+) {
   const [selection, setSelection] = useState<TextSelectionState | null>(null)
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const confirmedTextRef = useRef<string | null>(null)
@@ -56,7 +59,7 @@ export function useTextSelection(container: HTMLElement | null) {
         }
         confirmedTextRef.current = text
         setSelection({ text })
-      }, SELECTION_CONFIRM_MS)
+      }, confirmMs)
     }
 
     function refresh() {
@@ -85,7 +88,7 @@ export function useTextSelection(container: HTMLElement | null) {
       container.removeEventListener('mouseup', refresh)
       container.removeEventListener('touchend', refresh)
     }
-  }, [container, clearConfirmTimer])
+  }, [container, clearConfirmTimer, confirmMs])
 
   return { selection, clearSelection }
 }

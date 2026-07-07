@@ -40,7 +40,8 @@ read/
 │   │   │   ├── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页）
 │   │   │   └── NotebookPickerSheet.tsx  # 保存笔记时选择笔记本
 │   │   ├── components/settings/
-│   │   │   ├── AppSettingsScreen.tsx    # 应用级设置（英语水平、智谱、备份、信源）
+│   │   │   ├── AppSettingsScreen.tsx    # 应用级设置（折叠分组）
+│   │   │   ├── CollapsibleSettingsSection.tsx # 设置页可折叠区块
 │   │   │   ├── ZhipuApiSection.tsx      # 智谱 API Key 配置
 │   │   │   ├── DictionarySourcesSection.tsx
 │   │   │   └── BackupDirectorySection.tsx
@@ -85,6 +86,7 @@ read/
 │   │       ├── notes/
 │   │       │   ├── notebooks.ts     # 笔记本与句子条目结构化存储
 │   │       │   ├── notebookUiSettings.ts # 笔记列表分页与每页条数偏好
+│   │       │   ├── events.ts        # 笔记数据变更事件
 │   │       │   └── bookNotebook.ts  # 每本书默认保存笔记本
 │   │       ├── backup/
 │   │       │   ├── types.ts           # 备份包 manifest 与结构
@@ -93,7 +95,7 @@ read/
 │   │       │   ├── events.ts          # 导入后 UI 刷新事件
 │   │       │   └── userDataBackup.ts  # 导入导出编排（写入用户目录）
 │   │       ├── reading/
-│   │       │   └── readingTime.ts     # 阅读时长累计与统计
+│   │       │   └── readingTime.ts     # 阅读时长累计、统计与备份合并
 │   │       ├── llm/
 │   │       │   ├── zhipuSettings.ts   # 智谱 API Key 本地存储
 │   │       │   ├── zhipuClient.ts     # chat/completions 调用

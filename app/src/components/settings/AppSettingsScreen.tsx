@@ -6,6 +6,7 @@ import {
   type UserSettings,
 } from '../../services/settings/userSettings'
 import { BackupDirectorySection } from './BackupDirectorySection'
+import { CollapsibleSettingsSection } from './CollapsibleSettingsSection'
 import { DeepAnalysisSettings } from './DeepAnalysisSettings'
 import { DictionarySourcesSection } from './DictionarySourcesSection'
 
@@ -30,8 +31,11 @@ export function AppSettingsScreen() {
       </header>
 
       <div className="app-settings-body">
-        <section className="settings-section">
-          <h4 className="settings-section-title">学习偏好</h4>
+        <CollapsibleSettingsSection
+          title="学习偏好"
+          summary="英语水平与行间翻译阈值"
+          defaultExpanded
+        >
           <label className="reader-setting-row">
             <span>你的英语水平</span>
             <select
@@ -52,19 +56,42 @@ export function AppSettingsScreen() {
           <p className="settings-section-note">
             影响行间翻译显示阈值：仅对高于你所选水平的单词显示行间释义。
           </p>
-        </section>
+        </CollapsibleSettingsSection>
 
-        <div className="settings-section-divider" />
+        <CollapsibleSettingsSection title="阅读交互" summary="选段工具栏弹出延迟">
+          <label className="reader-setting-row">
+            <span>选段工具弹出延迟</span>
+            <div className="settings-inline-stepper">
+              <input
+                type="number"
+                min={200}
+                max={3000}
+                step={50}
+                value={userSettings?.selectionToolbarDelayMs ?? 850}
+                disabled={!userSettings}
+                onChange={(e) =>
+                  updateUser({ selectionToolbarDelayMs: Number(e.target.value) || 850 })
+                }
+              />
+              <span className="settings-inline-unit">毫秒</span>
+            </div>
+          </label>
+          <p className="settings-section-note">
+            长按选段后，等待该时长再弹出工具栏，避免拖动手柄时被挡住。默认 850 毫秒。
+          </p>
+        </CollapsibleSettingsSection>
 
-        <DeepAnalysisSettings />
+        <CollapsibleSettingsSection title="深度解析（AI）" summary="智谱 / 豆包 API 与模型">
+          <DeepAnalysisSettings embedded />
+        </CollapsibleSettingsSection>
 
-        <div className="settings-section-divider" />
+        <CollapsibleSettingsSection title="数据备份目录" summary="导出 zip 与学习数据的默认保存位置">
+          <BackupDirectorySection embedded />
+        </CollapsibleSettingsSection>
 
-        <BackupDirectorySection />
-
-        <div className="settings-section-divider" />
-
-        <DictionarySourcesSection />
+        <CollapsibleSettingsSection title="词典信源" summary="有道、金山词霸可用率与健康度">
+          <DictionarySourcesSection embedded />
+        </CollapsibleSettingsSection>
       </div>
     </div>
   )

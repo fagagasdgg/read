@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core'
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem'
 import { Preferences } from '@capacitor/preferences'
 import { listSavedBooks } from '../epub/library'
+import { notifyNotebookDataChanged } from './events'
 
 export interface NotebookMeta {
   id: string
@@ -323,6 +324,7 @@ export async function createNotebook(title?: string): Promise<NotebookMeta> {
   notebooks.unshift(meta)
   await writeRegistry(notebooks)
   await writeDocument(doc)
+  notifyNotebookDataChanged()
   return meta
 }
 
@@ -393,6 +395,7 @@ export async function removeNotebook(id: string): Promise<void> {
   const notebooks = (await readRegistry()).filter((item) => item.id !== id)
   await writeRegistry(notebooks)
   await deleteDocument(id)
+  notifyNotebookDataChanged()
 }
 
 export async function touchNotebook(id: string): Promise<void> {
@@ -445,6 +448,7 @@ export async function removeNotebookEntry(
     await removeMirrorFromBaseSentence(entry, notebookId)
   }
 
+  notifyNotebookDataChanged()
   return { totalAfter: doc.entries.length }
 }
 
@@ -524,6 +528,7 @@ export async function addNotebookEntry(
     await mirrorEntryToBaseSentence(entry, notebookId, options)
   }
 
+  notifyNotebookDataChanged()
   return entry
 }
 
