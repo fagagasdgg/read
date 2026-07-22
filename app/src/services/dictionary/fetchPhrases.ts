@@ -2,7 +2,9 @@ import { Capacitor } from '@capacitor/core'
 import { pickYoudaoText } from '../../lib/pickYoudaoText'
 
 const YOUDAO_DIRECT = 'https://dict.youdao.com/jsonapi_s'
+const YOUDAO_LEGACY_DIRECT = 'https://dict.youdao.com/jsonapi'
 const YOUDAO_PROXY = '/api/youdao'
+const YOUDAO_LEGACY_PROXY = '/api/youdao-legacy'
 
 export interface FetchedPhrase {
   phrase: string
@@ -35,10 +37,38 @@ interface YoudaoPhraseResponse {
   }
 }
 
-function buildPhraseLookupUrl(lemma: string): string {
-  const params = `doctype=json&jsonversion=4&q=${encodeURIComponent(lemma)}`
-  const base = Capacitor.isNativePlatform() ? YOUDAO_DIRECT : YOUDAO_PROXY
+function buildPhraseLookupUrl(lemma: string, legacy = false): string {
+  const params = legacy
+    ? `doctype=json&q=${encodeURIComponent(lemma)}`
+    : `doctype=json&jsonversion=4&le=eng&q=${encodeURIComponent(lemma)}`
+  const base = Capacitor.isNativePlatform()
+    ? legacy
+      ? YOUDAO_LEGACY_DIRECT
+      : YOUDAO_DIRECT
+    : legacy
+      ? YOUDAO_LEGACY_PROXY
+      : YOUDAO_PROXY
   return `${base}?${params}`
+}
+
+async function requestYoudaoPhrases(url: string): Promise<FetchedPhrase[]> {
+  let response: Response
+  try {
+    response = await fetch(url)
+  } catch {
+    throw new Error(
+      Capacitor.isNativePlatform()
+        ? '网络连接失败，请检查网络后重试'
+        : '网络请求失败，请确认开发服务器已启动',
+    )
+  }
+
+  if (!response.ok) {
+    throw new Error('词组获取失败，请稍后再试')
+  }
+
+  const data = (await response.json()) as YoudaoPhraseResponse
+  return parseYoudaoPhrases(data)
 }
 
 function normalizePhraseKey(phrase: string): string {
@@ -125,25 +155,15 @@ function parseYoudaoPhrases(data: YoudaoPhraseResponse): FetchedPhrase[] {
 }
 
 export async function fetchPhrasesFromYoudao(lemma: string): Promise<FetchedPhrase[]> {
-  const url = buildPhraseLookupUrl(lemma)
+  const primary = await requestYoudaoPhrases(buildPhraseLookupUrl(lemma))
+  if (primary.length < 20) return primary
 
-  let response: Response
   try {
-    response = await fetch(url)
+    const legacy = await requestYoudaoPhrases(buildPhraseLookupUrl(lemma, true))
+    return dedupePhrases([...primary, ...legacy])
   } catch {
-    throw new Error(
-      Capacitor.isNativePlatform()
-        ? '网络连接失败，请检查网络后重试'
-        : '网络请求失败，请确认开发服务器已启动',
-    )
+    return primary
   }
-
-  if (!response.ok) {
-    throw new Error('词组获取失败，请稍后再试')
-  }
-
-  const data = (await response.json()) as YoudaoPhraseResponse
-  return parseYoudaoPhrases(data)
 }
 
 export async function fetchPhrasesOnline(lemma: string): Promise<FetchedPhrase[]> {

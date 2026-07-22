@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
 import { loadAllProgress } from '../epub/progress'
+import { listSavedBooks } from '../epub/library'
 import { countNotebookEntries } from '../notes/notebooks'
 
 const STORAGE_KEY = 'read-reading-time-v2'
@@ -54,6 +55,7 @@ export interface ReadingHistoryStats {
   totalMs: number
   hours: number
   minutes: number
+  todayMs: number
   dailyAvgMinutes: number
   comparePercent: number | null
   comparePeriodLabel: string
@@ -230,16 +232,11 @@ export async function importReadingTimeBackup(
   for (const [bookId, book] of Object.entries(incoming.books ?? {})) {
     if (!book?.bookId || !Number.isFinite(book.totalMs) || book.totalMs <= 0) continue
 
-    const existing = store.books[bookId] ?? {
-      bookId,
-      title: book.title?.trim() || '未知书籍',
-      totalMs: 0,
-      updatedAt: 0,
-    }
+    const existing = store.books[bookId]
+    if (!existing) continue
 
     existing.totalMs += book.totalMs
     if ((book.updatedAt ?? 0) >= existing.updatedAt) {
-      existing.title = book.title?.trim() || existing.title
       existing.updatedAt = book.updatedAt ?? existing.updatedAt
     }
 
@@ -462,6 +459,10 @@ export async function getReadingHistoryStats(
   anchor: Date,
 ): Promise<ReadingHistoryStats> {
   const store = await readStore()
+  const savedBooks = await listSavedBooks()
+  const localBookIds = new Set(savedBooks.map((book) => book.id))
+  const localBookTitles = new Map(savedBooks.map((book) => [book.id, book.title]))
+  const todayMs = store.days[dateKey(new Date())]?.totalMs ?? 0
   const { start, end } = getPeriodRange(mode, anchor)
   const totalMs = sumMsInRange(store, start, end)
   const totalMinutes = Math.floor(totalMs / 60_000)
@@ -501,15 +502,12 @@ export async function getReadingHistoryStats(
   const distributionMaxMs = Math.max(...distribution.map((d) => d.ms), 1)
 
   const topBooks: ReadingBookRank[] = Object.entries(bookTotals)
-    .filter(([, ms]) => ms > 0)
-    .map(([bookId, ms]) => {
-      const meta = store.books[bookId]
-      return {
-        bookId,
-        title: meta?.title ?? '未知书籍',
-        totalMs: ms,
-      }
-    })
+    .filter(([bookId, ms]) => ms > 0 && localBookIds.has(bookId))
+    .map(([bookId, ms]) => ({
+      bookId,
+      title: localBookTitles.get(bookId) ?? store.books[bookId]?.title ?? '未知书籍',
+      totalMs: ms,
+    }))
     .sort((a, b) => b.totalMs - a.totalMs)
 
   const longestBook = topBooks[0] ?? null
@@ -518,6 +516,7 @@ export async function getReadingHistoryStats(
     totalMs,
     hours,
     minutes,
+    todayMs,
     dailyAvgMinutes,
     comparePercent,
     comparePeriodLabel,

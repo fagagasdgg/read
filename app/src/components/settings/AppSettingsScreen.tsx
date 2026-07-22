@@ -10,6 +10,62 @@ import { CollapsibleSettingsSection } from './CollapsibleSettingsSection'
 import { DeepAnalysisSettings } from './DeepAnalysisSettings'
 import { DictionarySourcesSection } from './DictionarySourcesSection'
 
+function SelectionDelayInput({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: number
+  disabled?: boolean
+  onChange: (next: number) => void
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+
+  useEffect(() => {
+    setDraft(null)
+  }, [value])
+
+  const displayValue = draft ?? String(value)
+
+  function commitDraft(raw: string) {
+    const trimmed = raw.trim()
+    if (!trimmed) {
+      setDraft(null)
+      return
+    }
+    const parsed = Number(trimmed)
+    if (!Number.isFinite(parsed)) {
+      setDraft(null)
+      return
+    }
+    const clamped = Math.min(3000, Math.max(200, Math.round(parsed)))
+    onChange(clamped)
+    setDraft(null)
+  }
+
+  return (
+    <div className="settings-inline-stepper">
+      <input
+        type="number"
+        min={200}
+        max={3000}
+        step={50}
+        inputMode="numeric"
+        value={displayValue}
+        disabled={disabled}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={(e) => commitDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.currentTarget.blur()
+          }
+        }}
+      />
+      <span className="settings-inline-unit">毫秒</span>
+    </div>
+  )
+}
+
 export function AppSettingsScreen() {
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null)
 
@@ -61,20 +117,11 @@ export function AppSettingsScreen() {
         <CollapsibleSettingsSection title="阅读交互" summary="选段工具栏弹出延迟">
           <label className="reader-setting-row">
             <span>选段工具弹出延迟</span>
-            <div className="settings-inline-stepper">
-              <input
-                type="number"
-                min={200}
-                max={3000}
-                step={50}
-                value={userSettings?.selectionToolbarDelayMs ?? 850}
-                disabled={!userSettings}
-                onChange={(e) =>
-                  updateUser({ selectionToolbarDelayMs: Number(e.target.value) || 850 })
-                }
-              />
-              <span className="settings-inline-unit">毫秒</span>
-            </div>
+            <SelectionDelayInput
+              value={userSettings?.selectionToolbarDelayMs ?? 850}
+              disabled={!userSettings}
+              onChange={(selectionToolbarDelayMs) => updateUser({ selectionToolbarDelayMs })}
+            />
           </label>
           <p className="settings-section-note">
             长按选段后，等待该时长再弹出工具栏，避免拖动手柄时被挡住。默认 850 毫秒。

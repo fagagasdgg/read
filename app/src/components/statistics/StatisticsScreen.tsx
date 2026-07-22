@@ -26,6 +26,7 @@ const PERIOD_TABS: Array<{ id: PeriodMode; label: string }> = [
 
 const LONGEST_COLLAPSED_COUNT = 3
 const LONGEST_PAGE_SIZE = 10
+const CHART_BAR_TRACK_PX = 88
 
 function DigitBoxes({ value, pad = 2 }: { value: number; pad?: number }) {
   const text = String(value).padStart(pad, '0')
@@ -290,6 +291,8 @@ export function StatisticsScreen({ isActive = true }: StatisticsScreenProps) {
     history && history.distributionMaxMs > 0
       ? formatReadingDuration(history.distributionMaxMs)
       : '0 分钟'
+  const activeDistributionItem =
+    history && activeBar !== null ? history.distribution[activeBar] ?? null : null
 
   return (
     <div className="statistics-screen yueli-screen">
@@ -355,6 +358,13 @@ export function StatisticsScreen({ isActive = true }: StatisticsScreenProps) {
             {history ? formatCompareText(history) : '加载中…'}
           </p>
 
+          <div className="yueli-today-row">
+            <span className="yueli-today-label">今日阅读</span>
+            <strong className="yueli-today-value">
+              {formatReadingDuration(history?.todayMs ?? 0)}
+            </strong>
+          </div>
+
           <div className="yueli-summary-grid">
             <div className="yueli-summary-item">
               <strong>{history?.daysRead ?? 0}</strong>
@@ -376,28 +386,32 @@ export function StatisticsScreen({ isActive = true }: StatisticsScreenProps) {
         </section>
 
         <section className="yueli-card">
-          <h3 className="yueli-card-title">阅读分布</h3>
+          <div className="yueli-chart-head">
+            <h3 className="yueli-card-title">阅读分布</h3>
+            {activeDistributionItem?.tooltip && (
+              <p className="yueli-chart-active">{activeDistributionItem.tooltip}</p>
+            )}
+          </div>
           <div className="yueli-chart-wrap">
             <span className="yueli-chart-max">{chartMaxLabel}</span>
             <div className={`yueli-chart yueli-chart-${periodMode}`}>
               {history?.distribution.map((item, index) => {
-                const height =
-                  history.distributionMaxMs > 0
-                    ? Math.max(4, Math.round((item.ms / history.distributionMaxMs) * 100))
-                    : 4
+                const barHeightPx =
+                  history.distributionMaxMs > 0 && item.ms > 0
+                    ? Math.max(3, Math.round((item.ms / history.distributionMaxMs) * CHART_BAR_TRACK_PX))
+                    : 0
                 return (
                   <div key={`${item.dateKey}-${index}`} className="yueli-chart-col">
-                    <button
-                      type="button"
-                      className={`yueli-chart-bar${activeBar === index ? ' active' : ''}`}
-                      style={{ height: `${height}%` }}
-                      onClick={() => setActiveBar((v) => (v === index ? null : index))}
-                      aria-label={`${item.label} ${formatReadingDuration(item.ms)}`}
-                    />
+                    <div className="yueli-chart-bar-track">
+                      <button
+                        type="button"
+                        className={`yueli-chart-bar${activeBar === index ? ' active' : ''}`}
+                        style={{ height: `${barHeightPx}px` }}
+                        onClick={() => setActiveBar((v) => (v === index ? null : index))}
+                        aria-label={`${item.label} ${formatReadingDuration(item.ms)}`}
+                      />
+                    </div>
                     <span className="yueli-chart-label">{item.label}</span>
-                    {activeBar === index && item.tooltip && (
-                      <span className="yueli-chart-tip">{item.tooltip}</span>
-                    )}
                   </div>
                 )
               })}

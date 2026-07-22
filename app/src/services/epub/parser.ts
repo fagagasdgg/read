@@ -119,6 +119,23 @@ function hrefBasename(href: string): string {
   return parts[parts.length - 1] ?? href
 }
 
+function mergeTitleLabels(existing: string | undefined, incoming: string): string {
+  const next = incoming.trim()
+  if (!next) return existing?.trim() ?? ''
+  if (!existing?.trim()) return next
+  if (existing.includes(next) || next.includes(existing)) {
+    return existing.length >= next.length ? existing : next
+  }
+  return `${existing.trim()} ${next}`
+}
+
+function setTocTitle(map: Map<string, string>, href: string, label: string): void {
+  const key = normalizeHref(href)
+  map.set(key, mergeTitleLabels(map.get(key), label))
+  const base = hrefBasename(href)
+  map.set(base, mergeTitleLabels(map.get(base), label))
+}
+
 function parseNcxTitles(ncxXml: string): Map<string, string> {
   const map = new Map<string, string>()
   const doc = new DOMParser().parseFromString(ncxXml, 'application/xml')
@@ -127,10 +144,7 @@ function parseNcxTitles(ncxXml: string): Map<string, string> {
     const label = np.querySelector('navLabel > text')?.textContent?.trim()
     const src = np.querySelector(':scope > content')?.getAttribute('src')
     if (label && src) {
-      const key = normalizeHref(src)
-      if (!map.has(key)) map.set(key, label)
-      const base = hrefBasename(src)
-      if (!map.has(base)) map.set(base, label)
+      setTocTitle(map, src, label)
     }
     np.querySelectorAll(':scope > navPoint').forEach(walkNavPoint)
   }
@@ -146,10 +160,7 @@ function parseNavDocumentTitles(navHtml: string): Map<string, string> {
     const href = anchor.getAttribute('href')
     const label = anchor.textContent?.trim()
     if (!href || !label) return
-    const key = normalizeHref(href)
-    if (!map.has(key)) map.set(key, label)
-    const base = hrefBasename(href)
-    if (!map.has(base)) map.set(base, label)
+    setTocTitle(map, href, label)
   })
   return map
 }
@@ -184,6 +195,89 @@ async function loadTocTitleMap(
   return titles
 }
 
+const GENERIC_CHAPTER_LABEL =
+  /^(?:第\s*\d+\s*节|chapter\s+\d+|\d+)$/i
+
+const ROMAN_CHAPTER_LABEL =
+  /^(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)$/i
+
+function isGenericChapterLabel(label: string): boolean {
+  const text = label.trim()
+  if (!text || text.length > 48) return false
+  if (GENERIC_CHAPTER_LABEL.test(text)) return true
+  if (ROMAN_CHAPTER_LABEL.test(text)) return true
+  return false
+}
+
+function normalizeTitleText(text: string): string {
+  return text.replace(/\s+/g, ' ').trim()
+}
+
+function isTitleLikeLine(text: string): boolean {
+  const normalized = normalizeTitleText(text)
+  if (!normalized || normalized.length > 100) return false
+  if (/^[A-Z0-9][A-Z0-9\s,'’.-]{2,}$/.test(normalized)) return true
+  if (/^第\s*\d+\s*章/.test(normalized)) return true
+  return normalized.length <= 60 && !/[.!?。！？]$/.test(normalized)
+}
+
+function extractHeadingFromHtml(html: string, bookTitle: string): string | null {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const body = doc.body
+  if (!body) return null
+
+  const parts: string[] = []
+
+  for (const child of Array.from(body.children).slice(0, 8)) {
+    if (parts.length >= 3) break
+
+    const tag = child.tagName.toLowerCase()
+    if (/^h[1-6]$/.test(tag)) {
+      const text = normalizeTitleText(child.textContent ?? '')
+      if (!text || text === bookTitle) continue
+      if (isGenericChapterLabel(text)) continue
+      parts.push(text)
+      continue
+    }
+
+    if (parts.length === 0) {
+      if (tag === 'p' || tag === 'div' || tag === 'span') {
+        const text = normalizeTitleText(child.textContent ?? '')
+        if (!text || text === bookTitle) continue
+        if (isTitleLikeLine(text)) {
+          parts.push(text)
+          continue
+        }
+      }
+      continue
+    }
+
+    if (tag === 'p' || tag === 'div' || tag === 'span') {
+      const text = normalizeTitleText(child.textContent ?? '')
+      if (!text || text === bookTitle) continue
+      if (isTitleLikeLine(text)) {
+        parts.push(text)
+        continue
+      }
+      break
+    }
+
+    break
+  }
+
+  if (!parts.length) {
+    const heading = body.querySelector('h1, h2, h3, h4')
+    const headingText = normalizeTitleText(heading?.textContent ?? '')
+    if (headingText && headingText !== bookTitle && headingText.length < 120) {
+      return headingText
+    }
+    return null
+  }
+
+  const merged = normalizeTitleText(parts.join(' '))
+  return merged && merged !== bookTitle && merged.length < 120 ? merged : null
+}
+
 function resolveChapterTitle(
   tocTitles: Map<string, string>,
   chapterHref: string,
@@ -197,14 +291,22 @@ function resolveChapterTitle(
     tocTitles.get(hrefBasename(chapterHref)) ??
     tocTitles.get(hrefBasename(normalized))
 
-  if (fromToc && fromToc !== bookTitle) return fromToc
+  const fromHtml = extractHeadingFromHtml(html, bookTitle)
 
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-  const heading = doc.body?.querySelector('h1, h2, h3, h4')
-  const headingText = heading?.textContent?.trim()
-  if (headingText && headingText !== bookTitle && headingText.length < 120) {
-    return headingText
+  if (fromHtml) {
+    if (!fromToc || fromToc === bookTitle || isGenericChapterLabel(fromToc)) {
+      return fromHtml
+    }
+    if (fromHtml.toLowerCase().includes(fromToc.toLowerCase())) {
+      return fromHtml
+    }
+    if (fromToc.toLowerCase().includes(fromHtml.toLowerCase())) {
+      return fromToc
+    }
+    return fromHtml
   }
+
+  if (fromToc && fromToc !== bookTitle) return fromToc
 
   return fallback
 }

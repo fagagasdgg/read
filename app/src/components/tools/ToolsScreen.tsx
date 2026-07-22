@@ -1,5 +1,3 @@
-import { ZLibraryFinderTool } from './ZLibraryFinderTool'
-
 export function ToolsScreen() {
   return (
     <div className="tools-screen">
@@ -9,7 +7,10 @@ export function ToolsScreen() {
       </header>
 
       <div className="tools-body">
-        <ZLibraryFinderTool />
+        <div className="tools-empty">
+          <p>暂无可用工具</p>
+          <p className="tools-empty-hint">后续会在这里添加阅读辅助功能</p>
+        </div>
       </div>
     </div>
   )

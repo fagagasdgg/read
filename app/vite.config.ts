@@ -16,6 +16,14 @@ export default defineConfig({
           Referer: 'https://dict.youdao.com/',
         },
       },
+      '/api/youdao-legacy': {
+        target: 'https://dict.youdao.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/youdao-legacy/, '/jsonapi'),
+        headers: {
+          Referer: 'https://dict.youdao.com/',
+        },
+      },
       '/api/iciba': {
         target: 'https://dict.iciba.com',
         changeOrigin: true,

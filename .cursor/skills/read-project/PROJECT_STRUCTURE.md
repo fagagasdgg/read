@@ -34,8 +34,7 @@ read/
 │   │   ├── components/home/
 │   │   │   └── HomeShell.tsx        # 底部 Tab：书架 / 笔记 / 统计 / 工具 / 设置
 │   │   ├── components/tools/
-│   │   │   ├── ToolsScreen.tsx      # 工具页
-│   │   │   └── ZLibraryFinderTool.tsx # Z-Library 镜像检测（可折叠、帮助面板、扩大搜索）
+│   │   │   └── ToolsScreen.tsx      # 工具页（空态占位，待后续扩展）
 │   │   ├── components/statistics/
 │   │   │   └── StatisticsScreen.tsx # 阅读时长 + 词汇统计（可展开收起）
 │   │   ├── components/notes/
@@ -99,12 +98,6 @@ read/
 │   │       │   └── userDataBackup.ts  # 导入导出编排（写入用户目录）
 │   │       ├── reading/
 │   │       │   └── readingTime.ts     # 阅读时长累计、统计与备份合并
-│   │       ├── tools/
-│   │       │   ├── zlibraryTypes.ts   # Z-Library 工具类型
-│   │       │   ├── zlibraryConfig.ts  # 内置/远程配置与本地缓存
-│   │       │   ├── zlibraryProbe.ts   # HTTP 探测引擎
-│   │       │   ├── zlibraryDiscovery.ts # 扩大搜索（域名组合/页面/检索）
-│   │       │   └── zlibraryMirrors.ts # 对外导出
 │   │       ├── llm/
 │   │       │   ├── zhipuSettings.ts   # 智谱 API Key 本地存储
 │   │       │   ├── zhipuClient.ts     # chat/completions 调用
