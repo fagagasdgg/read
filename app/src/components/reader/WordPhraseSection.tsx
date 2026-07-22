@@ -12,14 +12,14 @@ interface WordPhraseSectionProps {
   lemma: string
 }
 
-const PHRASE_LIST_COLLAPSED_COUNT = 8
+const PHRASE_COLLAPSE_THRESHOLD = 8
 
 export function WordPhraseSection({ lemma }: WordPhraseSectionProps) {
   const [record, setRecord] = useState<WordPhraseRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
   const [expanded, setExpanded] = useState(false)
-  const [listExpanded, setListExpanded] = useState(false)
+  const [listCollapsed, setListCollapsed] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [manualPhrase, setManualPhrase] = useState('')
   const [manualTranslation, setManualTranslation] = useState('')
@@ -32,7 +32,7 @@ export function WordPhraseSection({ lemma }: WordPhraseSectionProps) {
     setError('')
     setMessage('')
     setExpanded(false)
-    setListExpanded(false)
+    setListCollapsed(false)
     setShowAddForm(false)
     setManualPhrase('')
     setManualTranslation('')
@@ -52,11 +52,7 @@ export function WordPhraseSection({ lemma }: WordPhraseSectionProps) {
 
   const hasFetched = Boolean(record?.fetchedAt)
   const phraseCount = record?.items.length ?? 0
-  const canCollapseList = phraseCount > PHRASE_LIST_COLLAPSED_COUNT
-  const visiblePhrases =
-    record && canCollapseList && !listExpanded
-      ? record.items.slice(0, PHRASE_LIST_COLLAPSED_COUNT)
-      : record?.items ?? []
+  const canCollapseList = phraseCount > PHRASE_COLLAPSE_THRESHOLD
 
   async function handleFetch() {
     setFetching(true)
@@ -66,7 +62,7 @@ export function WordPhraseSection({ lemma }: WordPhraseSectionProps) {
       const next = await fetchAndSaveWordPhrases(lemma)
       setRecord(next)
       setExpanded(true)
-      setListExpanded(false)
+      setListCollapsed(false)
       setMessage(`已获取 ${next.items.length} 条词组`)
     } catch (err) {
       const text = err instanceof Error ? err.message : '获取词组失败'
@@ -107,7 +103,7 @@ export function WordPhraseSection({ lemma }: WordPhraseSectionProps) {
     await clearWordPhrases(lemma)
     setRecord(null)
     setExpanded(false)
-    setListExpanded(false)
+    setListCollapsed(false)
     setShowAddForm(false)
     setMessage('词组已清空')
   }
@@ -130,7 +126,13 @@ export function WordPhraseSection({ lemma }: WordPhraseSectionProps) {
           <button
             type="button"
             className={`popup-phrase-summary${expanded ? ' expanded' : ''}`}
-            onClick={() => setExpanded((value) => !value)}
+            onClick={() => {
+              setExpanded((value) => {
+                const next = !value
+                if (next) setListCollapsed(false)
+                return next
+              })
+            }}
             aria-expanded={expanded}
           >
             <span>词组</span>
@@ -143,9 +145,11 @@ export function WordPhraseSection({ lemma }: WordPhraseSectionProps) {
           {expanded && (
             <div className="popup-phrase-body">
               {phraseCount > 0 ? (
-                <>
+                listCollapsed ? (
+                  <p className="popup-phrase-list-hint">词组已收起（共 {phraseCount} 条），点击上方「词组」可重新展开</p>
+                ) : (
                   <ul className="popup-phrase-list">
-                    {visiblePhrases.map((item) => (
+                    {record!.items.map((item) => (
                       <li key={item.id} className="popup-phrase-line">
                         <span className="popup-phrase-text">{item.phrase}</span>
                         <span className="popup-phrase-sep">·</span>
@@ -153,14 +157,7 @@ export function WordPhraseSection({ lemma }: WordPhraseSectionProps) {
                       </li>
                     ))}
                   </ul>
-                  {canCollapseList && (
-                    <p className="popup-phrase-list-hint">
-                      {listExpanded
-                        ? `已展示全部 ${phraseCount} 条词组`
-                        : `已展示前 ${PHRASE_LIST_COLLAPSED_COUNT} 条，共 ${phraseCount} 条`}
-                    </p>
-                  )}
-                </>
+                )
               ) : (
                 <p className="popup-phrase-empty">暂无词组，可点击下方补充。</p>
               )}
@@ -207,18 +204,6 @@ export function WordPhraseSection({ lemma }: WordPhraseSectionProps) {
                   >
                     补充词组
                   </button>
-                  {canCollapseList && (
-                    <>
-                      <span className="popup-phrase-tool-sep">|</span>
-                      <button
-                        type="button"
-                        className="popup-phrase-link-btn"
-                        onClick={() => setListExpanded((value) => !value)}
-                      >
-                        {listExpanded ? '收起词组' : `展开全部（${phraseCount}）`}
-                      </button>
-                    </>
-                  )}
                   <span className="popup-phrase-tool-sep">|</span>
                   <button
                     type="button"
@@ -227,6 +212,18 @@ export function WordPhraseSection({ lemma }: WordPhraseSectionProps) {
                   >
                     清空词组
                   </button>
+                  {canCollapseList && !listCollapsed && (
+                    <>
+                      <span className="popup-phrase-tool-sep">|</span>
+                      <button
+                        type="button"
+                        className="popup-phrase-link-btn"
+                        onClick={() => setListCollapsed(true)}
+                      >
+                        收起词组
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
