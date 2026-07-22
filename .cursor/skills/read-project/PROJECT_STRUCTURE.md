@@ -31,6 +31,8 @@ read/
 │   │   ├── components/bookshelf/
 │   │   │   ├── BookshelfScreen.tsx  # 书架网格、分组、导入删除
 │   │   │   └── DataBackupSheet.tsx  # 学习数据 zip 导入导出
+│   │   ├── contexts/
+│   │   │   └── AppShellThemeContext.tsx # 应用界面风格上下文
 │   │   ├── components/home/
 │   │   │   └── HomeShell.tsx        # 底部 Tab：书架 / 笔记 / 统计 / 工具 / 设置
 │   │   ├── components/tools/
@@ -42,7 +44,8 @@ read/
 │   │   │   ├── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页）
 │   │   │   └── NotebookPickerSheet.tsx  # 保存笔记时选择笔记本
 │   │   ├── components/settings/
-│   │   │   ├── AppSettingsScreen.tsx    # 应用级设置（折叠分组）
+│   │   │   ├── AppSettingsScreen.tsx    # 应用级设置（含界面风格）
+│   │   │   ├── AppShellThemePicker.tsx  # 界面风格选择器
 │   │   │   ├── CollapsibleSettingsSection.tsx # 设置页可折叠区块
 │   │   │   ├── ZhipuApiSection.tsx      # 智谱 API Key 配置
 │   │   │   ├── DictionarySourcesSection.tsx
@@ -112,7 +115,8 @@ read/
 │   │       │   └── index.ts
 │   │       └── settings/
 │   │           ├── readingSettings.ts # 字号/行距/主题/字体栈
-│   │           ├── userSettings.ts    # 英语水平、行间翻译
+│   │           ├── appShellTheme.ts    # 界面风格定义（木质/素纸/墨韵等）
+│   │           ├── userSettings.ts    # 英语水平、行间翻译、界面风格
 │   │           └── backupDirectory.ts   # 默认数据备份目录
 │   │
 │   ├── dist/                        # 构建产物

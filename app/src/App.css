@@ -1211,6 +1211,139 @@
   min-height: 100vh;
 }
 
+/* App shell themes */
+.app-shell.bookshelf-app {
+  --shell-screen-bg:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.08), transparent 120px),
+    repeating-linear-gradient(90deg, #b8895a 0px, #c99862 3px, #a67c52 6px, #b8895a 10px);
+  --shell-screen-base: #a67c52;
+  --shell-title-color: #2d1f12;
+  --shell-title-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+  --shell-bar-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.08)),
+    repeating-linear-gradient(90deg, #8f6238 0px, #98673e 3px, #7a5230 6px, #8f6238 10px);
+  --shell-bar-border: rgba(74, 46, 24, 0.35);
+  --shell-tab-inactive: rgba(243, 233, 210, 0.75);
+  --shell-tab-active: #fff8eb;
+  --shell-header-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.08)),
+    repeating-linear-gradient(90deg, #8f6238 0px, #98673e 3px, #7a5230 6px, #8f6238 10px);
+  --shell-header-text: #fff8eb;
+  --shell-inner-bg: #f8f6f1;
+  --shell-shelf-bg: linear-gradient(180deg, #8f6238 0%, #7a5230 100%);
+  --shell-shelf-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.2);
+  --shell-btn-bg: rgba(255, 255, 255, 0.85);
+  --shell-btn-color: #5c3d22;
+  --shell-stats-bg:
+    linear-gradient(180deg, #f3ebe0 0%, #ebe3d6 40%, #e8dfd2 100%);
+  --shell-stats-header: linear-gradient(180deg, #9a7048, #8f6238);
+  --shell-accent: #8f6238;
+  --shell-accent-dark: #6b4e3d;
+  --shell-accent-soft: rgba(143, 98, 56, 0.15);
+  --shell-chip-active-bg: #fff8eb;
+  --shell-chip-active-text: #6b4e3d;
+}
+
+.app-shell.bookshelf-app[data-app-theme='paper'] {
+  --shell-screen-bg: linear-gradient(180deg, #ffffff 0%, #f3f0eb 100%);
+  --shell-screen-base: #f3f0eb;
+  --shell-title-color: #2f2a25;
+  --shell-title-shadow: none;
+  --shell-bar-bg: linear-gradient(180deg, #ffffff, #f7f4ef);
+  --shell-bar-border: rgba(0, 0, 0, 0.08);
+  --shell-tab-inactive: #9ca3af;
+  --shell-tab-active: #1f2937;
+  --shell-header-bg: linear-gradient(180deg, #ffffff, #f5f2ed);
+  --shell-header-text: #1f2937;
+  --shell-inner-bg: #f7f4ef;
+  --shell-shelf-bg: linear-gradient(180deg, #ece7df 0%, #e2dbd1 100%);
+  --shell-shelf-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shell-btn-bg: #ffffff;
+  --shell-btn-color: #374151;
+  --shell-stats-bg: linear-gradient(180deg, #faf9f7 0%, #f3f0eb 100%);
+  --shell-stats-header: linear-gradient(180deg, #ffffff, #f0ebe4);
+  --shell-accent: #6b7280;
+  --shell-accent-dark: #374151;
+  --shell-accent-soft: rgba(107, 114, 128, 0.12);
+  --shell-chip-active-bg: #1f2937;
+  --shell-chip-active-text: #ffffff;
+}
+
+.app-shell.bookshelf-app[data-app-theme='ink'] {
+  --shell-screen-bg: linear-gradient(180deg, #2a2622 0%, #1a1816 100%);
+  --shell-screen-base: #1a1816;
+  --shell-title-color: #f5f0e8;
+  --shell-title-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shell-bar-bg: linear-gradient(180deg, #342f2a, #1f1c19);
+  --shell-bar-border: rgba(255, 255, 255, 0.08);
+  --shell-tab-inactive: rgba(245, 240, 232, 0.55);
+  --shell-tab-active: #f5e6c8;
+  --shell-header-bg: linear-gradient(180deg, #3d3731, #25211d);
+  --shell-header-text: #f5f0e8;
+  --shell-inner-bg: #1f1c19;
+  --shell-shelf-bg: linear-gradient(180deg, #3a342e 0%, #2a2622 100%);
+  --shell-shelf-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shell-btn-bg: rgba(255, 255, 255, 0.12);
+  --shell-btn-color: #f5f0e8;
+  --shell-stats-bg: linear-gradient(180deg, #2a2622 0%, #1f1c19 100%);
+  --shell-stats-header: linear-gradient(180deg, #3d3731, #2a2622);
+  --shell-accent: #c9a962;
+  --shell-accent-dark: #f5e6c8;
+  --shell-accent-soft: rgba(201, 169, 98, 0.18);
+  --shell-chip-active-bg: #f5e6c8;
+  --shell-chip-active-text: #2a2622;
+}
+
+.app-shell.bookshelf-app[data-app-theme='forest'] {
+  --shell-screen-bg: linear-gradient(180deg, #eef5ee 0%, #e3ede3 100%);
+  --shell-screen-base: #e3ede3;
+  --shell-title-color: #2f3d2f;
+  --shell-title-shadow: none;
+  --shell-bar-bg: linear-gradient(180deg, #5a7a52, #4a6741);
+  --shell-bar-border: rgba(47, 61, 47, 0.2);
+  --shell-tab-inactive: rgba(255, 255, 255, 0.72);
+  --shell-tab-active: #ffffff;
+  --shell-header-bg: linear-gradient(180deg, #6b8b62, #4a6741);
+  --shell-header-text: #f4faf4;
+  --shell-inner-bg: #eef5ee;
+  --shell-shelf-bg: linear-gradient(180deg, #6b8b62 0%, #567a4f 100%);
+  --shell-shelf-shadow: inset 0 2px 6px rgba(47, 61, 47, 0.2);
+  --shell-btn-bg: rgba(255, 255, 255, 0.9);
+  --shell-btn-color: #3d5238;
+  --shell-stats-bg: linear-gradient(180deg, #eef5ee 0%, #e3ede3 100%);
+  --shell-stats-header: linear-gradient(180deg, #6b8b62, #4a6741);
+  --shell-accent: #4a6741;
+  --shell-accent-dark: #2f3d2f;
+  --shell-accent-soft: rgba(74, 103, 65, 0.14);
+  --shell-chip-active-bg: #ffffff;
+  --shell-chip-active-text: #2f3d2f;
+}
+
+.app-shell.bookshelf-app[data-app-theme='ocean'] {
+  --shell-screen-bg: linear-gradient(180deg, #edf3f8 0%, #e2ebf3 100%);
+  --shell-screen-base: #e2ebf3;
+  --shell-title-color: #1e3a5f;
+  --shell-title-shadow: none;
+  --shell-bar-bg: linear-gradient(180deg, #3d6a9e, #2c5282);
+  --shell-bar-border: rgba(30, 58, 95, 0.2);
+  --shell-tab-inactive: rgba(255, 255, 255, 0.72);
+  --shell-tab-active: #ffffff;
+  --shell-header-bg: linear-gradient(180deg, #4a7ab0, #2c5282);
+  --shell-header-text: #f0f7ff;
+  --shell-inner-bg: #edf3f8;
+  --shell-shelf-bg: linear-gradient(180deg, #4a7ab0 0%, #356299 100%);
+  --shell-shelf-shadow: inset 0 2px 6px rgba(30, 58, 95, 0.2);
+  --shell-btn-bg: rgba(255, 255, 255, 0.92);
+  --shell-btn-color: #1e3a5f;
+  --shell-stats-bg: linear-gradient(180deg, #edf3f8 0%, #e2ebf3 100%);
+  --shell-stats-header: linear-gradient(180deg, #4a7ab0, #2c5282);
+  --shell-accent: #2c5282;
+  --shell-accent-dark: #1e3a5f;
+  --shell-accent-soft: rgba(44, 82, 130, 0.14);
+  --shell-chip-active-bg: #ffffff;
+  --shell-chip-active-text: #1e3a5f;
+}
+
 .bookshelf-screen {
   min-height: 100%;
   height: 100%;
@@ -1219,16 +1352,8 @@
   position: relative;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.08), transparent 120px),
-    repeating-linear-gradient(
-      90deg,
-      #b8895a 0px,
-      #c99862 3px,
-      #a67c52 6px,
-      #b8895a 10px
-    );
-  background-color: #a67c52;
+  background: var(--shell-screen-bg);
+  background-color: var(--shell-screen-base);
 }
 
 .bookshelf-header {
@@ -1241,8 +1366,8 @@
 .bookshelf-header h1 {
   margin: 0;
   font-size: 1.6rem;
-  color: #2d1f12;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+  color: var(--shell-title-color);
+  text-shadow: var(--shell-title-shadow);
 }
 
 .bookshelf-header-actions {
@@ -1256,8 +1381,8 @@
   height: 40px;
   border: none;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.85);
-  color: #5c3d22;
+  background: var(--shell-btn-bg);
+  color: var(--shell-btn-color);
   font-size: 1.6rem;
   line-height: 1;
   cursor: pointer;
@@ -1297,8 +1422,8 @@
   margin: 8px 12px 24px;
   padding: 16px 12px 24px;
   border-radius: 4px;
-  background: linear-gradient(180deg, #8f6238 0%, #7a5230 100%);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.2);
+  background: var(--shell-shelf-bg);
+  box-shadow: var(--shell-shelf-shadow);
 }
 
 .bookshelf-grid {
@@ -1539,16 +1664,8 @@
 .home-tab-bar {
   display: flex;
   flex-shrink: 0;
-  border-top: 1px solid rgba(74, 46, 24, 0.35);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.08)),
-    repeating-linear-gradient(
-      90deg,
-      #8f6238 0px,
-      #98673e 3px,
-      #7a5230 6px,
-      #8f6238 10px
-    );
+  border-top: 1px solid var(--shell-bar-border);
+  background: var(--shell-bar-bg);
   padding-bottom: env(safe-area-inset-bottom);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
   z-index: 20;
@@ -1564,14 +1681,14 @@
   padding: 8px 0 6px;
   border: none;
   background: none;
-  color: rgba(243, 233, 210, 0.75);
+  color: var(--shell-tab-inactive);
   font-size: 0.72rem;
   cursor: pointer;
   touch-action: manipulation;
 }
 
 .home-tab-btn.active {
-  color: #fff8eb;
+  color: var(--shell-tab-active);
   font-weight: 600;
 }
 
@@ -1589,16 +1706,8 @@
   flex-direction: column;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.06), transparent 120px),
-    repeating-linear-gradient(
-      90deg,
-      #b8895a 0px,
-      #c99862 3px,
-      #a67c52 6px,
-      #b8895a 10px
-    );
-  background-color: #a67c52;
+  background: var(--shell-screen-bg);
+  background-color: var(--shell-screen-base);
 }
 
 .notes-shelf {
@@ -2612,23 +2721,15 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f8f6f1;
+  background: var(--shell-inner-bg);
   overflow: hidden;
 }
 
 .app-settings-header {
   flex-shrink: 0;
   padding: 16px 20px 12px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.08)),
-    repeating-linear-gradient(
-      90deg,
-      #8f6238 0px,
-      #98673e 3px,
-      #7a5230 6px,
-      #8f6238 10px
-    );
-  color: #fff8eb;
+  background: var(--shell-header-bg);
+  color: var(--shell-header-text);
 }
 
 .app-settings-header h1 {
@@ -2991,14 +3092,14 @@
 
 /* 阅历页（掌阅风格，应用木质配色） */
 .yueli-screen {
-  background: linear-gradient(180deg, #f3ebe0 0%, #ebe3d6 40%, #e8dfd2 100%);
+  background: var(--shell-stats-bg);
 }
 
 .yueli-header {
   padding: calc(14px + env(safe-area-inset-top)) 16px 10px;
-  background: linear-gradient(180deg, #9a7048, #8f6238);
-  color: #fff8eb;
-  box-shadow: 0 2px 10px rgba(74, 46, 24, 0.2);
+  background: var(--shell-stats-header);
+  color: var(--shell-header-text);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }
 
 .yueli-header-top {
@@ -3032,8 +3133,8 @@
 }
 
 .yueli-period-tab.active {
-  background: #fff8eb;
-  color: #6b4e3d;
+  background: var(--shell-chip-active-bg);
+  color: var(--shell-chip-active-text);
   font-weight: 600;
 }
 
@@ -3264,7 +3365,7 @@
   min-height: 0;
   border: none;
   border-radius: 4px 4px 0 0;
-  background: linear-gradient(180deg, #b8895a, #8f6238);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--shell-accent) 70%, white), var(--shell-accent));
   cursor: pointer;
   padding: 0;
   transition: opacity 0.15s, height 0.15s;
@@ -3455,23 +3556,15 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f8f6f1;
+  background: var(--shell-inner-bg);
   overflow: hidden;
 }
 
 .tools-header {
   flex-shrink: 0;
   padding: 16px 20px 12px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.08)),
-    repeating-linear-gradient(
-      90deg,
-      #8f6238 0px,
-      #98673e 3px,
-      #7a5230 6px,
-      #8f6238 10px
-    );
-  color: #fff8eb;
+  background: var(--shell-header-bg);
+  color: var(--shell-header-text);
 }
 
 .tools-header h1 {
@@ -3515,4 +3608,78 @@
   margin-top: 8px !important;
   font-size: 0.78rem !important;
   color: #9ca3af !important;
+}
+
+.app-theme-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.app-theme-chip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fafafa;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.app-theme-chip.active {
+  border-color: var(--shell-accent);
+  background: var(--shell-accent-soft);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--shell-accent) 35%, transparent);
+}
+
+.app-theme-chip-preview {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.app-theme-chip[data-theme-preview='wood'] .app-theme-chip-preview {
+  background:
+    linear-gradient(135deg, #c99862, #8f6238),
+    repeating-linear-gradient(90deg, #b8895a 0 3px, #a67c52 3px 6px);
+}
+
+.app-theme-chip[data-theme-preview='paper'] .app-theme-chip-preview {
+  background: linear-gradient(180deg, #ffffff, #ece7df);
+}
+
+.app-theme-chip[data-theme-preview='ink'] .app-theme-chip-preview {
+  background: linear-gradient(180deg, #3d3731, #1a1816);
+}
+
+.app-theme-chip[data-theme-preview='forest'] .app-theme-chip-preview {
+  background: linear-gradient(180deg, #8fb286, #4a6741);
+}
+
+.app-theme-chip[data-theme-preview='ocean'] .app-theme-chip-preview {
+  background: linear-gradient(180deg, #6a9fd4, #2c5282);
+}
+
+.app-theme-chip-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.app-theme-chip-text strong {
+  font-size: 0.88rem;
+  color: #374151;
+}
+
+.app-theme-chip-text small {
+  font-size: 0.76rem;
+  color: #9ca3af;
+  line-height: 1.35;
 }

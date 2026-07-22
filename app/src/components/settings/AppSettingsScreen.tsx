@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
+import { useAppShellTheme } from '../../contexts/AppShellThemeContext'
 import {
   ENGLISH_LEVEL_OPTIONS,
   loadUserSettings,
   saveUserSettings,
   type UserSettings,
 } from '../../services/settings/userSettings'
+import type { AppShellThemeId } from '../../services/settings/appShellTheme'
+import { AppShellThemePicker } from './AppShellThemePicker'
 import { BackupDirectorySection } from './BackupDirectorySection'
 import { CollapsibleSettingsSection } from './CollapsibleSettingsSection'
 import { DeepAnalysisSettings } from './DeepAnalysisSettings'
@@ -67,6 +70,7 @@ function SelectionDelayInput({
 }
 
 export function AppSettingsScreen() {
+  const { themeId, setThemeId } = useAppShellTheme()
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null)
 
   useEffect(() => {
@@ -80,6 +84,11 @@ export function AppSettingsScreen() {
     void saveUserSettings(next)
   }
 
+  function handleThemeChange(nextThemeId: AppShellThemeId) {
+    setThemeId(nextThemeId)
+    updateUser({ appShellThemeId: nextThemeId })
+  }
+
   return (
     <div className="app-settings-screen">
       <header className="app-settings-header">
@@ -87,10 +96,16 @@ export function AppSettingsScreen() {
       </header>
 
       <div className="app-settings-body">
+        <CollapsibleSettingsSection title="界面风格" summary="书架、笔记、统计等页面主题" defaultExpanded>
+          <AppShellThemePicker value={themeId} onChange={handleThemeChange} />
+          <p className="settings-section-note">
+            切换后书架、底部导航、阅历与设置页会立即应用新风格；阅读页背景仍在阅读设置中单独调整。
+          </p>
+        </CollapsibleSettingsSection>
+
         <CollapsibleSettingsSection
           title="学习偏好"
           summary="英语水平与行间翻译阈值"
-          defaultExpanded
         >
           <label className="reader-setting-row">
             <span>你的英语水平</span>

@@ -1,5 +1,10 @@
 import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
+import {
+  DEFAULT_APP_SHELL_THEME,
+  normalizeAppShellThemeId,
+  type AppShellThemeId,
+} from './appShellTheme'
 
 export const ENGLISH_LEVEL_OPTIONS = [
   { id: '中考', label: '中考' },
@@ -31,6 +36,7 @@ export const DEFAULT_INLINE_GLOSS_COLOR = INLINE_GLOSS_COLORS[3].color
 
 export interface UserSettings {
   englishLevel: EnglishLevelId
+  appShellThemeId: AppShellThemeId
   showInlineTranslation: boolean
   /** 行间最多显示多少个词性 */
   maxInlinePosCount: number
@@ -55,6 +61,7 @@ const STORAGE_KEY = 'read-user-settings'
 
 const DEFAULT_SETTINGS: UserSettings = {
   englishLevel: 'CET4',
+  appShellThemeId: DEFAULT_APP_SHELL_THEME,
   showInlineTranslation: true,
   maxInlinePosCount: 4,
   maxMeaningsPerPos: 4,
@@ -138,6 +145,7 @@ function normalizeUserSettings(partial: LegacyUserSettings): UserSettings {
 
   return {
     ...merged,
+    appShellThemeId: normalizeAppShellThemeId(merged.appShellThemeId),
     maxInlinePosCount: clampCount(merged.maxInlinePosCount, DEFAULT_SETTINGS.maxInlinePosCount),
     maxMeaningsPerPos: clampCount(merged.maxMeaningsPerPos, DEFAULT_SETTINGS.maxMeaningsPerPos),
     inlineGlossFontSize: Math.min(16, Math.max(8, Math.round(merged.inlineGlossFontSize))),
