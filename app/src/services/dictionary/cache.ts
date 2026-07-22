@@ -95,6 +95,23 @@ export async function setNotFoundLemma(lemma: string): Promise<void> {
   }
   const db = await getDb()
   await db.put(STORE, marker, lemma)
+  void import('../notes/systemNotebooks').then(({ syncNotFoundWordsNotebook }) =>
+    syncNotFoundWordsNotebook(),
+  )
+}
+
+export async function removeNotFoundLemma(lemma: string): Promise<void> {
+  const db = await getDb()
+  const record = await db.get(STORE, lemma)
+  if (record && isWordNotFoundMarker(record)) {
+    await db.delete(STORE, lemma)
+  }
+}
+
+export async function listNotFoundLemmas(): Promise<WordNotFoundMarker[]> {
+  const db = await getDb()
+  const all = await db.getAll(STORE)
+  return all.filter(isWordNotFoundMarker).map(normalizeNotFoundMarker)
 }
 
 /** 旧版仅标记有道的 notFound 记录，可用备用信源重试 */
@@ -222,6 +239,23 @@ function normalizeCacheValue(value: unknown, fallbackLemma: string): DictionaryC
     examLevels: Array.isArray(item.examLevels) ? (item.examLevels as ExamLevel[]) : [],
     definitions,
     forms,
+    frequency:
+      item.frequency && typeof item.frequency === 'object'
+        ? {
+            collinsStar:
+              typeof (item.frequency as { collinsStar?: unknown }).collinsStar === 'number'
+                ? (item.frequency as { collinsStar: number }).collinsStar
+                : undefined,
+            examFrequency:
+              typeof (item.frequency as { examFrequency?: unknown }).examFrequency === 'number'
+                ? (item.frequency as { examFrequency: number }).examFrequency
+                : undefined,
+            fetchedAt:
+              typeof (item.frequency as { fetchedAt?: unknown }).fetchedAt === 'number'
+                ? (item.frequency as { fetchedAt: number }).fetchedAt
+                : Date.now(),
+          }
+        : undefined,
     cachedAt,
     source: item.source === 'iciba' ? 'iciba' : 'youdao',
   }
@@ -262,6 +296,10 @@ export async function importDictionaryRecords(
       imported += 1
     }
   }
+
+  void import('../notes/systemNotebooks').then(({ syncNotFoundWordsNotebook }) =>
+    syncNotFoundWordsNotebook(),
+  )
 
   return { imported, skipped }
 }

@@ -20,6 +20,14 @@ export interface WordForm {
   value: string
 }
 
+export interface WordFrequencyInfo {
+  /** 柯林斯星级 1–5 */
+  collinsStar?: number
+  /** 有道真题出现次数 */
+  examFrequency?: number
+  fetchedAt: number
+}
+
 export interface WordEntry {
   lemma: string
   phoneticUs: string
@@ -29,6 +37,7 @@ export interface WordEntry {
   examLevels: ExamLevel[]
   definitions: WordDefinition[]
   forms: WordForm[]
+  frequency?: WordFrequencyInfo
   cachedAt: number
   source: DictionarySourceId
 }

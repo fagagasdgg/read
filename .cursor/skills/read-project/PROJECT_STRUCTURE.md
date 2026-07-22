@@ -1,7 +1,7 @@
 # 项目结构
 
 > 按 `xq/需求.md` §98.1 维护。每次新增/删除/重命名文件后更新本文档。
-> Last updated: 2026-07-07
+> Last updated: 2026-07-22
 
 ```
 read/
@@ -36,12 +36,14 @@ read/
 │   │   ├── components/home/
 │   │   │   └── HomeShell.tsx        # 底部 Tab：书架 / 笔记 / 统计 / 工具 / 设置
 │   │   ├── components/tools/
-│   │   │   └── ToolsScreen.tsx      # 工具页（空态占位，待后续扩展）
+│   │   │   ├── ToolsScreen.tsx      # 工具页
+│   │   │   └── WordFrequencyTool.tsx # 批量获取词频（柯林斯星级+真题频次）
 │   │   ├── components/statistics/
 │   │   │   └── StatisticsScreen.tsx # 阅读时长 + 词汇统计（可展开收起）
 │   │   ├── components/notes/
 │   │   │   ├── NotesScreen.tsx      # 笔记本列表
 │   │   │   ├── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页）
+│   │   │   ├── NotFoundWordEditor.tsx   # 待补全词条手动/豆包录入
 │   │   │   └── NotebookPickerSheet.tsx  # 保存笔记时选择笔记本
 │   │   ├── components/settings/
 │   │   │   ├── AppSettingsScreen.tsx    # 应用级设置（含界面风格）
@@ -78,6 +80,9 @@ read/
 │   │       │   ├── youdao.ts
 │   │       │   ├── iciba.ts
 │   │       │   ├── lookup.ts        # 多信源串联查词
+│   │       │   ├── wordFrequency.ts # 有道词频（柯林斯星级、真题频次）
+│   │       │   ├── batchFrequency.ts # 批量补全词频
+│   │       │   ├── manualWord.ts    # 手动词条校验与保存
 │   │       │   ├── providers.ts     # 信源元数据
 │   │       │   ├── sourceStatus.ts  # 信源健康度与统计
 │   │       │   ├── fetchPhrases.ts  # 有道词组 phrs 联网获取
@@ -89,7 +94,8 @@ read/
 │   │       │   ├── mastered.ts      # 已掌握单词列表
 │   │       │   └── phrases.ts       # 按 lemma 存储词组（联网+手动）
 │   │       ├── notes/
-│   │       │   ├── notebooks.ts     # 笔记本与句子条目结构化存储
+│   │       │   ├── notebooks.ts     # 笔记本与句子条目；含 base_sentence/base_phrases/not_found_words
+│   │       │   ├── systemNotebooks.ts # 系统笔记本同步（词组总集、待补全词条）
 │   │       │   ├── notebookUiSettings.ts # 笔记列表分页与每页条数偏好
 │   │       │   ├── events.ts        # 笔记数据变更事件
 │   │       │   └── bookNotebook.ts  # 每本书默认保存笔记本
@@ -102,6 +108,7 @@ read/
 │   │       ├── reading/
 │   │       │   └── readingTime.ts     # 阅读时长累计、统计与备份合并
 │   │       ├── llm/
+│   │       │   ├── doubaoWordWorkflow.ts # 待补全词条豆包 prompt
 │   │       │   ├── zhipuSettings.ts   # 智谱 API Key 本地存储
 │   │       │   ├── zhipuClient.ts     # chat/completions 调用
 │   │       │   └── deepAnalysis.ts    # 选段深度解析 → NotebookEntry

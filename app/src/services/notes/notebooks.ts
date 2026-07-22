@@ -45,8 +45,57 @@ export interface NotebookEntry {
 export const BASE_SENTENCE_NOTEBOOK_ID = 'base_sentence'
 export const BASE_SENTENCE_NOTEBOOK_TITLE = 'base_sentence'
 
+export const BASE_PHRASES_NOTEBOOK_ID = 'base_phrases'
+export const BASE_PHRASES_NOTEBOOK_TITLE = '词组总集'
+
+export const NOT_FOUND_WORDS_NOTEBOOK_ID = 'not_found_words'
+export const NOT_FOUND_WORDS_NOTEBOOK_TITLE = '待补全词条'
+
+const SYSTEM_NOTEBOOK_ORDER = [
+  BASE_SENTENCE_NOTEBOOK_ID,
+  BASE_PHRASES_NOTEBOOK_ID,
+  NOT_FOUND_WORDS_NOTEBOOK_ID,
+] as const
+
 export function isBaseSentenceNotebook(id: string): boolean {
   return id === BASE_SENTENCE_NOTEBOOK_ID
+}
+
+export function isBasePhrasesNotebook(id: string): boolean {
+  return id === BASE_PHRASES_NOTEBOOK_ID
+}
+
+export function isNotFoundWordsNotebook(id: string): boolean {
+  return id === NOT_FOUND_WORDS_NOTEBOOK_ID
+}
+
+export function isSystemNotebook(id: string): boolean {
+  return (
+    isBaseSentenceNotebook(id) ||
+    isBasePhrasesNotebook(id) ||
+    isNotFoundWordsNotebook(id)
+  )
+}
+
+function systemNotebookRank(id: string): number {
+  const index = SYSTEM_NOTEBOOK_ORDER.indexOf(id as (typeof SYSTEM_NOTEBOOK_ORDER)[number])
+  return index === -1 ? 999 : index
+}
+
+function sortNotebookRegistry(notebooks: NotebookMeta[]): NotebookMeta[] {
+  return [...notebooks].sort((a, b) => {
+    const rankA = systemNotebookRank(a.id)
+    const rankB = systemNotebookRank(b.id)
+    if (rankA !== rankB) return rankA - rankB
+    return b.updatedAt - a.updatedAt
+  })
+}
+
+function resolveSystemNotebookTitle(id: string, fallback?: string): string {
+  if (isBaseSentenceNotebook(id)) return BASE_SENTENCE_NOTEBOOK_TITLE
+  if (isBasePhrasesNotebook(id)) return BASE_PHRASES_NOTEBOOK_TITLE
+  if (isNotFoundWordsNotebook(id)) return NOT_FOUND_WORDS_NOTEBOOK_TITLE
+  return fallback?.trim() || '笔记本'
 }
 
 export interface AddNotebookEntryOptions {
@@ -247,21 +296,54 @@ export async function ensureBaseSentenceNotebook(): Promise<NotebookMeta> {
       updatedAt: now,
     }
     notebooks.unshift(meta)
-    await writeRegistry(notebooks)
+    await writeRegistry(sortNotebookRegistry(notebooks))
   }
 
   await ensureNotebookDocument(BASE_SENTENCE_NOTEBOOK_ID)
   return meta
 }
 
-export async function listNotebooks(): Promise<NotebookMeta[]> {
-  await ensureBaseSentenceNotebook()
+async function ensureSystemNotebook(
+  id: string,
+  title: string,
+): Promise<NotebookMeta> {
   const notebooks = await readRegistry()
-  return notebooks.sort((a, b) => {
-    if (isBaseSentenceNotebook(a.id)) return -1
-    if (isBaseSentenceNotebook(b.id)) return 1
-    return b.updatedAt - a.updatedAt
-  })
+  let meta = notebooks.find((item) => item.id === id)
+  const now = Date.now()
+
+  if (!meta) {
+    meta = { id, title, createdAt: now, updatedAt: now }
+    notebooks.push(meta)
+    await writeRegistry(sortNotebookRegistry(notebooks))
+  } else if (meta.title !== title) {
+    meta.title = title
+    await writeRegistry(sortNotebookRegistry(notebooks))
+  }
+
+  await ensureNotebookDocument(id)
+  return meta
+}
+
+export async function ensureBasePhrasesNotebook(): Promise<NotebookMeta> {
+  return ensureSystemNotebook(BASE_PHRASES_NOTEBOOK_ID, BASE_PHRASES_NOTEBOOK_TITLE)
+}
+
+export async function ensureNotFoundWordsNotebook(): Promise<NotebookMeta> {
+  return ensureSystemNotebook(NOT_FOUND_WORDS_NOTEBOOK_ID, NOT_FOUND_WORDS_NOTEBOOK_TITLE)
+}
+
+export async function ensureAllSystemNotebooks(): Promise<void> {
+  await ensureBaseSentenceNotebook()
+  await ensureBasePhrasesNotebook()
+  await ensureNotFoundWordsNotebook()
+}
+
+export async function listNotebooks(): Promise<NotebookMeta[]> {
+  await ensureAllSystemNotebooks()
+  const { syncAllSystemNotebooks } = await import('./systemNotebooks')
+  await syncAllSystemNotebooks()
+  const notebooks = await readRegistry()
+  return sortNotebookRegistry(notebooks)
 }
 
 export async function countNotebookEntries(options?: {
@@ -272,7 +354,7 @@ export async function countNotebookEntries(options?: {
   let total = 0
 
   for (const meta of notebooks) {
-    if (isBaseSentenceNotebook(meta.id)) continue
+    if (isSystemNotebook(meta.id)) continue
     const doc = await readDocument(meta.id)
     if (!doc?.entries.length) continue
 
@@ -305,6 +387,13 @@ export async function createNotebook(title?: string): Promise<NotebookMeta> {
 
   if (normalizeTitleKey(resolvedTitle) === normalizeTitleKey(BASE_SENTENCE_NOTEBOOK_TITLE)) {
     throw new Error(`「${BASE_SENTENCE_NOTEBOOK_TITLE}」为系统总笔记本，请使用其他名称`)
+  }
+  if (
+    [BASE_PHRASES_NOTEBOOK_TITLE, NOT_FOUND_WORDS_NOTEBOOK_TITLE].some(
+      (name) => normalizeTitleKey(resolvedTitle) === normalizeTitleKey(name),
+    )
+  ) {
+    throw new Error('该名称为系统笔记本保留名称，请使用其他名称')
   }
 
   const meta: NotebookMeta = {
@@ -388,9 +477,21 @@ export function getNotebookEntryById(
   return doc.entries.find((entry) => entry.id === entryId) ?? null
 }
 
+/** 系统笔记本全量替换条目（词组总集、待补全词条） */
+export async function replaceNotebookEntries(
+  notebookId: string,
+  entries: NotebookEntry[],
+): Promise<void> {
+  const doc = await ensureNotebookDocument(notebookId)
+  doc.entries = entries
+  doc.updatedAt = Date.now()
+  await writeDocument(doc)
+  notifyNotebookDataChanged()
+}
+
 export async function removeNotebook(id: string): Promise<void> {
-  if (isBaseSentenceNotebook(id)) {
-    throw new Error('总笔记本 base_sentence 不可删除')
+  if (isSystemNotebook(id)) {
+    throw new Error('系统笔记本不可删除')
   }
   const notebooks = (await readRegistry()).filter((item) => item.id !== id)
   await writeRegistry(notebooks)
@@ -403,12 +504,7 @@ export async function touchNotebook(id: string): Promise<void> {
   const item = notebooks.find((nb) => nb.id === id)
   if (!item) return
   item.updatedAt = Date.now()
-  notebooks.sort((a, b) => {
-    if (isBaseSentenceNotebook(a.id)) return -1
-    if (isBaseSentenceNotebook(b.id)) return 1
-    return b.updatedAt - a.updatedAt
-  })
-  await writeRegistry(notebooks)
+  await writeRegistry(sortNotebookRegistry(notebooks))
 }
 
 function sourceMirrorKey(entry: NotebookEntry, sourceNotebookId: string): string {
@@ -435,6 +531,9 @@ export async function removeNotebookEntry(
   notebookId: string,
   entryId: string,
 ): Promise<{ totalAfter: number }> {
+  if (isBasePhrasesNotebook(notebookId) || isNotFoundWordsNotebook(notebookId)) {
+    throw new Error('系统汇总笔记本的条目不可手动删除')
+  }
   const doc = await ensureNotebookDocument(notebookId)
   const entry = doc.entries.find((item) => item.id === entryId)
   if (!entry) throw new Error('笔记条目不存在')
@@ -575,12 +674,7 @@ export async function importNotebooksBackup(payload: {
 
     const meta: NotebookMeta = {
       id: rawMeta.id,
-      title:
-        isBaseSentenceNotebook(rawMeta.id)
-          ? BASE_SENTENCE_NOTEBOOK_TITLE
-          : typeof rawMeta.title === 'string' && rawMeta.title.trim()
-            ? rawMeta.title.trim()
-            : '笔记本',
+      title: resolveSystemNotebookTitle(rawMeta.id, rawMeta.title),
       createdAt: typeof rawMeta.createdAt === 'number' ? rawMeta.createdAt : Date.now(),
       updatedAt: typeof rawMeta.updatedAt === 'number' ? rawMeta.updatedAt : Date.now(),
     }
@@ -642,13 +736,9 @@ export async function importNotebooksBackup(payload: {
     entriesAdded += normalizedDoc.entries.length
   }
 
-  const mergedRegistry = [...registryMap.values()].sort((a, b) => {
-    if (isBaseSentenceNotebook(a.id)) return -1
-    if (isBaseSentenceNotebook(b.id)) return 1
-    return b.updatedAt - a.updatedAt
-  })
+  const mergedRegistry = sortNotebookRegistry([...registryMap.values()])
   await writeRegistry(mergedRegistry)
-  await ensureBaseSentenceNotebook()
+  await ensureAllSystemNotebooks()
 
   return {
     notebooks: mergedRegistry.length,

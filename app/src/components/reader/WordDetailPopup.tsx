@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { formatExamLevelsDisplay } from '../../lib/examLevel'
 import { extractVariantLookupWord } from '../../lib/variantToken'
 import {
   lookupWord,
@@ -7,6 +8,7 @@ import {
   getDictionarySourceLabel,
 } from '../../services/dictionary'
 import type { WordEntry } from '../../services/dictionary'
+import { formatWordFrequency } from '../../services/dictionary/wordFrequency'
 import { isMasteredLemma, setMasteredLemma } from '../../services/words/mastered'
 import { WordPhraseSection } from './WordPhraseSection'
 
@@ -141,7 +143,26 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
             </div>
 
             {entry.examLevels.length > 0 && (
-              <p className="popup-levels">等级: {entry.examLevels.join(' / ')}</p>
+              <div className="popup-levels">
+                <span className="popup-levels-label">等级</span>
+                <div className="popup-level-chips">
+                  {formatExamLevelsDisplay(entry.examLevels).map((label) => (
+                    <span key={label} className="popup-level-chip">
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {entry.frequency && formatWordFrequency(entry.frequency).length > 0 && (
+              <div className="popup-frequency">
+                {formatWordFrequency(entry.frequency).map((line) => (
+                  <span key={line} className="popup-frequency-item">
+                    {line}
+                  </span>
+                ))}
+              </div>
             )}
 
             <ul className="popup-defs">

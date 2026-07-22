@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatExamLevelsDisplay } from '../lib/examLevel'
 import { lookupWord, playSpeechWord } from '../services/dictionary'
 import type { WordEntry } from '../services/dictionary'
 
@@ -61,7 +62,7 @@ export function DictDebugPage() {
             </button>
           </div>
           {entry.examLevels.length > 0 && (
-            <p className="levels">等级: {entry.examLevels.join(' / ')}</p>
+            <p className="levels">等级: {formatExamLevelsDisplay(entry.examLevels).join(' ')}</p>
           )}
           <ul className="defs">
             {entry.definitions.map((def, index) => (

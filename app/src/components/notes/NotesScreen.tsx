@@ -3,7 +3,10 @@ import { AppToast, type AppToastVariant } from '../common/AppToast'
 import { BACKUP_DATA_CHANGED } from '../../services/backup/events'
 import {
   createNotebook,
+  isBasePhrasesNotebook,
   isBaseSentenceNotebook,
+  isNotFoundWordsNotebook,
+  isSystemNotebook,
   listNotebooks,
   removeNotebook,
   touchNotebook,
@@ -67,8 +70,8 @@ export function NotesScreen() {
   }
 
   async function handleRemove(id: string, title: string) {
-    if (isBaseSentenceNotebook(id)) {
-      showToast('总笔记本 base_sentence 不可删除', 'error')
+    if (isSystemNotebook(id)) {
+      showToast('系统笔记本不可删除', 'error')
       return
     }
     if (!window.confirm(`确定删除笔记本「${title}」？`)) return
@@ -113,10 +116,12 @@ export function NotesScreen() {
       </header>
 
       <div className="bookshelf-shelf notes-shelf">
-        {notebooks.filter((n) => !isBaseSentenceNotebook(n.id)).length === 0 ? (
+        {notebooks.filter((n) => !isSystemNotebook(n.id)).length === 0 ? (
           <div className="bookshelf-empty">
             <p>还没有自定义笔记本</p>
-            <p className="bookshelf-empty-hint">点击右上角 + 创建；保存的句子会自动汇总到 base_sentence</p>
+            <p className="bookshelf-empty-hint">
+              点击右上角 + 创建；句子会自动汇总到 base_sentence，词组汇总到「词组总集」
+            </p>
           </div>
         ) : null}
         <ul className="bookshelf-grid">
@@ -124,19 +129,25 @@ export function NotesScreen() {
               <li key={notebook.id} className="bookshelf-book">
                 <button
                   type="button"
-                  className={`bookshelf-cover notes-cover${isBaseSentenceNotebook(notebook.id) ? ' notes-cover-base' : ''}`}
+                  className={`bookshelf-cover notes-cover${isSystemNotebook(notebook.id) ? ' notes-cover-base' : ''}`}
                   style={{ background: notebookColor(notebook.id) }}
                   onClick={() => void handleOpen(notebook.id)}
                 >
                   <span className="notes-cover-icon" aria-hidden>
-                    {isBaseSentenceNotebook(notebook.id) ? '📚' : '📒'}
+                    {isBaseSentenceNotebook(notebook.id)
+                      ? '📚'
+                      : isBasePhrasesNotebook(notebook.id)
+                        ? '🔗'
+                        : isNotFoundWordsNotebook(notebook.id)
+                          ? '✏️'
+                          : '📒'}
                   </span>
                   <span className="notes-cover-title">{notebook.title}</span>
-                  {isBaseSentenceNotebook(notebook.id) && (
-                    <span className="notes-cover-badge">总笔记本</span>
+                  {isSystemNotebook(notebook.id) && (
+                    <span className="notes-cover-badge">系统</span>
                   )}
                 </button>
-                {!isBaseSentenceNotebook(notebook.id) && (
+                {!isSystemNotebook(notebook.id) && (
                   <button
                     type="button"
                     className="bookshelf-book-delete"

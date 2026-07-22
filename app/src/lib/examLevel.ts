@@ -16,7 +16,35 @@ const LEVEL_RANK: Record<string, number> = {
   GRE: 8,
 }
 
-function normalizeExamTag(tag: string): string {
+const LEVEL_LABEL_ZH: Record<string, string> = {
+  中考: '中考',
+  高考: '高考',
+  CET4: '四级',
+  CET6: '六级',
+  考研: '考研',
+  雅思: '雅思',
+  托福: '托福',
+  GRE: 'GRE',
+}
+
+export const EXAM_LEVEL_OPTIONS = [
+  '中考',
+  '高考',
+  'CET4',
+  'CET6',
+  '考研',
+  '雅思',
+  '托福',
+  'GRE',
+] as const
+
+function rankOf(level: string): number {
+  const key = normalizeExamTag(level)
+  return LEVEL_RANK[key] ?? 99
+}
+
+/** 将考试等级标签规范为内部键（如 CET4） */
+export function normalizeExamTag(tag: string): string {
   const raw = tag.trim()
   const upper = raw.toUpperCase()
 
@@ -32,9 +60,55 @@ function normalizeExamTag(tag: string): string {
   return raw
 }
 
-function rankOf(level: string): number {
+/** 展示用中文标签 */
+export function formatExamLevelLabel(level: string): string {
   const key = normalizeExamTag(level)
-  return LEVEL_RANK[key] ?? 99
+  return LEVEL_LABEL_ZH[key] ?? level.trim()
+}
+
+/** 去重并排序后的中文等级列表 */
+export function formatExamLevelsDisplay(levels: string[]): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  for (const level of levels) {
+    const key = normalizeExamTag(level)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    result.push(formatExamLevelLabel(key))
+  }
+
+  return result.sort((a, b) => rankOf(a) - rankOf(b))
+}
+
+/** 解析用户或豆包输入的等级字段，返回规范键列表 */
+export function parseExamLevelsInput(raw: unknown): string[] {
+  const items: string[] = []
+
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (typeof item === 'string' && item.trim()) items.push(item.trim())
+    }
+  } else if (typeof raw === 'string' && raw.trim()) {
+    items.push(
+      ...raw
+        .split(/[,，/|、\s]+/)
+        .map((part) => part.trim())
+        .filter(Boolean),
+    )
+  }
+
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const item of items) {
+    const key = normalizeExamTag(item)
+    if (!LEVEL_LABEL_ZH[key] && !LEVEL_RANK[key]) continue
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(key)
+  }
+
+  return result.sort((a, b) => rankOf(a) - rankOf(b))
 }
 
 /** 单词是否难于用户所选水平（应显示行间翻译） */

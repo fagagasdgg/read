@@ -3,11 +3,15 @@ import { normalizeAnalysisListField } from '../../services/llm/analysisParse'
 import {
   getNotebookDocument,
   getNotebookEntryById,
+  isBasePhrasesNotebook,
   isBaseSentenceNotebook,
+  isNotFoundWordsNotebook,
+  isSystemNotebook,
   listNotebookEntries,
   removeNotebookEntry,
   type NotebookDocument,
 } from '../../services/notes/notebooks'
+import { NotFoundWordEditor } from './NotFoundWordEditor'
 import {
   loadNotebookPageSize,
   NOTEBOOK_PAGE_SIZE_OPTIONS,
@@ -129,7 +133,11 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
               <p className="notebook-detail-placeholder">
                 {isBaseSentenceNotebook(notebookId)
                   ? '所有保存到各笔记本的句子都会自动汇总到这里，并标注来源书籍与笔记本。'
-                  : '这里会展示句子笔记列表。阅读时保存的句子解析会按条目收纳。'}
+                  : isBasePhrasesNotebook(notebookId)
+                    ? '所有已收录词组会按基础单词聚合展示在这里，点击单词可查看词组与释义。'
+                    : isNotFoundWordsNotebook(notebookId)
+                      ? '阅读时查不到的单词会出现在这里，点击可手动补全词条。'
+                      : '这里会展示句子笔记列表。阅读时保存的句子解析会按条目收纳。'}
               </p>
             )}
 
@@ -180,7 +188,7 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
                         type="button"
                         className="notebook-entry-delete"
                         aria-label="删除这条笔记"
-                        disabled={deletingId === entry.id}
+                        disabled={deletingId === entry.id || isSystemNotebook(notebookId)}
                         onClick={() => void handleDeleteEntry(entry.id)}
                       >
                         {deletingId === entry.id ? '…' : '×'}
@@ -221,7 +229,18 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
           </>
         )}
 
-        {!loading && selectedEntry && (
+        {!loading && selectedEntry && isNotFoundWordsNotebook(notebookId) && (
+          <NotFoundWordEditor
+            lemma={selectedEntry.sentence}
+            onCancel={() => setSelectedEntryId(null)}
+            onSaved={() => {
+              setSelectedEntryId(null)
+              void loadDoc()
+            }}
+          />
+        )}
+
+        {!loading && selectedEntry && !isNotFoundWordsNotebook(notebookId) && (
           <div className="notebook-entry-detail">
             {selectedEntry.source && (
               <p className="notebook-entry-source-detail">
@@ -231,6 +250,18 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
             )}
             <h2 className="notebook-entry-detail-title">{selectedEntry.sentence}</h2>
 
+            {isBasePhrasesNotebook(notebookId) ? (
+              <section className="notebook-entry-block">
+                <h3>词组</h3>
+                <p>
+                  {normalizeAnalysisListField(
+                    selectedEntry.analysis.collocations || '暂无词组',
+                    'collocations',
+                  ) || '暂无词组'}
+                </p>
+              </section>
+            ) : (
+              <>
             <section className="notebook-entry-block">
               <h3>原句翻译</h3>
               <p>{selectedEntry.analysis.translation || '暂无内容'}</p>
@@ -257,7 +288,10 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
               <h3>句型分析</h3>
               <p>{selectedEntry.analysis.sentencePattern || '暂无内容'}</p>
             </section>
+              </>
+            )}
 
+            {!isSystemNotebook(notebookId) && (
             <button
               type="button"
               className="notebook-entry-delete-btn"
@@ -266,6 +300,7 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
             >
               {deletingId === selectedEntry.id ? '删除中…' : '删除这条笔记'}
             </button>
+            )}
           </div>
         )}
       </div>

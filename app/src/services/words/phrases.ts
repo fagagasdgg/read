@@ -66,6 +66,8 @@ async function writeStore(store: Record<string, WordPhraseRecord>): Promise<void
   } else {
     localStorage.setItem(STORAGE_KEY, payload)
   }
+
+  void import('../notes/systemNotebooks').then(({ syncBasePhrasesNotebook }) => syncBasePhrasesNotebook())
 }
 
 function emptyRecord(lemma: string): WordPhraseRecord {
@@ -187,6 +189,11 @@ export async function getWordPhraseCount(rawLemma: string): Promise<number> {
 export async function getLemmaPhraseWordCount(): Promise<number> {
   const store = await readStore()
   return Object.values(store).filter((record) => record.items.length > 0).length
+}
+
+export async function listAllWordPhraseRecords(): Promise<WordPhraseRecord[]> {
+  const store = await readStore()
+  return Object.values(store)
 }
 
 export async function exportPhraseStore(): Promise<Record<string, WordPhraseRecord>> {

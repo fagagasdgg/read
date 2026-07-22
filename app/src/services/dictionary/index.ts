@@ -8,6 +8,7 @@ import {
   setNotFoundLemma,
   shouldRetryNotFound,
 } from './cache'
+import { fetchFrequencyForLemmaIfMissing } from './batchFrequency'
 import { fetchWordFromProviders } from './lookup'
 import { isWordEntry, isWordNotFoundMarker, type DictionaryCacheValue, type LookupOptions, type WordEntry } from './types'
 
@@ -26,7 +27,11 @@ export {
   getCachedRecords,
   getDictionaryCacheStats,
   listCachedWords,
+  listNotFoundLemmas,
 } from './cache'
+export { batchFetchWordFrequencies } from './batchFrequency'
+export { saveManualWordEntry, parseDoubaoWordClipboard, type ManualWordDraft } from './manualWord'
+export { formatWordFrequency, formatCollinsStar } from './wordFrequency'
 export { DICTIONARY_SOURCES, getDictionarySourceLabel } from './providers'
 export {
   formatSourceCheckTime,
@@ -90,6 +95,7 @@ export async function lookupWordDetailed(
 
   await setCachedWord(entry)
   void cacheVariantForms(entry)
+  void fetchFrequencyForLemmaIfMissing(entry.lemma)
 
   return { entry, fromCache: false }
 }
