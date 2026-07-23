@@ -58,6 +58,9 @@ export async function syncBasePhrasesNotebook(): Promise<void> {
 /** 仅在打开「待补全词条」或手动保存词条后调用 */
 export async function syncNotFoundWordsNotebook(): Promise<void> {
   await ensureNotFoundWordsNotebook()
+  const { cleanupPossessiveNotFoundMarkers } = await import('../dictionary/cache')
+  await cleanupPossessiveNotFoundMarkers()
+
   const markers = await listNotFoundLemmas()
   const sorted = [...markers].sort((a, b) => a.lemma.localeCompare(b.lemma))
 

@@ -453,12 +453,29 @@ export function listNotebookEntries(
   doc: NotebookDocument | null,
   page: number,
   pageSize: number,
+  options?: { query?: string },
 ): { items: NotebookEntry[]; total: number; totalPages: number; page: number } {
   if (!doc?.entries.length) {
     return { items: [], total: 0, totalPages: 1, page: 1 }
   }
 
-  const sorted = [...doc.entries].sort((a, b) => b.createdAt - a.createdAt)
+  const query = options?.query?.trim().toLowerCase() ?? ''
+  const filtered = query
+    ? doc.entries.filter((entry) => {
+        const haystack = [
+          entry.sentence,
+          entry.analysis.translation,
+          entry.analysis.collocations,
+          entry.analysis.slangs,
+          entry.analysis.sentencePattern,
+        ]
+          .join('\n')
+          .toLowerCase()
+        return haystack.includes(query)
+      })
+    : doc.entries
+
+  const sorted = [...filtered].sort((a, b) => b.createdAt - a.createdAt)
   const total = sorted.length
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const safePage = Math.min(totalPages, Math.max(1, page))

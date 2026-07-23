@@ -111,6 +111,31 @@ export async function listNotFoundLemmas(): Promise<WordNotFoundMarker[]> {
   return all.filter(isWordNotFoundMarker).map(normalizeNotFoundMarker)
 }
 
+/**
+ * 清理历史上带 's 等尾巴的「查不到」标记：
+ * 删除旧键；若规范化后的 lemma 已有词条则不再标记。
+ */
+export async function cleanupPossessiveNotFoundMarkers(): Promise<{ removed: number }> {
+  const { normalizeWordToken } = await import('../../lib/lemmatize')
+  const markers = await listNotFoundLemmas()
+  const db = await getDb()
+  let removed = 0
+
+  for (const marker of markers) {
+    const cleaned = normalizeWordToken(marker.lemma)
+    if (!cleaned || cleaned === marker.lemma) continue
+
+    await db.delete(STORE, marker.lemma)
+    removed += 1
+
+    const existing = await db.get(STORE, cleaned)
+    if (existing) continue
+    // 不主动写入 notFound，留给下次点词重新查询正确原型
+  }
+
+  return { removed }
+}
+
 /** 旧版仅标记有道的 notFound 记录，可用备用信源重试 */
 export function shouldRetryNotFound(record: WordNotFoundMarker): boolean {
   const tried = record.triedSources ?? ['youdao']

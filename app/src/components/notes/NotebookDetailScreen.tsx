@@ -32,6 +32,10 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
   const [pageSize, setPageSize] = useState<NotebookPageSize>(20)
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [searchDraft, setSearchDraft] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const showSearch = isBasePhrasesNotebook(notebookId) || isNotFoundWordsNotebook(notebookId)
 
   const loadDoc = useCallback(async () => {
     setLoading(true)
@@ -72,10 +76,23 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
   useEffect(() => {
     setPage(1)
     setSelectedEntryId(null)
+    setSearchDraft('')
+    setSearchQuery('')
   }, [notebookId])
 
-  const pageData = listNotebookEntries(doc, page, pageSize)
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearchQuery(searchDraft.trim())
+      setPage(1)
+    }, 200)
+    return () => window.clearTimeout(timer)
+  }, [searchDraft])
+
+  const pageData = listNotebookEntries(doc, page, pageSize, {
+    query: showSearch ? searchQuery : undefined,
+  })
   const selectedEntry = selectedEntryId ? getNotebookEntryById(doc, selectedEntryId) : null
+  const totalEntries = doc?.entries.length ?? 0
 
   function openEntry(entryId: string) {
     setSelectedEntryId(entryId)
@@ -85,7 +102,7 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
     setPageSize(nextSize)
     await saveNotebookPageSize(nextSize)
     setPage((current) => {
-      const total = doc?.entries.length ?? 0
+      const total = pageData.total
       const totalPages = Math.max(1, Math.ceil(total / nextSize))
       return Math.min(current, totalPages)
     })
@@ -113,6 +130,10 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
     }
   }
 
+  const searchPlaceholder = isBasePhrasesNotebook(notebookId)
+    ? '搜索单词或词组…'
+    : '搜索待补全单词…'
+
   return (
     <div className="notebook-detail-screen">
       <header className="notebook-detail-header">
@@ -136,7 +157,7 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
         {loading && <p className="notebook-detail-placeholder">加载中…</p>}
         {!loading && !selectedEntry && (
           <>
-            {pageData.total === 0 && (
+            {totalEntries === 0 && (
               <p className="notebook-detail-placeholder">
                 {isBaseSentenceNotebook(notebookId)
                   ? '所有保存到各笔记本的句子都会自动汇总到这里，并标注来源书籍与笔记本。'
@@ -148,8 +169,42 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
               </p>
             )}
 
+            {showSearch && totalEntries > 0 && (
+              <div className="notebook-search-bar">
+                <input
+                  type="search"
+                  className="notebook-search-input"
+                  value={searchDraft}
+                  onChange={(e) => setSearchDraft(e.target.value)}
+                  placeholder={searchPlaceholder}
+                  enterKeyHint="search"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+                {searchDraft ? (
+                  <button
+                    type="button"
+                    className="notebook-search-clear"
+                    aria-label="清空搜索"
+                    onClick={() => {
+                      setSearchDraft('')
+                      setSearchQuery('')
+                      setPage(1)
+                    }}
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+            )}
+
             <div className="notebook-detail-toolbar">
-              <p className="notebook-detail-meta">条目数：{pageData.total}</p>
+              <p className="notebook-detail-meta">
+                {searchQuery
+                  ? `匹配 ${pageData.total} / 共 ${totalEntries} 条`
+                  : `条目数：${pageData.total}`}
+              </p>
               <label className="notebook-page-size">
                 <span>每页</span>
                 <select
@@ -184,6 +239,9 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
                           #{(pageData.page - 1) * pageSize + idx + 1}
                         </span>
                         <span className="notebook-entry-sentence">{entry.sentence}</span>
+                        {isBasePhrasesNotebook(notebookId) && entry.analysis.translation && (
+                          <span className="notebook-entry-source">{entry.analysis.translation}</span>
+                        )}
                         {entry.source && (
                           <span className="notebook-entry-source">
                             来自《{entry.source.bookTitle}》· {entry.source.notebookTitle}
@@ -228,9 +286,11 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
               </>
             ) : (
               <p className="notebook-detail-placeholder">
-                {pageData.total > 0 && page > 1
-                  ? '本页暂无条目，请返回上一页。'
-                  : '暂无句子条目。后续保存时会以「原句 + 四类解析」结构写入列表。'}
+                {searchQuery
+                  ? '没有匹配的条目，试试其他关键词。'
+                  : pageData.total > 0 && page > 1
+                    ? '本页暂无条目，请返回上一页。'
+                    : '暂无句子条目。后续保存时会以「原句 + 四类解析」结构写入列表。'}
               </p>
             )}
           </>
@@ -269,44 +329,44 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
               </section>
             ) : (
               <>
-            <section className="notebook-entry-block">
-              <h3>原句翻译</h3>
-              <p>{selectedEntry.analysis.translation || '暂无内容'}</p>
-            </section>
-            <section className="notebook-entry-block">
-              <h3>固定搭配</h3>
-              <p>
-                {normalizeAnalysisListField(
-                  selectedEntry.analysis.collocations || '暂无内容',
-                  'collocations',
-                ) || '暂无内容'}
-              </p>
-            </section>
-            <section className="notebook-entry-block">
-              <h3>俚语讲解</h3>
-              <p>
-                {normalizeAnalysisListField(
-                  selectedEntry.analysis.slangs || '暂无内容',
-                  'slangs',
-                ) || '暂无内容'}
-              </p>
-            </section>
-            <section className="notebook-entry-block">
-              <h3>句型分析</h3>
-              <p>{selectedEntry.analysis.sentencePattern || '暂无内容'}</p>
-            </section>
+                <section className="notebook-entry-block">
+                  <h3>原句翻译</h3>
+                  <p>{selectedEntry.analysis.translation || '暂无内容'}</p>
+                </section>
+                <section className="notebook-entry-block">
+                  <h3>固定搭配</h3>
+                  <p>
+                    {normalizeAnalysisListField(
+                      selectedEntry.analysis.collocations || '暂无内容',
+                      'collocations',
+                    ) || '暂无内容'}
+                  </p>
+                </section>
+                <section className="notebook-entry-block">
+                  <h3>俚语讲解</h3>
+                  <p>
+                    {normalizeAnalysisListField(
+                      selectedEntry.analysis.slangs || '暂无内容',
+                      'slangs',
+                    ) || '暂无内容'}
+                  </p>
+                </section>
+                <section className="notebook-entry-block">
+                  <h3>句型分析</h3>
+                  <p>{selectedEntry.analysis.sentencePattern || '暂无内容'}</p>
+                </section>
               </>
             )}
 
             {!isSystemNotebook(notebookId) && (
-            <button
-              type="button"
-              className="notebook-entry-delete-btn"
-              disabled={deletingId === selectedEntry.id}
-              onClick={() => void handleDeleteEntry(selectedEntry.id)}
-            >
-              {deletingId === selectedEntry.id ? '删除中…' : '删除这条笔记'}
-            </button>
+              <button
+                type="button"
+                className="notebook-entry-delete-btn"
+                disabled={deletingId === selectedEntry.id}
+                onClick={() => void handleDeleteEntry(selectedEntry.id)}
+              >
+                {deletingId === selectedEntry.id ? '删除中…' : '删除这条笔记'}
+              </button>
             )}
           </div>
         )}

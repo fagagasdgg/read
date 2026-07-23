@@ -8,7 +8,6 @@ import {
   getDictionarySourceLabel,
 } from '../../services/dictionary'
 import type { WordEntry } from '../../services/dictionary'
-import { formatWordFrequency } from '../../services/dictionary/wordFrequency'
 import { isMasteredLemma, setMasteredLemma } from '../../services/words/mastered'
 import { WordPhraseSection } from './WordPhraseSection'
 
@@ -155,13 +154,32 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
               </div>
             )}
 
-            {entry.frequency && formatWordFrequency(entry.frequency).length > 0 && (
+            {entry.frequency &&
+              (entry.frequency.collinsStar !== undefined ||
+                entry.frequency.examFrequency !== undefined) && (
               <div className="popup-frequency">
-                {formatWordFrequency(entry.frequency).map((line) => (
-                  <span key={line} className="popup-frequency-item">
-                    {line}
-                  </span>
-                ))}
+                {entry.frequency.collinsStar !== undefined && (
+                  <div className="popup-freq-collins" aria-label={`柯林斯 ${entry.frequency.collinsStar} 星`}>
+                    <span className="popup-freq-label">柯林斯</span>
+                    <span className="popup-freq-stars" aria-hidden>
+                      {Array.from({ length: 5 }, (_, i) => (
+                        <span
+                          key={i}
+                          className={`popup-freq-star${i < entry.frequency!.collinsStar! ? ' on' : ''}`}
+                        >
+                          ★
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                )}
+                {entry.frequency.examFrequency !== undefined && (
+                  <div className="popup-freq-exam">
+                    <span className="popup-freq-label">真题</span>
+                    <strong className="popup-freq-num">{entry.frequency.examFrequency}</strong>
+                    <span className="popup-freq-unit">次</span>
+                  </div>
+                )}
               </div>
             )}
 
