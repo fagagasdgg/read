@@ -159,7 +159,7 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
                 entry.frequency.examFrequency !== undefined) && (
               <div className="popup-frequency">
                 {entry.frequency.collinsStar !== undefined && (
-                  <div className="popup-freq-collins" aria-label={`柯林斯 ${entry.frequency.collinsStar} 星`}>
+                  <span className="popup-freq-collins" aria-label={`柯林斯 ${entry.frequency.collinsStar} 星`}>
                     <span className="popup-freq-label">柯林斯</span>
                     <span className="popup-freq-stars" aria-hidden>
                       {Array.from({ length: 5 }, (_, i) => (
@@ -171,14 +171,20 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
                         </span>
                       ))}
                     </span>
-                  </div>
+                  </span>
                 )}
+                {entry.frequency.collinsStar !== undefined &&
+                  entry.frequency.examFrequency !== undefined && (
+                    <span className="popup-freq-sep" aria-hidden>
+                      ·
+                    </span>
+                  )}
                 {entry.frequency.examFrequency !== undefined && (
-                  <div className="popup-freq-exam">
+                  <span className="popup-freq-exam">
                     <span className="popup-freq-label">真题</span>
                     <strong className="popup-freq-num">{entry.frequency.examFrequency}</strong>
                     <span className="popup-freq-unit">次</span>
-                  </div>
+                  </span>
                 )}
               </div>
             )}
