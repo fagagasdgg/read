@@ -24,6 +24,7 @@ function formatPhraseLines(
   return items.map((item) => `${item.phrase} — ${item.translation}`).join('\n')
 }
 
+/** 仅在打开「词组总集」时调用，禁止挂到 listNotebooks / 导入热路径 */
 export async function syncBasePhrasesNotebook(): Promise<void> {
   await ensureBasePhrasesNotebook()
   const records = await listAllWordPhraseRecords()
@@ -51,9 +52,10 @@ export async function syncBasePhrasesNotebook(): Promise<void> {
     },
   }))
 
-  await replaceNotebookEntries(BASE_PHRASES_NOTEBOOK_ID, entries)
+  await replaceNotebookEntries(BASE_PHRASES_NOTEBOOK_ID, entries, { silent: true })
 }
 
+/** 仅在打开「待补全词条」或手动保存词条后调用 */
 export async function syncNotFoundWordsNotebook(): Promise<void> {
   await ensureNotFoundWordsNotebook()
   const markers = await listNotFoundLemmas()
@@ -79,7 +81,7 @@ export async function syncNotFoundWordsNotebook(): Promise<void> {
     },
   }))
 
-  await replaceNotebookEntries(NOT_FOUND_WORDS_NOTEBOOK_ID, entries)
+  await replaceNotebookEntries(NOT_FOUND_WORDS_NOTEBOOK_ID, entries, { silent: true })
 }
 
 export async function syncAllSystemNotebooks(): Promise<void> {

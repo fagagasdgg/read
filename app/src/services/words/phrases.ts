@@ -66,8 +66,6 @@ async function writeStore(store: Record<string, WordPhraseRecord>): Promise<void
   } else {
     localStorage.setItem(STORAGE_KEY, payload)
   }
-
-  void import('../notes/systemNotebooks').then(({ syncBasePhrasesNotebook }) => syncBasePhrasesNotebook())
 }
 
 function emptyRecord(lemma: string): WordPhraseRecord {

@@ -95,9 +95,6 @@ export async function setNotFoundLemma(lemma: string): Promise<void> {
   }
   const db = await getDb()
   await db.put(STORE, marker, lemma)
-  void import('../notes/systemNotebooks').then(({ syncNotFoundWordsNotebook }) =>
-    syncNotFoundWordsNotebook(),
-  )
 }
 
 export async function removeNotFoundLemma(lemma: string): Promise<void> {
@@ -296,10 +293,6 @@ export async function importDictionaryRecords(
       imported += 1
     }
   }
-
-  void import('../notes/systemNotebooks').then(({ syncNotFoundWordsNotebook }) =>
-    syncNotFoundWordsNotebook(),
-  )
 
   return { imported, skipped }
 }

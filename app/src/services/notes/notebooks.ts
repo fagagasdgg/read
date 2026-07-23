@@ -339,9 +339,8 @@ export async function ensureAllSystemNotebooks(): Promise<void> {
 }
 
 export async function listNotebooks(): Promise<NotebookMeta[]> {
+  // 仅确保系统笔记本存在；禁止在此全量同步内容（会与统计页 NOTEBOOK 监听形成死循环并卡死导入/切 Tab）
   await ensureAllSystemNotebooks()
-  const { syncAllSystemNotebooks } = await import('./systemNotebooks')
-  await syncAllSystemNotebooks()
   const notebooks = await readRegistry()
   return sortNotebookRegistry(notebooks)
 }
@@ -481,12 +480,16 @@ export function getNotebookEntryById(
 export async function replaceNotebookEntries(
   notebookId: string,
   entries: NotebookEntry[],
+  options?: { silent?: boolean },
 ): Promise<void> {
   const doc = await ensureNotebookDocument(notebookId)
   doc.entries = entries
   doc.updatedAt = Date.now()
   await writeDocument(doc)
-  notifyNotebookDataChanged()
+  // 默认静默：避免同步写盘触发统计页刷新 → 再 listNotebooks 的连锁卡顿
+  if (!options?.silent) {
+    notifyNotebookDataChanged()
+  }
 }
 
 export async function removeNotebook(id: string): Promise<void> {

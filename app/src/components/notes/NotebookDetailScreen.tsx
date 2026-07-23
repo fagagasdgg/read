@@ -36,6 +36,13 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
   const loadDoc = useCallback(async () => {
     setLoading(true)
     try {
+      if (isBasePhrasesNotebook(notebookId)) {
+        const { syncBasePhrasesNotebook } = await import('../../services/notes/systemNotebooks')
+        await syncBasePhrasesNotebook()
+      } else if (isNotFoundWordsNotebook(notebookId)) {
+        const { syncNotFoundWordsNotebook } = await import('../../services/notes/systemNotebooks')
+        await syncNotFoundWordsNotebook()
+      }
       const next = await getNotebookDocument(notebookId)
       setDoc(next)
       return next
