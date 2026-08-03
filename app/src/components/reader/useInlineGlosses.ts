@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { shouldShowInlineForWord } from '../../lib/examLevel'
 import { formatInlineGloss } from '../../lib/formatInlineGloss'
-import { toLemma } from '../../lib/lemmatize'
+import { normalizeWordToken, toLemma } from '../../lib/lemmatize'
 import {
   getCachedRecords,
   lookupLemmasBatch,
 } from '../../services/dictionary'
 import { shouldRetryNotFound } from '../../services/dictionary/cache'
-import { isWordNotFoundMarker } from '../../services/dictionary/types'
+import { isWordEntry, isWordNotFoundMarker } from '../../services/dictionary/types'
 import { getMasteredLemmaSet, subscribeMasteredWords } from '../../services/words/mastered'
 import type { UserSettings } from '../../services/settings/userSettings'
 
@@ -43,7 +43,7 @@ function collectVisibleLemmas(contentEl: HTMLElement, viewportEl: HTMLElement): 
     if (rect.right <= bounds.left || rect.left >= bounds.right) continue
 
     const lemma =
-      el.dataset.lemma || toLemma(el.dataset.word ?? el.textContent ?? '')
+      el.dataset.lemma || normalizeWordToken(el.dataset.word ?? el.textContent ?? '')
     if (lemma) lemmas.add(lemma)
   }
 
@@ -67,7 +67,7 @@ function collectPageLemmas(
     if (bottom <= 0 || top >= viewHeight) continue
 
     const lemma =
-      el.dataset.lemma || toLemma(el.dataset.word ?? el.textContent ?? '')
+      el.dataset.lemma || normalizeWordToken(el.dataset.word ?? el.textContent ?? '')
     if (lemma) lemmas.add(lemma)
   }
 
@@ -93,7 +93,9 @@ function applyRecordToSession(
   userSettings: UserSettings,
   mastered: Set<string>,
 ): string | null {
-  if (mastered.has(lemma)) {
+  // 已掌握：同时认原词 key 与还原形（兼容旧数据里 mastered 存的是 tell）
+  const alt = toLemma(lemma)
+  if (mastered.has(lemma) || (alt && mastered.has(alt))) {
     session.set(lemma, null)
     return null
   }
@@ -127,9 +129,24 @@ async function hydrateGlossesFromLocal(
 ): Promise<Record<string, string>> {
   const needDb = lemmas.filter((lemma) => !session.has(lemma))
   if (needDb.length) {
-    const records = await getCachedRecords(needDb)
-    for (const lemma of needDb) {
-      applyRecordToSession(session, lemma, records.get(lemma), userSettings, mastered)
+    const altKeys = [
+      ...new Set(
+        needDb.map((key) => toLemma(key)).filter((lemma) => lemma && !needDb.includes(lemma)),
+      ),
+    ]
+    const records = await getCachedRecords([...needDb, ...altKeys])
+    for (const key of needDb) {
+      const direct = records.get(key)
+      const alt = toLemma(key)
+      const viaAlt =
+        alt && alt !== key && (!direct || !isWordEntry(direct)) ? records.get(alt) : undefined
+      const record =
+        direct && isWordEntry(direct)
+          ? direct
+          : viaAlt && isWordEntry(viaAlt)
+            ? viaAlt
+            : direct
+      applyRecordToSession(session, key, record, userSettings, mastered)
     }
   }
 
@@ -213,12 +230,27 @@ export function useInlineGlosses(
         await lookupLemmasBatch(missing, { prefetchVariants: true })
         if (cancelled || runId !== runIdRef.current) return
 
-        const records = await getCachedRecords(missing)
+        const altKeys = [
+          ...new Set(
+            missing.map((key) => toLemma(key)).filter((lemma) => lemma && !missing.includes(lemma)),
+          ),
+        ]
+        const records = await getCachedRecords([...missing, ...altKeys])
         const next = { ...localGlosses }
-        for (const lemma of missing) {
-          applyRecordToSession(session, lemma, records.get(lemma), userSettings, mastered)
-          const text = session.get(lemma)
-          if (text) next[lemma] = text
+        for (const key of missing) {
+          const direct = records.get(key)
+          const alt = toLemma(key)
+          const viaAlt =
+            alt && alt !== key && (!direct || !isWordEntry(direct)) ? records.get(alt) : undefined
+          const record =
+            direct && isWordEntry(direct)
+              ? direct
+              : viaAlt && isWordEntry(viaAlt)
+                ? viaAlt
+                : direct
+          applyRecordToSession(session, key, record, userSettings, mastered)
+          const text = session.get(key)
+          if (text) next[key] = text
         }
         setGlosses((prev) => (glossMapsEqual(prev, next) ? prev : next))
       } finally {

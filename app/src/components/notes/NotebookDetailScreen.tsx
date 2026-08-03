@@ -253,7 +253,11 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
                         type="button"
                         className="notebook-entry-delete"
                         aria-label="删除这条笔记"
-                        disabled={deletingId === entry.id || isSystemNotebook(notebookId)}
+                        disabled={
+                          deletingId === entry.id ||
+                          isBasePhrasesNotebook(notebookId) ||
+                          isBaseSentenceNotebook(notebookId)
+                        }
                         onClick={() => void handleDeleteEntry(entry.id)}
                       >
                         {deletingId === entry.id ? '…' : '×'}

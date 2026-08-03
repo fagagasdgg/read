@@ -5,6 +5,7 @@ import {
   getCachedRecords,
   isLemmaMarkedNotFound,
   setCachedWord,
+  setCachedWordAlias,
   setNotFoundLemma,
   shouldRetryNotFound,
 } from './cache'
@@ -74,30 +75,71 @@ function getSkipSources(record: DictionaryCacheValue | undefined) {
   return record.triedSources ?? ['youdao']
 }
 
+function buildLookupKeys(rawWord: string, exactToken: boolean): string[] {
+  const surface = normalizeWordToken(rawWord)
+  if (!surface) return []
+  if (exactToken) return [surface]
+
+  const lemma = toLemma(rawWord)
+  if (lemma && lemma !== surface) return [surface, lemma]
+  return [surface]
+}
+
+async function lookupSingleKey(
+  key: string,
+  options: LookupOptions,
+): Promise<{ entry: WordEntry; fromCache: boolean } | 'miss' | 'blocked'> {
+  const record = !options.forceRefresh ? await getCachedRecord(key) : null
+
+  if (record) {
+    if (isWordEntry(record)) return { entry: record, fromCache: true }
+    if (isWordNotFoundMarker(record) && !shouldRetryNotFound(record)) {
+      return 'blocked'
+    }
+  }
+
+  try {
+    const entry = await fetchWordFromProviders(key, {
+      skipSources: getSkipSources(record ?? undefined),
+    })
+    if (!entry) return 'miss'
+    await setCachedWord(entry)
+    void cacheVariantForms(entry)
+    void fetchFrequencyForLemmaIfMissing(entry.lemma)
+    return { entry, fromCache: false }
+  } catch {
+    return 'miss'
+  }
+}
+
+/**
+ * 查词：先全小写原词，未命中再试词形还原（兼容旧缓存中的 tell/book 等）。
+ * 弹窗标题使用返回词条的 entry.lemma：
+ * - 原词直接命中 → 多为该词本身（如 unperturbed）
+ * - 靠还原命中 → 为原型（如 told→tell），与以往展示一致
+ * 词形变体仍在「变体」区展示。
+ */
 export async function lookupWordDetailed(
   rawWord: string,
   options: LookupOptions = {},
 ): Promise<{ entry: WordEntry; fromCache: boolean } | null> {
-  const lemma = options.exactToken ? normalizeWordToken(rawWord) : toLemma(rawWord)
-  if (!lemma) return null
+  const keys = buildLookupKeys(rawWord, Boolean(options.exactToken))
+  if (!keys.length) return null
 
-  const record = !options.forceRefresh ? await getCachedRecord(lemma) : null
-  if (record) {
-    if (isWordNotFoundMarker(record) && !shouldRetryNotFound(record)) return null
-    if (isWordEntry(record)) return { entry: record, fromCache: true }
+  const surface = keys[0]
+
+  for (const key of keys) {
+    const result = await lookupSingleKey(key, options)
+    if (result === 'blocked' || result === 'miss') continue
+    // 还原命中时，把词条也挂到原词 key，下次点原词可直接命中缓存；标题仍用 entry.lemma（原型）
+    if (key !== surface) {
+      await setCachedWordAlias(surface, result.entry)
+    }
+    return result
   }
 
-  const entry = await fetchWordFromProviders(lemma, { skipSources: getSkipSources(record ?? undefined) })
-  if (!entry) {
-    await setNotFoundLemma(lemma)
-    return null
-  }
-
-  await setCachedWord(entry)
-  void cacheVariantForms(entry)
-  void fetchFrequencyForLemmaIfMissing(entry.lemma)
-
-  return { entry, fromCache: false }
+  await setNotFoundLemma(surface)
+  return null
 }
 
 export async function lookupWord(
@@ -108,50 +150,90 @@ export async function lookupWord(
   return result?.entry ?? null
 }
 
-/** 批量查词：先读本地（含查不到标记），仅对未记录词联网 */
+/** 批量查词：每个 key 先查自身，再试 toLemma；结果挂到请求的 key 上 */
 export async function lookupLemmasBatch(
   lemmas: string[],
   options: { prefetchVariants?: boolean } = {},
 ): Promise<Map<string, WordEntry>> {
   const unique = [...new Set(lemmas.filter(Boolean))]
-  const records = await getCachedRecords(unique)
   const found = new Map<string, WordEntry>()
+  if (!unique.length) return found
 
-  for (const [lemma, record] of records) {
-    if (isWordEntry(record)) found.set(lemma, record)
+  const altUnique = [
+    ...new Set(
+      unique.map((key) => toLemma(key)).filter((lemma) => Boolean(lemma) && !unique.includes(lemma)),
+    ),
+  ]
+  const records = await getCachedRecords([...unique, ...altUnique])
+
+  const missing: string[] = []
+
+  for (const key of unique) {
+    const direct = records.get(key)
+    if (direct && isWordEntry(direct)) {
+      found.set(key, direct)
+      continue
+    }
+
+    const lemma = toLemma(key)
+    if (lemma && lemma !== key) {
+      const viaLemma = records.get(lemma)
+      if (viaLemma && isWordEntry(viaLemma)) {
+        found.set(key, viaLemma)
+        continue
+      }
+    }
+
+    const surfaceBlocked =
+      direct && isWordNotFoundMarker(direct) && !shouldRetryNotFound(direct)
+    const lemmaRecord = lemma && lemma !== key ? records.get(lemma) : undefined
+    const lemmaBlocked =
+      lemmaRecord && isWordNotFoundMarker(lemmaRecord) && !shouldRetryNotFound(lemmaRecord)
+
+    if (surfaceBlocked && (lemmaBlocked || !lemma || lemma === key)) {
+      continue
+    }
+
+    missing.push(key)
   }
 
-  const missing = unique.filter((lemma) => {
-    const record = records.get(lemma)
-    if (!record) return true
-    if (isWordNotFoundMarker(record)) return shouldRetryNotFound(record)
-    return false
-  })
   if (!missing.length) return found
 
   const concurrency = 6
   let index = 0
 
-  async function worker(): Promise<void> {
-    while (index < missing.length) {
-      const lemma = missing[index++]
-      const prior = records.get(lemma)
+  async function processKey(key: string): Promise<void> {
+    const candidates = buildLookupKeys(key, false)
+    for (const candidate of candidates) {
+      const prior = records.get(candidate)
+      if (prior && isWordNotFoundMarker(prior) && !shouldRetryNotFound(prior)) {
+        continue
+      }
       try {
-        const entry = await fetchWordFromProviders(lemma, {
+        const entry = await fetchWordFromProviders(candidate, {
           skipSources: getSkipSources(prior),
         })
-        if (!entry) {
-          await setNotFoundLemma(lemma)
-          continue
-        }
+        if (!entry) continue
         await setCachedWord(entry)
-        found.set(lemma, entry)
+        if (candidate !== key) {
+          await setCachedWordAlias(key, entry)
+        }
+        found.set(key, entry)
         if (options.prefetchVariants) {
           void cacheVariantForms(entry)
         }
+        return
       } catch {
-        // 单词查询失败，跳过（下次可重试）
+        // try next candidate
       }
+    }
+    await setNotFoundLemma(key)
+  }
+
+  async function worker(): Promise<void> {
+    while (index < missing.length) {
+      const key = missing[index++]
+      await processKey(key)
     }
   }
 
@@ -162,12 +244,27 @@ export async function lookupLemmasBatch(
   return found
 }
 
-/** 仅从本地缓存解析词条（不联网） */
+/** 仅从本地缓存解析词条（不联网）；若 key 未命中会再试 toLemma */
 export async function lookupLemmasLocal(lemmas: string[]): Promise<Map<string, WordEntry>> {
-  const records = await getCachedRecords(lemmas)
+  const unique = [...new Set(lemmas.filter(Boolean))]
+  const altUnique = [
+    ...new Set(
+      unique.map((key) => toLemma(key)).filter((lemma) => lemma && !unique.includes(lemma)),
+    ),
+  ]
+  const records = await getCachedRecords([...unique, ...altUnique])
   const found = new Map<string, WordEntry>()
-  for (const [lemma, record] of records) {
-    if (isWordEntry(record)) found.set(lemma, record)
+  for (const key of unique) {
+    const direct = records.get(key)
+    if (direct && isWordEntry(direct)) {
+      found.set(key, direct)
+      continue
+    }
+    const lemma = toLemma(key)
+    if (lemma && lemma !== key) {
+      const viaLemma = records.get(lemma)
+      if (viaLemma && isWordEntry(viaLemma)) found.set(key, viaLemma)
+    }
   }
   return found
 }

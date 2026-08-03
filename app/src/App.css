@@ -1128,6 +1128,47 @@
   line-height: 1.4;
 }
 
+.popup-compound-hint {
+  margin: -4px 0 10px;
+  font-size: 0.72rem;
+  color: #9ca3af;
+}
+
+.popup-compound-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.popup-compound-arrow {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.popup-compound-arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.popup-compound-meta {
+  font-size: 0.8rem;
+  color: #6b7280;
+  min-width: 3.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .popup-loading,
 .popup-error {
   margin: 8px 0;

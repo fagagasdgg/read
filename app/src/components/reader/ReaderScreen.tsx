@@ -28,6 +28,7 @@ import { useInlineGlosses } from './useInlineGlosses'
 import { useTextSelection } from './useTextSelection'
 import { useViewportPagination, shouldWaitForMultiPageLand } from './useViewportPagination'
 import { WordDetailPopup, type WordLookupRequest } from './WordDetailPopup'
+import { resolveHyphenatedCompound } from './hyphenCompound'
 
 type ReaderOverlay = 'control' | 'toc' | 'settings' | null
 
@@ -331,8 +332,18 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     }
   }, [pageCount, pageIndex, persistPage])
 
-  const handleWordTap = useCallback((rawWord: string) => {
-    setWordLookup({ word: rawWord, exactToken: false, seq: Date.now() })
+  const handleWordTap = useCallback((rawWord: string, el?: HTMLElement) => {
+    const resolved = el
+      ? resolveHyphenatedCompound(el)
+      : { full: rawWord, parts: rawWord.split('-').filter(Boolean) }
+    const full = resolved.full || rawWord
+    const parts = resolved.parts.length > 1 ? resolved.parts : []
+    setWordLookup({
+      word: full,
+      exactToken: false,
+      seq: Date.now(),
+      compound: parts.length > 1 ? { full, parts, index: 0 } : undefined,
+    })
   }, [])
 
   function goPrev() {
@@ -512,6 +523,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
         onLookupVariant={(word) =>
           setWordLookup({ word, exactToken: true, seq: Date.now() })
         }
+        onCompoundNavigate={(next) => setWordLookup(next)}
       />
     </div>
   )

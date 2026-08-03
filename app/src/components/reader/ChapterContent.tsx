@@ -6,7 +6,7 @@ import {
   useMemo,
   createElement,
 } from 'react'
-import { toLemma } from '../../lib/lemmatize'
+import { normalizeWordToken } from '../../lib/lemmatize'
 import { splitTextSegments } from './tokenize'
 
 const BLOCK_TAGS = new Set([
@@ -20,7 +20,7 @@ const GlossContext = createContext<Record<string, string>>({})
 
 interface ChapterContentProps {
   html: string
-  onWordTap: (rawWord: string) => void
+  onWordTap: (rawWord: string, el: HTMLElement) => void
   glosses?: Record<string, string>
 }
 
@@ -28,7 +28,7 @@ interface ReaderWordProps {
   wordKey: string
   value: string
   lemma: string
-  onWordTap: (w: string) => void
+  onWordTap: (w: string, el: HTMLElement) => void
 }
 
 const ReaderWord = memo(function ReaderWord({
@@ -49,7 +49,7 @@ const ReaderWord = memo(function ReaderWord({
         data-lemma={lemma}
         onClick={(e) => {
           e.stopPropagation()
-          onWordTap(value)
+          onWordTap(value, e.currentTarget)
         }}
       >
         {value}
@@ -68,7 +68,7 @@ const ReaderWord = memo(function ReaderWord({
         data-lemma={lemma}
         onClick={(e) => {
           e.stopPropagation()
-          onWordTap(value)
+          onWordTap(value, e.currentTarget)
         }}
       >
         {value}
@@ -80,14 +80,14 @@ const ReaderWord = memo(function ReaderWord({
 function renderTextNode(
   text: string,
   key: string,
-  onWordTap: (w: string) => void,
+  onWordTap: (w: string, el: HTMLElement) => void,
 ): ReactNode[] {
   return splitTextSegments(text).map((seg, i) => {
     if (seg.type === 'text') {
       return <span key={`${key}-t-${i}`}>{seg.value}</span>
     }
 
-    const lemma = toLemma(seg.value)
+    const lemma = normalizeWordToken(seg.value)
     return (
       <ReaderWord
         key={`${key}-w-${i}`}
@@ -103,7 +103,7 @@ function renderTextNode(
 function renderNode(
   node: ChildNode,
   key: string,
-  onWordTap: (w: string) => void,
+  onWordTap: (w: string, el: HTMLElement) => void,
 ): ReactNode {
   if (node.nodeType === Node.TEXT_NODE) {
     const text = node.textContent ?? ''

@@ -86,6 +86,14 @@ export async function setCachedWord(entry: WordEntry): Promise<void> {
   await db.put(STORE, entry, entry.lemma)
 }
 
+/** 将同一词条挂到额外 key（如原词 told → 原型词条 tell），便于原词优先查缓存 */
+export async function setCachedWordAlias(alias: string, entry: WordEntry): Promise<void> {
+  const key = alias.trim()
+  if (!key || key === entry.lemma) return
+  const db = await getDb()
+  await db.put(STORE, entry, key)
+}
+
 export async function setNotFoundLemma(lemma: string): Promise<void> {
   const marker: WordNotFoundMarker = {
     lemma,

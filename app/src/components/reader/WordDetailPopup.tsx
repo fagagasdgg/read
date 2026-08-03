@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { formatExamLevelsDisplay } from '../../lib/examLevel'
+import { normalizeWordToken } from '../../lib/lemmatize'
 import { extractVariantLookupWord } from '../../lib/variantToken'
 import {
   lookupWord,
@@ -15,15 +16,27 @@ export interface WordLookupRequest {
   word: string
   exactToken: boolean
   seq: number
+  /** 连字符复合词：index 0=整词，1..=各分段 */
+  compound?: {
+    full: string
+    parts: string[]
+    index: number
+  }
 }
 
 interface WordDetailPopupProps {
   lookup: WordLookupRequest | null
   onClose: () => void
   onLookupVariant?: (word: string) => void
+  onCompoundNavigate?: (next: WordLookupRequest) => void
 }
 
-export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetailPopupProps) {
+export function WordDetailPopup({
+  lookup,
+  onClose,
+  onLookupVariant,
+  onCompoundNavigate,
+}: WordDetailPopupProps) {
   const [loading, setLoading] = useState(false)
   const [entry, setEntry] = useState<WordEntry | null>(null)
   const [error, setError] = useState('')
@@ -52,7 +65,10 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
           setError('未找到该词的释义')
           return
         }
-        const marked = await isMasteredLemma(result.lemma)
+        const surface = normalizeWordToken(lookup.word)
+        const marked =
+          (await isMasteredLemma(result.lemma)) ||
+          (surface !== result.lemma && (await isMasteredLemma(surface)))
         if (!cancelled) setMastered(marked)
       })
       .catch((err) => {
@@ -83,6 +99,23 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
 
   if (!lookup) return null
 
+  const compound = lookup.compound
+  const compoundTotal = compound ? compound.parts.length + 1 : 0
+  const compoundIndex = compound?.index ?? 0
+
+  function goCompound(delta: number) {
+    if (!compound || !onCompoundNavigate) return
+    const nextIndex = Math.max(0, Math.min(compoundTotal - 1, compoundIndex + delta))
+    if (nextIndex === compoundIndex) return
+    const word = nextIndex === 0 ? compound.full : compound.parts[nextIndex - 1]
+    onCompoundNavigate({
+      word,
+      exactToken: nextIndex > 0,
+      seq: Date.now(),
+      compound: { ...compound, index: nextIndex },
+    })
+  }
+
   return (
     <div className="popup-mask" onClick={onClose}>
       <div className="word-popup" onClick={(e) => e.stopPropagation()}>
@@ -99,6 +132,14 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
               <strong>{entry.lemma}</strong>
               <span className="popup-source">来源：{getDictionarySourceLabel(entry.source)}</span>
             </div>
+
+            {compound && compoundTotal > 1 && (
+              <p className="popup-compound-hint">
+                {compoundIndex === 0
+                  ? '连字符词 · 整词'
+                  : `连字符词 · 第 ${compoundIndex}/${compound.parts.length} 段`}
+              </p>
+            )}
 
             <div className="popup-phonetics">
               {(entry.phoneticUs || entry.usSpeechUrl) && (
@@ -233,6 +274,32 @@ export function WordDetailPopup({ lookup, onClose, onLookupVariant }: WordDetail
                 <p className="popup-mastered-note">该词将不再显示行间翻译，点词弹窗仍可查看释义。</p>
               )}
             </div>
+
+            {compound && compoundTotal > 1 && (
+              <div className="popup-compound-nav">
+                <button
+                  type="button"
+                  className="popup-compound-arrow"
+                  aria-label="上一段"
+                  disabled={compoundIndex <= 0}
+                  onClick={() => goCompound(-1)}
+                >
+                  ‹
+                </button>
+                <span className="popup-compound-meta">
+                  {compoundIndex + 1} / {compoundTotal}
+                </span>
+                <button
+                  type="button"
+                  className="popup-compound-arrow"
+                  aria-label="下一段"
+                  disabled={compoundIndex >= compoundTotal - 1}
+                  onClick={() => goCompound(1)}
+                >
+                  ›
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>

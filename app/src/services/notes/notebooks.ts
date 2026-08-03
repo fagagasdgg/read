@@ -551,8 +551,8 @@ export async function removeNotebookEntry(
   notebookId: string,
   entryId: string,
 ): Promise<{ totalAfter: number }> {
-  if (isBasePhrasesNotebook(notebookId) || isNotFoundWordsNotebook(notebookId)) {
-    throw new Error('系统汇总笔记本的条目不可手动删除')
+  if (isBasePhrasesNotebook(notebookId)) {
+    throw new Error('词组总集的条目不可手动删除')
   }
   const doc = await ensureNotebookDocument(notebookId)
   const entry = doc.entries.find((item) => item.id === entryId)
@@ -563,7 +563,12 @@ export async function removeNotebookEntry(
   await writeDocument(doc)
   await touchNotebook(notebookId)
 
-  if (!isBaseSentenceNotebook(notebookId)) {
+  if (isNotFoundWordsNotebook(notebookId)) {
+    const { removeNotFoundLemma } = await import('../dictionary/cache')
+    const { normalizeWordToken } = await import('../../lib/lemmatize')
+    const lemma = normalizeWordToken(entry.sentence) || entry.sentence.trim().toLowerCase()
+    if (lemma) await removeNotFoundLemma(lemma)
+  } else if (!isBaseSentenceNotebook(notebookId)) {
     await removeMirrorFromBaseSentence(entry, notebookId)
   }
 
