@@ -752,10 +752,31 @@
 
 .popup-word-title {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 8px;
-  flex-wrap: wrap;
   margin-bottom: 4px;
+}
+
+.popup-source-toggle {
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  background: transparent;
+  color: inherit;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.popup-source-toggle.active {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  border-color: color-mix(in srgb, currentColor 40%, transparent);
+}
+
+.popup-source-toggle:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .popup-phonetics {
@@ -920,6 +941,17 @@
   padding-left: 1.2rem;
   line-height: 1.5;
   font-size: 0.9rem;
+}
+
+.popup-definition-en {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  opacity: 0.85;
+  white-space: pre-wrap;
 }
 
 .popup-forms {

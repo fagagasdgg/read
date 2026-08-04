@@ -1,15 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { shouldShowInlineForWord } from '../../lib/examLevel'
 import { formatInlineGloss } from '../../lib/formatInlineGloss'
-import { normalizeWordToken, toLemma } from '../../lib/lemmatize'
+import { normalizeWordToken } from '../../lib/lemmatize'
 import {
   getCachedRecords,
+  lookupFromEcdict,
   lookupLemmasBatch,
+  resolveLemma,
 } from '../../services/dictionary'
 import { shouldRetryNotFound } from '../../services/dictionary/cache'
 import { isWordEntry, isWordNotFoundMarker } from '../../services/dictionary/types'
-import { getMasteredLemmaSet, subscribeMasteredWords } from '../../services/words/mastered'
+import {
+  getMasteredLemmaSet,
+  isMasteredInSet,
+  subscribeMasteredWords,
+} from '../../services/words/mastered'
 import type { UserSettings } from '../../services/settings/userSettings'
+import type { WordEntry } from '../../services/dictionary/types'
 
 /** 按章节保留行间释义会话缓存，避免重进章节时重复读库 */
 const glossSessionByChapter = new Map<number, Map<string, string | null>>()
@@ -86,16 +93,48 @@ function glossesFromSession(
   return glosses
 }
 
+function applyEntryToSession(
+  session: Map<string, string | null>,
+  lemma: string,
+  entry: WordEntry,
+  userSettings: UserSettings,
+  mastered: Set<string>,
+  canonicalLemma?: string,
+): string | null {
+  if (
+    isMasteredInSet(lemma, mastered) ||
+    (canonicalLemma && isMasteredInSet(canonicalLemma, mastered)) ||
+    (entry.lemma && isMasteredInSet(entry.lemma, mastered))
+  ) {
+    session.set(lemma, null)
+    return null
+  }
+
+  if (!shouldShowInlineForWord(entry.examLevels, userSettings.englishLevel)) {
+    session.set(lemma, null)
+    return null
+  }
+
+  const text = formatInlineGloss(entry, {
+    maxPosCount: userSettings.maxInlinePosCount,
+    maxMeaningsPerPos: userSettings.maxMeaningsPerPos,
+  })
+  session.set(lemma, text)
+  return text
+}
+
 function applyRecordToSession(
   session: Map<string, string | null>,
   lemma: string,
   record: import('../../services/dictionary/types').DictionaryCacheValue | undefined,
   userSettings: UserSettings,
   mastered: Set<string>,
+  canonicalLemma?: string,
 ): string | null {
-  // 已掌握：同时认原词 key 与还原形（兼容旧数据里 mastered 存的是 tell）
-  const alt = toLemma(lemma)
-  if (mastered.has(lemma) || (alt && mastered.has(alt))) {
+  if (
+    isMasteredInSet(lemma, mastered) ||
+    (canonicalLemma && isMasteredInSet(canonicalLemma, mastered))
+  ) {
     session.set(lemma, null)
     return null
   }
@@ -108,17 +147,10 @@ function applyRecordToSession(
     return null
   }
 
-  if (!shouldShowInlineForWord(record.examLevels, userSettings.englishLevel)) {
-    session.set(lemma, null)
-    return null
-  }
+  // 跳过误写入缓存的 ecdict（行间改走 lookupFromEcdict）
+  if (record.source === 'ecdict') return null
 
-  const text = formatInlineGloss(record, {
-    maxPosCount: userSettings.maxInlinePosCount,
-    maxMeaningsPerPos: userSettings.maxMeaningsPerPos,
-  })
-  session.set(lemma, text)
-  return text
+  return applyEntryToSession(session, lemma, record, userSettings, mastered, canonicalLemma)
 }
 
 async function hydrateGlossesFromLocal(
@@ -129,24 +161,43 @@ async function hydrateGlossesFromLocal(
 ): Promise<Record<string, string>> {
   const needDb = lemmas.filter((lemma) => !session.has(lemma))
   if (needDb.length) {
+    const resolved = new Map<string, string>()
+    await Promise.all(
+      needDb.map(async (key) => {
+        resolved.set(key, await resolveLemma(key, false))
+      }),
+    )
     const altKeys = [
       ...new Set(
-        needDb.map((key) => toLemma(key)).filter((lemma) => lemma && !needDb.includes(lemma)),
+        [...resolved.values()].filter((lemma) => lemma && !needDb.includes(lemma)),
       ),
     ]
     const records = await getCachedRecords([...needDb, ...altKeys])
+
     for (const key of needDb) {
+      const canonical = resolved.get(key) || key
+      try {
+        const local = await lookupFromEcdict(key)
+        if (local) {
+          applyEntryToSession(session, key, local, userSettings, mastered, canonical)
+          continue
+        }
+      } catch {
+        // fall through to cache
+      }
+
       const direct = records.get(key)
-      const alt = toLemma(key)
       const viaAlt =
-        alt && alt !== key && (!direct || !isWordEntry(direct)) ? records.get(alt) : undefined
+        canonical !== key && (!direct || !isWordEntry(direct) || direct.source === 'ecdict')
+          ? records.get(canonical)
+          : undefined
       const record =
-        direct && isWordEntry(direct)
+        direct && isWordEntry(direct) && direct.source !== 'ecdict'
           ? direct
-          : viaAlt && isWordEntry(viaAlt)
+          : viaAlt && isWordEntry(viaAlt) && viaAlt.source !== 'ecdict'
             ? viaAlt
             : direct
-      applyRecordToSession(session, key, record, userSettings, mastered)
+      applyRecordToSession(session, key, record, userSettings, mastered, canonical)
     }
   }
 
@@ -230,25 +281,51 @@ export function useInlineGlosses(
         await lookupLemmasBatch(missing, { prefetchVariants: true })
         if (cancelled || runId !== runIdRef.current) return
 
+        const resolved = new Map<string, string>()
+        await Promise.all(
+          missing.map(async (key) => {
+            resolved.set(key, await resolveLemma(key, false))
+          }),
+        )
         const altKeys = [
           ...new Set(
-            missing.map((key) => toLemma(key)).filter((lemma) => lemma && !missing.includes(lemma)),
+            [...resolved.values()].filter((lemma) => lemma && !missing.includes(lemma)),
           ),
         ]
         const records = await getCachedRecords([...missing, ...altKeys])
         const next = { ...localGlosses }
         for (const key of missing) {
+          if (session.has(key)) {
+            const text = session.get(key)
+            if (text) next[key] = text
+            continue
+          }
+
+          const canonical = resolved.get(key) || key
+          try {
+            const local = await lookupFromEcdict(key)
+            if (local) {
+              applyEntryToSession(session, key, local, userSettings, mastered, canonical)
+              const text = session.get(key)
+              if (text) next[key] = text
+              continue
+            }
+          } catch {
+            // fall through
+          }
+
           const direct = records.get(key)
-          const alt = toLemma(key)
           const viaAlt =
-            alt && alt !== key && (!direct || !isWordEntry(direct)) ? records.get(alt) : undefined
+            canonical !== key && (!direct || !isWordEntry(direct) || direct.source === 'ecdict')
+              ? records.get(canonical)
+              : undefined
           const record =
-            direct && isWordEntry(direct)
+            direct && isWordEntry(direct) && direct.source !== 'ecdict'
               ? direct
-              : viaAlt && isWordEntry(viaAlt)
+              : viaAlt && isWordEntry(viaAlt) && viaAlt.source !== 'ecdict'
                 ? viaAlt
                 : direct
-          applyRecordToSession(session, key, record, userSettings, mastered)
+          applyRecordToSession(session, key, record, userSettings, mastered, canonical)
           const text = session.get(key)
           if (text) next[key] = text
         }

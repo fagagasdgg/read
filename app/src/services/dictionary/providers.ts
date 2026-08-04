@@ -1,7 +1,7 @@
-import type { DictionarySourceId } from './types'
+import type { DictionarySourceId, OnlineDictionarySourceId } from './types'
 
 export interface DictionarySourceInfo {
-  id: DictionarySourceId
+  id: OnlineDictionarySourceId
   label: string
   role: 'primary' | 'fallback'
   description: string
@@ -23,9 +23,10 @@ export const DICTIONARY_SOURCES: DictionarySourceInfo[] = [
 ]
 
 export function getDictionarySourceLabel(id: DictionarySourceId): string {
+  if (id === 'ecdict') return 'ECDICT 本地'
   return DICTIONARY_SOURCES.find((item) => item.id === id)?.label ?? id
 }
 
-export function getAllDictionarySourceIds(): DictionarySourceId[] {
+export function getAllDictionarySourceIds(): OnlineDictionarySourceId[] {
   return DICTIONARY_SOURCES.map((item) => item.id)
 }

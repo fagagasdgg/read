@@ -33,6 +33,8 @@
 | 2026-07-07 | v1 | 底部新增工具 Tab |
 | 2026-07-22 | v1 | 移除 Z-Library 镜像检测工具（保留工具 Tab 空态） |
 | 2026-07-22 | v1 | 章节标题两行合并、阅历图表/今日阅读、设置延迟输入、词组展开、导入不恢复阅读最久书名 |
+| 2026-08-04 | v1 | 弹窗默认 ECDICT 本地释义，可切换「网络」；本地词形还原；ECDICT 不写词条缓存；词组/已掌握统一原型键 |
+| 2026-08-04 | v1 | 集成 ECDICT 全量本地 SQLite（约 77 万词）；查词优先本地再联网；展示 BNC/当代词频/牛津核心 |
 | 2026-08-03 | v1 | 连字符复合词整词查词 + 弹窗左右翻看各段；待补全支持删除并清除 notFound |
 | 2026-08-03 | v1 | 查词改为先全小写原词再词形还原，避免 unperturbed→unperturb 类误还原 |
 | 2026-07-23 | v1 | 柯林斯星级视觉增强；词组/待补全搜索；点词剥离 's 所有格 |
@@ -51,7 +53,7 @@
 | F-01 | 项目脚手架 | 已完成 | `app/`，含 Vite + Capacitor + android/ |
 | F-02 | EPUB 解析与章节加载 | 已完成 | jszip + OPF/spine；章节内插图 blob 解析 |
 | F-03 | 自定义逐词渲染器 | 已完成 | ChapterContent，无 iframe |
-| F-04 | 本地持久化（SQLite/IndexedDB） | 进行中 | 词典 IndexedDB；章节 localStorage；EPUB 文件已存手机 Data 目录 |
+| F-04 | 本地持久化（SQLite/IndexedDB） | 进行中 | 词典 IndexedDB + ECDICT SQLite；章节 localStorage；EPUB 存 Data 目录 |
 | M-01 | 手机 EPUB 文件选择导入 | 已完成 | @capawesome/capacitor-file-picker |
 | M-02 | 继续阅读上次书籍（手机） | 已完成 | Filesystem + Preferences |
 | M-03 | GitHub Actions 云端打 APK | 已完成 | `.github/workflows/build-apk.yml` |
@@ -121,8 +123,10 @@
 | W-14 | 词组：获取/补充/清空 | 已完成 | 有道 phrs；缓存统计已添加词组单词数 |
 | W-07 | 「已掌握」开关（隐藏行间翻译） | 已完成 | 弹窗切换；Preferences 持久化 |
 | W-08 | 联网词典查询（免费 API） | 已完成 | 有道主 + 金山词霸备；设置页展示信源与状态 |
-| W-09 | 本地词典缓存 | 已完成 | IndexedDB |
-| W-10 | 词形还原（大小写/变体→原型） | 进行中 | compromise + 不规则表 |
+| W-08b | ECDICT 本地全量词典 | 已完成 | `public/dict/ecdict.db`；`npm run dict:build`；sql.js 查询 |
+| W-08c | 弹窗本地/网络双面板 | 已完成 | 默认本地（音标/释义/等级/COCA·BNC·柯林斯/变体）；「网络」切换有道/词霸旧逻辑 |
+| W-09 | 本地词典缓存 | 已完成 | IndexedDB 仅存联网词条；ECDICT 不写入 |
+| W-10 | 词形还原（大小写/变体→原型） | 已完成 | ECDICT lemma_map 优先 + compromise 兜底 |
 | W-11 | 导出/导入用户数据包 | 待开始 | 含词典、笔记、已掌握、notFound；先完成备份目录设置 |
 | W-13 | 默认数据备份目录 | 已完成 | 应用设置页选择目录 |
 | W-12 | 查词信源状态监控 | 已完成 | 应用设置页；阅读设置保留缓存调试 |
@@ -185,4 +189,4 @@
 1. ~~免费词典 API 选哪个？~~ → 已定为有道 jsonapi_s
 2. 木质书架皮肤：纯 CSS 还是用切图？
 3. 主设置完整范围 — 需求文档写「后续慢慢讲」
-4. 是否显示 BNC/COCA 词频？有道不提供，是否叠加 ECDICT？
+4. ~~是否显示 BNC/COCA 词频？有道不提供，是否叠加 ECDICT？~~ → 已集成 ECDICT：BNC/当代语料/柯林斯/牛津核心；查词优先本地全库

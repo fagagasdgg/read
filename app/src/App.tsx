@@ -3,6 +3,7 @@ import { AppShellThemeProvider } from './contexts/AppShellThemeContext'
 import { HomeShell } from './components/home/HomeShell'
 import { ReaderScreen } from './components/reader/ReaderScreen'
 import { DictDebugPage } from './pages/DictDebugPage'
+import { prefetchEcdict } from './services/dictionary'
 import { DEFAULT_APP_SHELL_THEME, type AppShellThemeId } from './services/settings/appShellTheme'
 import { loadUserSettings } from './services/settings/userSettings'
 import './App.css'
@@ -19,6 +20,7 @@ function App() {
     void loadUserSettings().then((settings) => {
       setAppShellThemeId(settings.appShellThemeId)
     })
+    prefetchEcdict()
   }, [])
 
   function openBook(bookId: string) {

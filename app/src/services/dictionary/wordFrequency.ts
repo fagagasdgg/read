@@ -83,10 +83,24 @@ export function formatWordFrequency(info: WordFrequencyInfo): string[] {
   if (info.examFrequency !== undefined) {
     lines.push(`真题频次 ${info.examFrequency}`)
   }
+  if (info.bnc !== undefined) {
+    lines.push(`BNC ${info.bnc}`)
+  }
+  if (info.frq !== undefined) {
+    lines.push(`当代语料 ${info.frq}`)
+  }
+  if (info.oxford) {
+    lines.push('牛津核心')
+  }
   return lines
 }
 
 export function isFrequencyComplete(info: WordFrequencyInfo | undefined): boolean {
   if (!info) return false
-  return info.collinsStar !== undefined || info.examFrequency !== undefined
+  return (
+    info.collinsStar !== undefined ||
+    info.examFrequency !== undefined ||
+    info.bnc !== undefined ||
+    info.frq !== undefined
+  )
 }

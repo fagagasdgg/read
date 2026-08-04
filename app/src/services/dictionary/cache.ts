@@ -4,8 +4,8 @@ import {
   isWordEntry,
   isWordNotFoundMarker,
   type DictionaryCacheValue,
-  type DictionarySourceId,
   type ExamLevel,
+  type OnlineDictionarySourceId,
   type WordDefinition,
   type WordEntry,
   type WordForm,
@@ -231,13 +231,15 @@ function normalizeCacheValue(value: unknown, fallbackLemma: string): DictionaryC
 
   if (item.notFound === true || item.notFound === 'true') {
     const triedSources = Array.isArray(item.triedSources)
-      ? (item.triedSources.filter((id) => id === 'youdao' || id === 'iciba') as DictionarySourceId[])
-      : (['youdao'] as DictionarySourceId[])
+      ? (item.triedSources.filter(
+          (id) => id === 'youdao' || id === 'iciba',
+        ) as OnlineDictionarySourceId[])
+      : (['youdao'] as OnlineDictionarySourceId[])
     return {
       lemma,
       notFound: true,
       cachedAt,
-      triedSources: triedSources.length ? triedSources : ['youdao'],
+      triedSources: triedSources.length ? triedSources : (['youdao'] as OnlineDictionarySourceId[]),
     }
   }
 
@@ -280,14 +282,35 @@ function normalizeCacheValue(value: unknown, fallbackLemma: string): DictionaryC
               typeof (item.frequency as { examFrequency?: unknown }).examFrequency === 'number'
                 ? (item.frequency as { examFrequency: number }).examFrequency
                 : undefined,
+            bnc:
+              typeof (item.frequency as { bnc?: unknown }).bnc === 'number'
+                ? (item.frequency as { bnc: number }).bnc
+                : undefined,
+            frq:
+              typeof (item.frequency as { frq?: unknown }).frq === 'number'
+                ? (item.frequency as { frq: number }).frq
+                : undefined,
+            oxford:
+              typeof (item.frequency as { oxford?: unknown }).oxford === 'boolean'
+                ? (item.frequency as { oxford: boolean }).oxford
+                : undefined,
             fetchedAt:
               typeof (item.frequency as { fetchedAt?: unknown }).fetchedAt === 'number'
                 ? (item.frequency as { fetchedAt: number }).fetchedAt
                 : Date.now(),
           }
         : undefined,
+    definitionEn: typeof item.definitionEn === 'string' ? item.definitionEn : undefined,
+    posDist: typeof item.posDist === 'string' ? item.posDist : undefined,
+    exchange: typeof item.exchange === 'string' ? item.exchange : undefined,
+    detail: typeof item.detail === 'string' ? item.detail : undefined,
     cachedAt,
-    source: item.source === 'iciba' ? 'iciba' : 'youdao',
+    source:
+      item.source === 'iciba'
+        ? 'iciba'
+        : item.source === 'ecdict'
+          ? 'ecdict'
+          : 'youdao',
   }
 }
 

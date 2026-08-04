@@ -10,8 +10,16 @@ import {
   shouldRetryNotFound,
 } from './cache'
 import { fetchFrequencyForLemmaIfMissing } from './batchFrequency'
+import { lookupEcdictExact, lookupFromEcdict, getEcdictDb } from './ecdict'
 import { fetchWordFromProviders } from './lookup'
-import { isWordEntry, isWordNotFoundMarker, type DictionaryCacheValue, type LookupOptions, type WordEntry } from './types'
+import { resolveLemma } from './resolveLemma'
+import {
+  isWordEntry,
+  isWordNotFoundMarker,
+  type DictionaryCacheValue,
+  type LookupOptions,
+  type WordEntry,
+} from './types'
 
 export type {
   LookupOptions,
@@ -42,26 +50,77 @@ export {
 } from './sourceStatus'
 export type { SourceHealth, SourceStatusView } from './sourceStatus'
 export { playSpeech, playSpeechWord, playSpeechWithFallback } from './speech'
+export { isEcdictReady, lookupEcdictLemma, lookupFromEcdict } from './ecdict'
+export { resolveLemma } from './resolveLemma'
 
-async function cacheVariantForms(entry: WordEntry): Promise<void> {
+/** 预热 ECDICT（后台加载），避免首次点词卡顿 */
+export function prefetchEcdict(): void {
+  void getEcdictDb()
+}
+
+function isOnlineCacheEntry(record: DictionaryCacheValue | null | undefined): record is WordEntry {
+  return Boolean(record && isWordEntry(record) && record.source !== 'ecdict')
+}
+
+function getSkipSources(record: DictionaryCacheValue | undefined) {
+  if (!record || !isWordNotFoundMarker(record)) return []
+  return record.triedSources ?? ['youdao']
+}
+
+/** 仅查 ECDICT，绝不写入 IndexedDB 词条缓存 */
+export async function lookupLocalWord(
+  rawWord: string,
+  options: LookupOptions = {},
+): Promise<WordEntry | null> {
+  const surface = normalizeWordToken(rawWord)
+  if (!surface) return null
+
+  if (options.exactToken) {
+    const exact = await lookupEcdictExact(surface)
+    if (exact) return exact
+    return lookupFromEcdict(surface)
+  }
+
+  const lemma = await resolveLemma(rawWord, false)
+  if (!lemma) return null
+
+  const byLemma = await lookupEcdictExact(lemma)
+  if (byLemma) return byLemma
+
+  if (lemma !== surface) {
+    return lookupEcdictExact(surface)
+  }
+  return null
+}
+
+/** @deprecated 与 lookupLocalWord 相同，保留别名 */
+export async function lookupLocalWordDetailed(
+  rawWord: string,
+  options: LookupOptions = {},
+): Promise<WordEntry | null> {
+  return lookupLocalWord(rawWord, options)
+}
+
+async function cacheOnlineVariantForms(entry: WordEntry): Promise<void> {
+  if (entry.source === 'ecdict') return
+
   const tasks = entry.forms.map(async (form) => {
     const token = extractVariantLookupWord(form.value)
     if (!token) return
-    const lemma = normalizeWordToken(token)
-    if (!lemma || lemma === entry.lemma) return
+    const key = normalizeWordToken(token)
+    if (!key || key === entry.lemma) return
+    if (await isLemmaMarkedNotFound(key)) return
 
-    if (await isLemmaMarkedNotFound(lemma)) return
-
-    const existing = await getCachedRecord(lemma)
-    if (existing) return
+    const existing = await getCachedRecord(key)
+    if (isOnlineCacheEntry(existing)) return
 
     try {
-      const variantEntry = await fetchWordFromProviders(lemma)
+      const variantEntry = await fetchWordFromProviders(key)
       if (variantEntry) {
         await setCachedWord(variantEntry)
         return
       }
-      await setNotFoundLemma(lemma)
+      await setNotFoundLemma(key)
     } catch {
       // 变体预取失败不影响主词
     }
@@ -70,32 +129,19 @@ async function cacheVariantForms(entry: WordEntry): Promise<void> {
   await Promise.all(tasks)
 }
 
-function getSkipSources(record: DictionaryCacheValue | undefined) {
-  if (!record || !isWordNotFoundMarker(record)) return []
-  return record.triedSources ?? ['youdao']
-}
-
-function buildLookupKeys(rawWord: string, exactToken: boolean): string[] {
-  const surface = normalizeWordToken(rawWord)
-  if (!surface) return []
-  if (exactToken) return [surface]
-
-  const lemma = toLemma(rawWord)
-  if (lemma && lemma !== surface) return [surface, lemma]
-  return [surface]
-}
-
-async function lookupSingleKey(
+async function lookupOnlineSingleKey(
   key: string,
   options: LookupOptions,
 ): Promise<{ entry: WordEntry; fromCache: boolean } | 'miss' | 'blocked'> {
   const record = !options.forceRefresh ? await getCachedRecord(key) : null
 
-  if (record) {
-    if (isWordEntry(record)) return { entry: record, fromCache: true }
-    if (isWordNotFoundMarker(record) && !shouldRetryNotFound(record)) {
-      return 'blocked'
-    }
+  // 旧会话可能误写入了 ecdict，联网模式跳过，改走真联网
+  if (isOnlineCacheEntry(record)) {
+    return { entry: record, fromCache: true }
+  }
+
+  if (record && isWordNotFoundMarker(record) && !shouldRetryNotFound(record)) {
+    return 'blocked'
   }
 
   try {
@@ -104,7 +150,7 @@ async function lookupSingleKey(
     })
     if (!entry) return 'miss'
     await setCachedWord(entry)
-    void cacheVariantForms(entry)
+    void cacheOnlineVariantForms(entry)
     void fetchFrequencyForLemmaIfMissing(entry.lemma)
     return { entry, fromCache: false }
   } catch {
@@ -113,32 +159,51 @@ async function lookupSingleKey(
 }
 
 /**
- * 查词：先全小写原词，未命中再试词形还原（兼容旧缓存中的 tell/book 等）。
- * 弹窗标题使用返回词条的 entry.lemma：
- * - 原词直接命中 → 多为该词本身（如 unperturbed）
- * - 靠还原命中 → 为原型（如 told→tell），与以往展示一致
- * 词形变体仍在「变体」区展示。
+ * 联网查词（有道/词霸 + IndexedDB 缓存），不读 ECDICT 释义。
+ * 查询键：已还原的原型（或 exactToken 表面形）。
+ */
+export async function lookupOnlineWord(
+  rawWord: string,
+  options: LookupOptions = {},
+): Promise<WordEntry | null> {
+  const surface = normalizeWordToken(rawWord)
+  if (!surface) return null
+
+  const lemma = await resolveLemma(rawWord, Boolean(options.exactToken))
+  const keys =
+    !options.exactToken && lemma && lemma !== surface ? [lemma, surface] : [surface]
+
+  for (const key of keys) {
+    const result = await lookupOnlineSingleKey(key, options)
+    if (result === 'blocked' || result === 'miss') continue
+    if (key !== surface) {
+      await setCachedWordAlias(surface, result.entry)
+    }
+    return result.entry
+  }
+
+  // 仅标记表面形 notFound，避免污染原型缓存
+  await setNotFoundLemma(surface)
+  return null
+}
+
+/**
+ * 弹窗默认路径：本地优先；无本地再联网。
+ * 注意：本地命中不写入词条缓存；仅联网结果写入。
  */
 export async function lookupWordDetailed(
   rawWord: string,
   options: LookupOptions = {},
-): Promise<{ entry: WordEntry; fromCache: boolean } | null> {
-  const keys = buildLookupKeys(rawWord, Boolean(options.exactToken))
-  if (!keys.length) return null
-
-  const surface = keys[0]
-
-  for (const key of keys) {
-    const result = await lookupSingleKey(key, options)
-    if (result === 'blocked' || result === 'miss') continue
-    // 还原命中时，把词条也挂到原词 key，下次点原词可直接命中缓存；标题仍用 entry.lemma（原型）
-    if (key !== surface) {
-      await setCachedWordAlias(surface, result.entry)
-    }
-    return result
+): Promise<{ entry: WordEntry; fromCache: boolean; sourceMode: 'local' | 'online' } | null> {
+  const local = await lookupLocalWord(rawWord, options)
+  if (local) {
+    return { entry: local, fromCache: false, sourceMode: 'local' }
   }
 
-  await setNotFoundLemma(surface)
+  const online = await lookupOnlineWord(rawWord, options)
+  if (online) {
+    return { entry: online, fromCache: true, sourceMode: 'online' }
+  }
   return null
 }
 
@@ -150,7 +215,10 @@ export async function lookupWord(
   return result?.entry ?? null
 }
 
-/** 批量查词：每个 key 先查自身，再试 toLemma；结果挂到请求的 key 上 */
+/**
+ * 批量补全：先 ECDICT（不写缓存）再联网（写缓存）。
+ * 供行间翻译使用。
+ */
 export async function lookupLemmasBatch(
   lemmas: string[],
   options: { prefetchVariants?: boolean } = {},
@@ -159,9 +227,16 @@ export async function lookupLemmasBatch(
   const found = new Map<string, WordEntry>()
   if (!unique.length) return found
 
+  const resolved = new Map<string, string>()
+  await Promise.all(
+    unique.map(async (key) => {
+      resolved.set(key, await resolveLemma(key, false))
+    }),
+  )
+
   const altUnique = [
     ...new Set(
-      unique.map((key) => toLemma(key)).filter((lemma) => Boolean(lemma) && !unique.includes(lemma)),
+      [...resolved.values()].filter((lemma) => Boolean(lemma) && !unique.includes(lemma)),
     ),
   ]
   const records = await getCachedRecords([...unique, ...altUnique])
@@ -169,16 +244,26 @@ export async function lookupLemmasBatch(
   const missing: string[] = []
 
   for (const key of unique) {
+    try {
+      const local = await lookupFromEcdict(key)
+      if (local) {
+        found.set(key, local)
+        continue
+      }
+    } catch {
+      // continue
+    }
+
     const direct = records.get(key)
-    if (direct && isWordEntry(direct)) {
+    if (isOnlineCacheEntry(direct)) {
       found.set(key, direct)
       continue
     }
 
-    const lemma = toLemma(key)
+    const lemma = resolved.get(key) || toLemma(key)
     if (lemma && lemma !== key) {
       const viaLemma = records.get(lemma)
-      if (viaLemma && isWordEntry(viaLemma)) {
+      if (isOnlineCacheEntry(viaLemma)) {
         found.set(key, viaLemma)
         continue
       }
@@ -203,7 +288,9 @@ export async function lookupLemmasBatch(
   let index = 0
 
   async function processKey(key: string): Promise<void> {
-    const candidates = buildLookupKeys(key, false)
+    const lemma = resolved.get(key) || key
+    const candidates = lemma !== key ? [lemma, key] : [key]
+
     for (const candidate of candidates) {
       const prior = records.get(candidate)
       if (prior && isWordNotFoundMarker(prior) && !shouldRetryNotFound(prior)) {
@@ -220,11 +307,11 @@ export async function lookupLemmasBatch(
         }
         found.set(key, entry)
         if (options.prefetchVariants) {
-          void cacheVariantForms(entry)
+          void cacheOnlineVariantForms(entry)
         }
         return
       } catch {
-        // try next candidate
+        // try next
       }
     }
     await setNotFoundLemma(key)
@@ -244,26 +331,44 @@ export async function lookupLemmasBatch(
   return found
 }
 
-/** 仅从本地缓存解析词条（不联网）；若 key 未命中会再试 toLemma */
+/** 仅本地：ECDICT + 非 ecdict 的 IndexedDB 缓存，不联网、ECDICT 不写缓存 */
 export async function lookupLemmasLocal(lemmas: string[]): Promise<Map<string, WordEntry>> {
   const unique = [...new Set(lemmas.filter(Boolean))]
+  const found = new Map<string, WordEntry>()
+
+  const resolved = new Map<string, string>()
+  await Promise.all(
+    unique.map(async (key) => {
+      resolved.set(key, await resolveLemma(key, false))
+    }),
+  )
   const altUnique = [
     ...new Set(
-      unique.map((key) => toLemma(key)).filter((lemma) => lemma && !unique.includes(lemma)),
+      [...resolved.values()].filter((lemma) => lemma && !unique.includes(lemma)),
     ),
   ]
   const records = await getCachedRecords([...unique, ...altUnique])
-  const found = new Map<string, WordEntry>()
+
   for (const key of unique) {
+    try {
+      const local = await lookupFromEcdict(key)
+      if (local) {
+        found.set(key, local)
+        continue
+      }
+    } catch {
+      // ignore
+    }
+
     const direct = records.get(key)
-    if (direct && isWordEntry(direct)) {
+    if (isOnlineCacheEntry(direct)) {
       found.set(key, direct)
       continue
     }
-    const lemma = toLemma(key)
+    const lemma = resolved.get(key) || toLemma(key)
     if (lemma && lemma !== key) {
       const viaLemma = records.get(lemma)
-      if (viaLemma && isWordEntry(viaLemma)) found.set(key, viaLemma)
+      if (isOnlineCacheEntry(viaLemma)) found.set(key, viaLemma)
     }
   }
   return found

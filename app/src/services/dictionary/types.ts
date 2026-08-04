@@ -1,4 +1,5 @@
-export type DictionarySourceId = 'youdao' | 'iciba'
+export type OnlineDictionarySourceId = 'youdao' | 'iciba'
+export type DictionarySourceId = OnlineDictionarySourceId | 'ecdict'
 
 export type ExamLevel =
   | '中考'
@@ -25,6 +26,14 @@ export interface WordFrequencyInfo {
   collinsStar?: number
   /** 有道真题出现次数 */
   examFrequency?: number
+  /** ECDICT BNC 词频序号（越小越常见） */
+  bnc?: number
+  /** ECDICT 当代语料词频序号（UI 展示为 COCA；越小越常见） */
+  frq?: number
+  /** @deprecated 使用 frq；兼容旧字段名 */
+  coca?: number
+  /** 是否牛津 3000 核心词 */
+  oxford?: boolean
   fetchedAt: number
 }
 
@@ -38,6 +47,14 @@ export interface WordEntry {
   definitions: WordDefinition[]
   forms: WordForm[]
   frequency?: WordFrequencyInfo
+  /** ECDICT 英文释义原文 */
+  definitionEn?: string
+  /** ECDICT 词性分布，如 n:46/v:54 */
+  posDist?: string
+  /** ECDICT exchange 原文字段 */
+  exchange?: string
+  /** ECDICT detail JSON 原文 */
+  detail?: string
   cachedAt: number
   source: DictionarySourceId
 }
@@ -47,7 +64,7 @@ export interface WordNotFoundMarker {
   lemma: string
   notFound: true
   cachedAt: number
-  triedSources: DictionarySourceId[]
+  triedSources: OnlineDictionarySourceId[]
 }
 
 export type DictionaryCacheValue = WordEntry | WordNotFoundMarker

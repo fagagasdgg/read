@@ -47,6 +47,17 @@ function rankOf(level: string): number {
 export function normalizeExamTag(tag: string): string {
   const raw = tag.trim()
   const upper = raw.toUpperCase()
+  const lower = raw.toLowerCase()
+
+  // ECDICT tag 简写
+  if (lower === 'zk') return '中考'
+  if (lower === 'gk') return '高考'
+  if (lower === 'cet4') return 'CET4'
+  if (lower === 'cet6') return 'CET6'
+  if (lower === 'ky') return '考研'
+  if (lower === 'ielts') return '雅思'
+  if (lower === 'toefl') return '托福'
+  if (lower === 'gre') return 'GRE'
 
   if (upper.includes('CET4') || raw.includes('四级')) return 'CET4'
   if (upper.includes('CET6') || raw.includes('六级')) return 'CET6'

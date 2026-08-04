@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
 import { normalizeWordToken } from '../../lib/lemmatize'
+import { resolveLemma } from '../dictionary/resolveLemma'
 import { fetchPhrasesOnline, type FetchedPhrase } from '../dictionary/fetchPhrases'
 
 export interface WordPhraseItem {
@@ -83,45 +84,124 @@ function toNetworkItems(phrases: FetchedPhrase[]): WordPhraseItem[] {
   }))
 }
 
+/**
+ * 词组存储键：ECDICT 原型优先，兼容旧数据中的表面形 key。
+ * 已掌握 / 本地释义 / 词组共用同一原型，避免 grains/grain 分裂。
+ */
+async function resolvePhraseLemmaKeys(rawLemma: string): Promise<{ primary: string; aliases: string[] }> {
+  const surface = normalizeWordToken(rawLemma)
+  if (!surface) return { primary: '', aliases: [] }
+  const lemma = await resolveLemma(rawLemma, false)
+  const primary = lemma || surface
+  const aliases = surface !== primary ? [surface] : []
+  return { primary, aliases }
+}
+
+function pickRecord(
+  store: Record<string, WordPhraseRecord>,
+  primary: string,
+  aliases: string[],
+): { key: string; record: WordPhraseRecord } | null {
+  if (store[primary]) return { key: primary, record: store[primary] }
+  for (const alias of aliases) {
+    if (store[alias]) return { key: alias, record: store[alias] }
+  }
+  return null
+}
+
+/** 若词组落在旧表面 key 上，迁移到原型 key（合并，不丢数据） */
+async function migratePhraseToPrimary(
+  store: Record<string, WordPhraseRecord>,
+  primary: string,
+  foundKey: string,
+  record: WordPhraseRecord,
+): Promise<WordPhraseRecord> {
+  if (foundKey === primary) return record
+
+  const existing = store[primary]
+  const mergedItems = [...(existing?.items ?? [])]
+  const keys = new Set(mergedItems.map((item) => normalizePhraseKey(item.phrase)))
+  for (const item of record.items) {
+    const pk = normalizePhraseKey(item.phrase)
+    if (keys.has(pk)) continue
+    keys.add(pk)
+    mergedItems.push(item)
+  }
+
+  const next: WordPhraseRecord = {
+    lemma: primary,
+    fetchedAt: existing?.fetchedAt ?? record.fetchedAt,
+    fetchSource: existing?.fetchSource ?? record.fetchSource,
+    items: mergedItems,
+  }
+  store[primary] = next
+  delete store[foundKey]
+  await writeStore(store)
+  return next
+}
+
 export async function getWordPhraseRecord(rawLemma: string): Promise<WordPhraseRecord | null> {
-  const lemma = normalizeWordToken(rawLemma)
-  if (!lemma) return null
+  const { primary, aliases } = await resolvePhraseLemmaKeys(rawLemma)
+  if (!primary) return null
 
   const store = await readStore()
-  return store[lemma] ?? null
+  const found = pickRecord(store, primary, aliases)
+  if (!found) return null
+
+  if (found.key !== primary) {
+    return migratePhraseToPrimary(store, primary, found.key, found.record)
+  }
+  return found.record
 }
 
 export async function fetchAndSaveWordPhrases(rawLemma: string): Promise<WordPhraseRecord> {
-  const lemma = normalizeWordToken(rawLemma)
-  if (!lemma) throw new Error('无效单词')
+  const { primary, aliases } = await resolvePhraseLemmaKeys(rawLemma)
+  if (!primary) throw new Error('无效单词')
 
-  const phrases = await fetchPhrasesOnline(lemma)
+  const phrases = await fetchPhrasesOnline(primary)
+  const store = await readStore()
+  const legacy = pickRecord(store, primary, aliases)
+
+  const networkItems = toNetworkItems(phrases)
+  const manualItems =
+    legacy?.record.items.filter((item) => item.source === 'manual') ?? []
+  const keys = new Set(networkItems.map((item) => normalizePhraseKey(item.phrase)))
+  const mergedManual = manualItems.filter((item) => !keys.has(normalizePhraseKey(item.phrase)))
+
   const record: WordPhraseRecord = {
-    lemma,
+    lemma: primary,
     fetchedAt: Date.now(),
     fetchSource: 'youdao',
-    items: toNetworkItems(phrases),
+    items: [...networkItems, ...mergedManual],
   }
 
-  const store = await readStore()
-  store[lemma] = record
+  store[primary] = record
+  for (const alias of aliases) {
+    if (alias !== primary) delete store[alias]
+  }
   await writeStore(store)
   return record
 }
 
 /** 标记已获取但结果为空，便于用户手动补充 */
 export async function markWordPhrasesFetchedEmpty(rawLemma: string): Promise<WordPhraseRecord> {
-  const lemma = normalizeWordToken(rawLemma)
-  if (!lemma) throw new Error('无效单词')
+  const { primary, aliases } = await resolvePhraseLemmaKeys(rawLemma)
+  if (!primary) throw new Error('无效单词')
 
   const store = await readStore()
+  const legacy = pickRecord(store, primary, aliases)
+  const manualItems = legacy?.record.items.filter((item) => item.source === 'manual') ?? []
+
   const record: WordPhraseRecord = {
-    lemma,
+    lemma: primary,
     fetchedAt: Date.now(),
     fetchSource: 'youdao',
-    items: [],
+    items: manualItems,
   }
-  store[lemma] = record
+  store[primary] = record
+  for (const alias of aliases) {
+    if (alias !== primary) delete store[alias]
+  }
   await writeStore(store)
   return record
 }
@@ -131,14 +211,16 @@ export async function addManualWordPhrase(
   phrase: string,
   translation: string,
 ): Promise<WordPhraseRecord> {
-  const lemma = normalizeWordToken(rawLemma)
+  const { primary } = await resolvePhraseLemmaKeys(rawLemma)
   const phraseText = phrase.trim()
   const translationText = translation.trim()
-  if (!lemma) throw new Error('无效单词')
+  if (!primary) throw new Error('无效单词')
   if (!phraseText || !translationText) throw new Error('请填写词组和释义')
 
   const store = await readStore()
-  const existing = store[lemma] ?? emptyRecord(lemma)
+  // 先尝试迁移旧 key
+  const existingRecord = await getWordPhraseRecord(primary)
+  const existing = existingRecord ?? emptyRecord(primary)
   if (!existing.fetchedAt) {
     throw new Error('请先获取词组，或等待获取完成后再补充')
   }
@@ -150,6 +232,7 @@ export async function addManualWordPhrase(
 
   const next: WordPhraseRecord = {
     ...existing,
+    lemma: primary,
     items: [
       ...existing.items,
       {
@@ -162,20 +245,28 @@ export async function addManualWordPhrase(
     ],
   }
 
-  store[lemma] = next
+  store[primary] = next
   await writeStore(store)
   return next
 }
 
 export async function clearWordPhrases(rawLemma: string): Promise<void> {
-  const lemma = normalizeWordToken(rawLemma)
-  if (!lemma) return
+  const { primary, aliases } = await resolvePhraseLemmaKeys(rawLemma)
+  if (!primary) return
 
   const store = await readStore()
-  if (!store[lemma]) return
-
-  delete store[lemma]
-  await writeStore(store)
+  let changed = false
+  if (store[primary]) {
+    delete store[primary]
+    changed = true
+  }
+  for (const alias of aliases) {
+    if (store[alias]) {
+      delete store[alias]
+      changed = true
+    }
+  }
+  if (changed) await writeStore(store)
 }
 
 export async function getWordPhraseCount(rawLemma: string): Promise<number> {

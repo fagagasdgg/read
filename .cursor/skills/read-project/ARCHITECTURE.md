@@ -88,7 +88,26 @@ UserSettings { englishLevel, inlineFontSize, inlineColor, maxMeanings, offsetX, 
 
 ## 词典 API（已确认）
 
-**主数据源：有道 `jsonapi_s`（免费，无需 API Key）**
+**查词分层（2026-08-04）**
+
+| 层 | 职责 | 是否写 IndexedDB |
+|----|------|------------------|
+| ECDICT 本地 | 词形还原、默认弹窗释义、行间翻译优先 | **否** |
+| IndexedDB 缓存 | 仅有道/词霸联网结果 | 是 |
+| 有道 / 词霸 | 「网络」面板与缺本地词时的回退 | 是 |
+
+**弹窗**：默认展示 ECDICT（音标、词性释义、考试标签、COCA=`frq`/BNC/柯林斯、exchange 变体）；发音与词组仍联网；标题旁「网络」⇄「本地」切换。联网面板逻辑与旧版一致（美/英音标、柯林斯+真题频次等）。
+
+**键统一**：`resolveLemma()`（ECDICT lemma_map → compromise）得到原型；已掌握、词组、弹窗标题共用该原型。旧表面形词组会在读取时迁移到原型 key。
+
+### ECDICT 本地全量
+
+- 构建：`app/scripts/build_ecdict_db.py`（`npm run dict:build`）
+- 产物：`app/public/dict/ecdict.db`（约 100MB+，gitignore；CI 构建时下载 CSV 生成）
+- 运行时：`sql.js`；`services/dictionary/ecdict.ts` / `resolveLemma.ts`
+- 发音仍走有道 TTS
+
+**联网主数据源：有道 `jsonapi_s`（免费，无需 API Key）**
 
 ```
 GET https://dict.youdao.com/jsonapi_s?doctype=json&jsonversion=4&q={单词}
@@ -99,20 +118,18 @@ GET https://dict.youdao.com/jsonapi_s?doctype=json&jsonversion=4&q={单词}
 - `exam_type` — 中考/高考/CET4/雅思…
 - `word.trs[]` — `{ pos, tran }` 中文释义
 - `word.wfs[]` — 词形变体
-美音：`https://dict.youdao.com/dictvoice?audio={lemma}&type=2`（**必须用 lemma 原文**，不可用 API 返回的 `usspeech` 字段，否则长词发音截断）
+美音：`https://dict.youdao.com/dictvoice?audio={lemma}&type=2`（**必须用 lemma 原文**）
 
-**本地缓存**：IndexedDB（库名 `read-dictionary`），`idb` 包。  
+**本地缓存**：IndexedDB（库名 `read-dictionary`），`idb` 包；**不含** ECDICT 全量。  
 **实现路径**：`app/src/services/dictionary/`
 
-**词形还原**：`compromise` + 不规则动词表，见 `app/src/lib/lemmatize.ts`
+**词形还原**：ECDICT `lemma_map` 优先，其次 `compromise`，见 `resolveLemma.ts`
 
 **开发环境跨域**：浏览器走 Vite 代理 `/api/youdao`；APK 内开启 `CapacitorHttp`。
 
-| 词典 | `services/dictionary/` | 联网查词 + 缓存 + 发音 + 信源状态 |
+| 词典 | `services/dictionary/` | ECDICT 本地 + 联网查词 + 缓存 + 发音 + 信源状态 |
 
-**为何选有道 + 词霸双信源**：有道字段与产品截图一致；词霸作国内备用。两者均为网页公开接口，无需用户登录；设置页可查看各信源健康度与可用率。
-
-**信源状态**：`sourceStatus.ts` 记录每次联网 hit/miss/error，持久化到 Preferences；设置页可手动「检测信源」（探测词 hello）。
+**信源状态**：仅统计有道/词霸联网；ECDICT 不参与探测。
 
 ## 目录结构（当前）
 

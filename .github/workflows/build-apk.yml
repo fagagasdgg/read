@@ -30,6 +30,25 @@ jobs:
           npm -v
           npm install --no-audit --no-fund
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build ECDICT SQLite
+        working-directory: app
+        run: |
+          mkdir -p /tmp/ecdict
+          curl -L --retry 5 --retry-delay 5 -o /tmp/ecdict/ecdict.csv \
+            https://github.com/skywind3000/ECDICT/raw/master/ecdict.csv
+          curl -L --retry 5 --retry-delay 5 -o /tmp/ecdict/lemma.en.txt \
+            https://github.com/skywind3000/ECDICT/raw/master/lemma.en.txt
+          python scripts/build_ecdict_db.py \
+            --csv /tmp/ecdict/ecdict.csv \
+            --lemma /tmp/ecdict/lemma.en.txt \
+            --out public/dict/ecdict.db
+          ls -lh public/dict/ecdict.db
+
       - name: Build web assets
         working-directory: app
         run: npm run build

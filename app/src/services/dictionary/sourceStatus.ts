@@ -3,7 +3,7 @@ import { Preferences } from '@capacitor/preferences'
 import { fetchFromIciba } from './iciba'
 import { DICTIONARY_SOURCES } from './providers'
 import { fetchFromYoudao } from './youdao'
-import type { DictionarySourceId } from './types'
+import type { OnlineDictionarySourceId } from './types'
 
 export type SourceHealth = 'unknown' | 'healthy' | 'degraded' | 'offline'
 
@@ -21,7 +21,7 @@ interface SourceCounters {
 }
 
 export interface SourceStatusView {
-  id: DictionarySourceId
+  id: OnlineDictionarySourceId
   label: string
   role: 'primary' | 'fallback'
   health: SourceHealth
@@ -39,7 +39,7 @@ const STORAGE_KEY = 'read-dictionary-source-stats'
 const RECENT_LIMIT = 30
 const PROBE_WORD = 'hello'
 
-type StatsMap = Record<DictionarySourceId, SourceCounters>
+type StatsMap = Record<OnlineDictionarySourceId, SourceCounters>
 
 const listeners = new Set<() => void>()
 
@@ -155,7 +155,7 @@ function healthLabel(health: SourceHealth): string {
   }
 }
 
-function toView(id: DictionarySourceId, counter: SourceCounters): SourceStatusView {
+function toView(id: OnlineDictionarySourceId, counter: SourceCounters): SourceStatusView {
   const meta = DICTIONARY_SOURCES.find((item) => item.id === id)!
   const totalChecks = counter.hit + counter.miss + counter.error
   const successRate =
@@ -188,7 +188,7 @@ export async function getDictionarySourceStatus(): Promise<SourceStatusView[]> {
 }
 
 export async function recordSourceOutcome(
-  sourceId: DictionarySourceId,
+  sourceId: OnlineDictionarySourceId,
   outcome: SourceOutcome,
   errorMessage = '',
 ): Promise<void> {
@@ -216,7 +216,7 @@ export async function recordSourceOutcome(
 }
 
 export async function probeDictionarySources(): Promise<SourceStatusView[]> {
-  const fetchers: Record<DictionarySourceId, (word: string) => Promise<unknown>> = {
+  const fetchers: Record<OnlineDictionarySourceId, (word: string) => Promise<unknown>> = {
     youdao: fetchFromYoudao,
     iciba: fetchFromIciba,
   }

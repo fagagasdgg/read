@@ -1,7 +1,7 @@
 # 项目结构
 
 > 按 `xq/需求.md` §98.1 维护。每次新增/删除/重命名文件后更新本文档。
-> Last updated: 2026-07-22
+> Last updated: 2026-08-04
 
 ```
 read/
@@ -14,15 +14,21 @@ read/
 ├── GITHUB_BUILD.md                  # GitHub Actions 云端打包
 │
 ├── .github/workflows/
-│   └── build-apk.yml                # 推送 main 自动打 debug APK
+│   └── build-apk.yml                # 推送 main 自动打 debug APK（含 ECDICT 构建）
 │
 ├── app/                             # 主应用（Capacitor + React + TypeScript）
 │   ├── vite.config.ts               # Vite；含 /api/youdao、/api/youdao-fanyi 代理
 │   ├── capacitor.config.ts          # Capacitor；CapacitorHttp
+│   ├── scripts/
+│   │   └── build_ecdict_db.py       # ECDICT CSV → public/dict/ecdict.db
+│   ├── public/
+│   │   └── dict/
+│   │       ├── .gitkeep
+│   │       └── ecdict.db            # 本地生成，约 100MB+（gitignore）
 │   │
 │   ├── src/
 │   │   ├── main.tsx                 # React 入口
-│   │   ├── App.tsx                  # 根组件；阅读器 / 词典联调 切换
+│   │   ├── App.tsx                  # 根组件；预热 ECDICT；阅读器 / 词典联调 切换
 │   │   ├── App.css                  # 全局 UI 样式
 │   │   │
 │   │   ├── pages/
@@ -76,11 +82,13 @@ read/
 │   │   │   └── lemmatize.ts         # 词形还原
 │   │   │
 │   │   └── services/
-│   │       ├── dictionary/          # 有道 + 词霸 API、缓存、信源状态
+│   │       ├── dictionary/          # ECDICT 本地 + 有道/词霸、缓存、信源状态
+│   │       │   ├── ecdict.ts        # sql.js 查询本地全量库
+│   │       │   ├── resolveLemma.ts  # ECDICT 优先的词形还原（供词组/已掌握共用）
 │   │       │   ├── youdao.ts
 │   │       │   ├── iciba.ts
-│   │       │   ├── lookup.ts        # 多信源串联查词
-│   │       │   ├── wordFrequency.ts # 有道词频（柯林斯星级、真题频次）
+│   │       │   ├── lookup.ts        # 多信源串联查词（联网）
+│   │       │   ├── wordFrequency.ts # 词频展示（柯林斯/真题/BNC/当代）
 │   │       │   ├── batchFrequency.ts # 批量补全词频
 │   │       │   ├── manualWord.ts    # 手动词条校验与保存
 │   │       │   ├── providers.ts     # 信源元数据
@@ -89,7 +97,7 @@ read/
 │   │       │   ├── cache.ts
 │   │       │   ├── speech.ts        # 内联 Audio 播放
 │   │       │   ├── types.ts
-│   │       │   └── index.ts
+│   │       │   └── index.ts        # 查词编排：缓存→ECDICT→联网
 │   │       ├── words/
 │   │       │   ├── mastered.ts      # 已掌握单词列表
 │   │       │   └── phrases.ts       # 按 lemma 存储词组（联网+手动）
@@ -157,7 +165,7 @@ read/
 | 阅读进度 | `services/epub/progress.ts` | chapterIndex + pageIndex |
 | 阅读设置存储 | `services/settings/readingSettings.ts` | Preferences / localStorage |
 | 用户设置 | `services/settings/userSettings.ts` | 英语水平、行间翻译词性/释义数、字号颜色偏移 |
-| 词典 | `services/dictionary/` | 联网查词 + 缓存 + 发音 |
+| 词典 | `services/dictionary/` | ECDICT 本地 + 联网查词 + 缓存 + 发音 |
 
 ## 计划中（尚未创建）
 

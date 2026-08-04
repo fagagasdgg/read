@@ -2,14 +2,14 @@ import { fetchFromIciba } from './iciba'
 import { DICTIONARY_SOURCES } from './providers'
 import { recordSourceOutcome } from './sourceStatus'
 import { fetchFromYoudao } from './youdao'
-import type { DictionarySourceId, WordEntry } from './types'
+import type { OnlineDictionarySourceId, WordEntry } from './types'
 
-const FETCHERS: Record<DictionarySourceId, (lemma: string) => Promise<WordEntry | null>> = {
+const FETCHERS: Record<OnlineDictionarySourceId, (lemma: string) => Promise<WordEntry | null>> = {
   youdao: fetchFromYoudao,
   iciba: fetchFromIciba,
 }
 
-async function trySource(sourceId: DictionarySourceId, lemma: string): Promise<WordEntry | null> {
+async function trySource(sourceId: OnlineDictionarySourceId, lemma: string): Promise<WordEntry | null> {
   try {
     const entry = await FETCHERS[sourceId](lemma)
     void recordSourceOutcome(sourceId, entry ? 'hit' : 'miss')
@@ -23,7 +23,7 @@ async function trySource(sourceId: DictionarySourceId, lemma: string): Promise<W
 
 export async function fetchWordFromProviders(
   lemma: string,
-  options: { skipSources?: DictionarySourceId[] } = {},
+  options: { skipSources?: OnlineDictionarySourceId[] } = {},
 ): Promise<WordEntry | null> {
   const skip = new Set(options.skipSources ?? [])
   for (const source of DICTIONARY_SOURCES) {
@@ -35,7 +35,7 @@ export async function fetchWordFromProviders(
 }
 
 export async function fetchWordFromProvider(
-  sourceId: DictionarySourceId,
+  sourceId: OnlineDictionarySourceId,
   lemma: string,
 ): Promise<WordEntry | null> {
   return trySource(sourceId, lemma)

@@ -2,6 +2,9 @@
 app/node_modules/
 app/dist/
 
+# ECDICT 全量库（约 100MB+，本地/CI 用 npm run dict:build 生成）
+app/public/dict/ecdict.db
+
 # Logs
 *.log
 npm-debug.log*
