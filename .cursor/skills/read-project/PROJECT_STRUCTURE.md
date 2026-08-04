@@ -43,12 +43,12 @@ read/
 │   │   │   └── HomeShell.tsx        # 底部 Tab：书架 / 笔记 / 统计 / 工具 / 设置
 │   │   ├── components/tools/
 │   │   │   ├── ToolsScreen.tsx      # 工具页
-│   │   │   └── WordFrequencyTool.tsx # 批量获取词频（柯林斯星级+真题频次）
+│   │   │   └── BookWordFrequencyTool.tsx # 全书词频统计（离线 ECDICT）
 │   │   ├── components/statistics/
 │   │   │   └── StatisticsScreen.tsx # 阅读时长 + 词汇统计（可展开收起）
 │   │   ├── components/notes/
-│   │   │   ├── NotesScreen.tsx      # 笔记本列表
-│   │   │   ├── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页）
+│   │   │   ├── NotesScreen.tsx      # 笔记 / 词频统计 双页签
+│   │   │   ├── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页；词频本专用列表）
 │   │   │   ├── NotFoundWordEditor.tsx   # 待补全词条手动/豆包录入
 │   │   │   └── NotebookPickerSheet.tsx  # 保存笔记时选择笔记本
 │   │   ├── components/settings/
@@ -115,6 +115,8 @@ read/
 │   │       │   └── userDataBackup.ts  # 导入导出编排（写入用户目录）
 │   │       ├── reading/
 │   │       │   └── readingTime.ts     # 阅读时长累计、统计与备份合并
+│   │       ├── tools/
+│   │       │   └── bookWordFrequency.ts # 全书词频离线统计 → 词频笔记本
 │   │       ├── llm/
 │   │       │   ├── doubaoWordWorkflow.ts # 待补全词条豆包 prompt
 │   │       │   ├── zhipuSettings.ts   # 智谱 API Key 本地存储

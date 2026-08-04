@@ -1,4 +1,4 @@
-import { WordFrequencyTool } from './WordFrequencyTool'
+import { BookWordFrequencyTool } from './BookWordFrequencyTool'
 
 export function ToolsScreen() {
   return (
@@ -9,7 +9,7 @@ export function ToolsScreen() {
       </header>
 
       <div className="tools-body">
-        <WordFrequencyTool />
+        <BookWordFrequencyTool />
       </div>
     </div>
   )

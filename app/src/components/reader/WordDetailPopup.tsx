@@ -425,20 +425,36 @@ export function WordDetailPopup({
             {entry.forms.length > 0 && (
               <div className="popup-forms">
                 <span>变体：</span>
-                {entry.forms.map((form) => (
-                  <button
-                    key={`${form.label}-${form.value}`}
-                    type="button"
-                    className="form-chip"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      const token = extractVariantLookupWord(form.value)
-                      if (token) onLookupVariant?.(token)
-                    }}
-                  >
-                    {form.label}: {form.value}
-                  </button>
-                ))}
+                {entry.forms.map((form) => {
+                  const canJump =
+                    !lookup.exactToken &&
+                    form.clickable !== false &&
+                    Boolean(extractVariantLookupWord(form.value))
+                  const text = form.value ? `${form.label}: ${form.value}` : form.label
+
+                  if (!canJump) {
+                    return (
+                      <span key={`${form.label}-${form.value}`} className="form-chip form-chip-static">
+                        {text}
+                      </span>
+                    )
+                  }
+
+                  return (
+                    <button
+                      key={`${form.label}-${form.value}`}
+                      type="button"
+                      className="form-chip"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const token = extractVariantLookupWord(form.value)
+                        if (token) onLookupVariant?.(token)
+                      }}
+                    >
+                      {text}
+                    </button>
+                  )
+                })}
               </div>
             )}
 

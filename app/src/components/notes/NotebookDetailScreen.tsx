@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { formatExamLevelsDisplay } from '../../lib/examLevel'
 import { normalizeAnalysisListField } from '../../services/llm/analysisParse'
 import {
   getNotebookDocument,
@@ -11,6 +12,8 @@ import {
   removeNotebookEntry,
   type NotebookDocument,
 } from '../../services/notes/notebooks'
+import { parseFrequencyMeta } from '../../services/tools/bookWordFrequency'
+import { WordPhraseSection } from '../reader/WordPhraseSection'
 import { NotFoundWordEditor } from './NotFoundWordEditor'
 import {
   loadNotebookPageSize,
@@ -23,9 +26,16 @@ interface NotebookDetailScreenProps {
   notebookId: string
   title: string
   onBack: () => void
+  /** 全书词频统计本：列表显示排名/单词/词频 */
+  isFrequency?: boolean
 }
 
-export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDetailScreenProps) {
+export function NotebookDetailScreen({
+  notebookId,
+  title,
+  onBack,
+  isFrequency = false,
+}: NotebookDetailScreenProps) {
   const [doc, setDoc] = useState<NotebookDocument | null>(null)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -34,8 +44,13 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [searchDraft, setSearchDraft] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [freqSortDir, setFreqSortDir] = useState<'asc' | 'desc'>('desc')
 
-  const showSearch = isBasePhrasesNotebook(notebookId) || isNotFoundWordsNotebook(notebookId)
+  const showSearch =
+    isBasePhrasesNotebook(notebookId) ||
+    isNotFoundWordsNotebook(notebookId) ||
+    isFrequency
+
 
   const loadDoc = useCallback(async () => {
     setLoading(true)
@@ -78,6 +93,7 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
     setSelectedEntryId(null)
     setSearchDraft('')
     setSearchQuery('')
+    setFreqSortDir('desc')
   }, [notebookId])
 
   useEffect(() => {
@@ -90,6 +106,9 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
 
   const pageData = listNotebookEntries(doc, page, pageSize, {
     query: showSearch ? searchQuery : undefined,
+    sortBy: isFrequency ? 'frequency' : 'createdAt',
+    sortDir: isFrequency ? freqSortDir : 'desc',
+    matchWordOnly: isFrequency,
   })
   const selectedEntry = selectedEntryId ? getNotebookEntryById(doc, selectedEntryId) : null
   const totalEntries = doc?.entries.length ?? 0
@@ -132,7 +151,9 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
 
   const searchPlaceholder = isBasePhrasesNotebook(notebookId)
     ? '搜索单词或词组…'
-    : '搜索待补全单词…'
+    : isFrequency
+      ? '搜索单词词频…'
+      : '搜索待补全单词…'
 
   return (
     <div className="notebook-detail-screen">
@@ -159,13 +180,15 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
           <>
             {totalEntries === 0 && (
               <p className="notebook-detail-placeholder">
-                {isBaseSentenceNotebook(notebookId)
-                  ? '所有保存到各笔记本的句子都会自动汇总到这里，并标注来源书籍与笔记本。'
-                  : isBasePhrasesNotebook(notebookId)
-                    ? '所有已收录词组会按基础单词聚合展示在这里，点击单词可查看词组与释义。'
-                    : isNotFoundWordsNotebook(notebookId)
-                      ? '阅读时查不到的单词会出现在这里，点击可手动补全词条。'
-                      : '这里会展示句子笔记列表。阅读时保存的句子解析会按条目收纳。'}
+                {isFrequency
+                  ? '词频统计结果为空。可在工具页重新统计一本书。'
+                  : isBaseSentenceNotebook(notebookId)
+                    ? '所有保存到各笔记本的句子都会自动汇总到这里，并标注来源书籍与笔记本。'
+                    : isBasePhrasesNotebook(notebookId)
+                      ? '所有已收录词组会按基础单词聚合展示在这里，点击单词可查看词组与释义。'
+                      : isNotFoundWordsNotebook(notebookId)
+                        ? '阅读时查不到的单词会出现在这里，点击可手动补全词条。'
+                        : '这里会展示句子笔记列表。阅读时保存的句子解析会按条目收纳。'}
               </p>
             )}
 
@@ -205,68 +228,99 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
                   ? `匹配 ${pageData.total} / 共 ${totalEntries} 条`
                   : `条目数：${pageData.total}`}
               </p>
-              <label className="notebook-page-size">
-                <span>每页</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => {
-                    const next = Number(e.target.value)
-                    if (NOTEBOOK_PAGE_SIZE_OPTIONS.includes(next as NotebookPageSize)) {
-                      void handlePageSizeChange(next as NotebookPageSize)
-                    }
-                  }}
-                >
-                  {NOTEBOOK_PAGE_SIZE_OPTIONS.map((size) => (
-                    <option key={size} value={size}>
-                      {size} 条
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="notebook-toolbar-controls">
+                {isFrequency && (
+                  <label className="notebook-page-size">
+                    <span>排序</span>
+                    <select
+                      value={freqSortDir}
+                      onChange={(e) => {
+                        const next = e.target.value === 'asc' ? 'asc' : 'desc'
+                        setFreqSortDir(next)
+                        setPage(1)
+                      }}
+                    >
+                      <option value="desc">词频 DESC</option>
+                      <option value="asc">词频 ASC</option>
+                    </select>
+                  </label>
+                )}
+                <label className="notebook-page-size">
+                  <span>每页</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      const next = Number(e.target.value)
+                      if (NOTEBOOK_PAGE_SIZE_OPTIONS.includes(next as NotebookPageSize)) {
+                        void handlePageSizeChange(next as NotebookPageSize)
+                      }
+                    }}
+                  >
+                    {NOTEBOOK_PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>
+                        {size} 条
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             </div>
 
             {pageData.items.length > 0 ? (
               <>
                 <ul className="notebook-entry-list">
-                  {pageData.items.map((entry, idx) => (
-                    <li key={entry.id} className="notebook-entry-row">
-                      <button
-                        type="button"
-                        className="notebook-entry-item"
-                        onClick={() => openEntry(entry.id)}
-                      >
-                        <span className="notebook-entry-index">
-                          #{(pageData.page - 1) * pageSize + idx + 1}
-                        </span>
-                        <span className="notebook-entry-sentence">{entry.sentence}</span>
-                        {isBasePhrasesNotebook(notebookId) && entry.analysis.translation && (
-                          <span className="notebook-entry-source">{entry.analysis.translation}</span>
-                        )}
-                        {entry.source && (
-                          <span className="notebook-entry-source">
-                            来自《{entry.source.bookTitle}》· {entry.source.notebookTitle}
-                          </span>
-                        )}
-                        <span className="notebook-entry-arrow">›</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="notebook-entry-delete"
-                        aria-label="删除这条笔记"
-                        disabled={
-                          deletingId === entry.id ||
-                          isBasePhrasesNotebook(notebookId) ||
-                          isBaseSentenceNotebook(notebookId)
-                        }
-                        onClick={() => void handleDeleteEntry(entry.id)}
-                      >
-                        {deletingId === entry.id ? '…' : '×'}
-                      </button>
-                    </li>
-                  ))}
+                  {pageData.items.map((entry, idx) => {
+                    const freqMeta = isFrequency ? parseFrequencyMeta(entry.analysis.collocations) : null
+                    const rank = freqMeta?.rank ?? (pageData.page - 1) * pageSize + idx + 1
+                    return (
+                      <li key={entry.id} className="notebook-entry-row">
+                        <button
+                          type="button"
+                          className="notebook-entry-item"
+                          onClick={() => openEntry(entry.id)}
+                        >
+                          <span className="notebook-entry-index">#{rank}</span>
+                          <span className="notebook-entry-sentence">{entry.sentence}</span>
+                          {isFrequency && freqMeta && (
+                            <span className="notebook-entry-freq-count">{freqMeta.count} 次</span>
+                          )}
+                          {isBasePhrasesNotebook(notebookId) && entry.analysis.translation && (
+                            <span className="notebook-entry-source">{entry.analysis.translation}</span>
+                          )}
+                          {entry.source && (
+                            <span className="notebook-entry-source">
+                              来自《{entry.source.bookTitle}》· {entry.source.notebookTitle}
+                            </span>
+                          )}
+                          <span className="notebook-entry-arrow">›</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="notebook-entry-delete"
+                          aria-label="删除这条笔记"
+                          disabled={
+                            deletingId === entry.id ||
+                            isBasePhrasesNotebook(notebookId) ||
+                            isBaseSentenceNotebook(notebookId)
+                          }
+                          onClick={() => void handleDeleteEntry(entry.id)}
+                        >
+                          {deletingId === entry.id ? '…' : '×'}
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
 
                 <div className="notebook-pager">
+                  <button
+                    type="button"
+                    className="notebook-pager-btn"
+                    disabled={pageData.page <= 1}
+                    onClick={() => setPage(1)}
+                  >
+                    首页
+                  </button>
                   <button
                     type="button"
                     className="notebook-pager-btn"
@@ -285,6 +339,14 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
                     onClick={() => setPage((value) => Math.min(pageData.totalPages, value + 1))}
                   >
                     下一页
+                  </button>
+                  <button
+                    type="button"
+                    className="notebook-pager-btn"
+                    disabled={pageData.page >= pageData.totalPages}
+                    onClick={() => setPage(pageData.totalPages)}
+                  >
+                    尾页
                   </button>
                 </div>
               </>
@@ -321,7 +383,54 @@ export function NotebookDetailScreen({ notebookId, title, onBack }: NotebookDeta
             )}
             <h2 className="notebook-entry-detail-title">{selectedEntry.sentence}</h2>
 
-            {isBasePhrasesNotebook(notebookId) ? (
+            {isFrequency ? (
+              <>
+                {(() => {
+                  const meta = parseFrequencyMeta(selectedEntry.analysis.collocations)
+                  return (
+                    <section className="notebook-entry-block">
+                      <h3>词频</h3>
+                      <p>
+                        {meta
+                          ? `排名 #${meta.rank} · 出现 ${meta.count} 次`
+                          : '暂无词频数据'}
+                        {meta?.collins != null ? ` · 柯林斯 ${meta.collins} 星` : ''}
+                        {meta?.frq != null ? ` · COCA ${meta.frq}` : ''}
+                        {meta?.bnc != null ? ` · BNC ${meta.bnc}` : ''}
+                      </p>
+                    </section>
+                  )
+                })()}
+                {selectedEntry.analysis.slangs && (
+                  <section className="notebook-entry-block">
+                    <h3>考试等级</h3>
+                    <div className="popup-level-chips">
+                      {formatExamLevelsDisplay(
+                        selectedEntry.analysis.slangs.split(/[/、,，\s]+/).filter(Boolean),
+                      ).map((label) => (
+                        <span key={label} className="popup-level-chip">
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  </section>
+                )}
+                <section className="notebook-entry-block">
+                  <h3>中文释义</h3>
+                  <p className="notebook-freq-defs">{selectedEntry.analysis.translation || '暂无内容'}</p>
+                </section>
+                {selectedEntry.analysis.sentencePattern && (
+                  <section className="notebook-entry-block">
+                    <h3>变体</h3>
+                    <p>{selectedEntry.analysis.sentencePattern}</p>
+                  </section>
+                )}
+                <section className="notebook-entry-block">
+                  <h3>词组</h3>
+                  <WordPhraseSection lemma={selectedEntry.sentence} />
+                </section>
+              </>
+            ) : isBasePhrasesNotebook(notebookId) ? (
               <section className="notebook-entry-block">
                 <h3>词组</h3>
                 <p>

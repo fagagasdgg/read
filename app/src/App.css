@@ -120,6 +120,12 @@
 .pos { color: #2563eb; font-weight: 600; margin-right: 4px; }
 .forms { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
 .form-chip { background: #e5e7eb; color: #111827; font-size: 0.8rem; padding: 6px 10px; }
+.form-chip-static {
+  display: inline-block;
+  border-radius: 999px;
+  cursor: default;
+  opacity: 0.92;
+}
 
 /* Reader */
 .reader-screen {
@@ -1886,6 +1892,35 @@
   background-color: var(--shell-screen-base);
 }
 
+.notes-header-with-tabs {
+  align-items: center;
+  gap: 8px;
+}
+
+.notes-pane-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.notes-pane-tab {
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.notes-pane-tab.active {
+  color: #1f2937;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
 .notes-shelf {
   margin-bottom: 12px;
 }
@@ -1894,6 +1929,10 @@
   flex-direction: column;
   gap: 8px;
   padding: 12px 8px;
+}
+
+.notes-cover-freq {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #1e4d7b 18%, transparent);
 }
 
 .notes-cover-icon {
@@ -2017,6 +2056,13 @@
   justify-content: space-between;
   gap: 12px;
   margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.notebook-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
@@ -2150,6 +2196,18 @@
   line-height: 1.5;
 }
 
+.notebook-entry-freq-count {
+  font-size: 0.78rem;
+  color: #1e4d7b;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.notebook-freq-defs {
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
 .notebook-entry-arrow {
   color: #9ca3af;
   font-size: 1rem;
@@ -2160,8 +2218,9 @@
   margin-top: 12px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .notebook-pager-btn {
@@ -2170,7 +2229,7 @@
   color: #374151;
   border-radius: 8px;
   padding: 7px 10px;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   cursor: pointer;
 }
 
@@ -4064,6 +4123,30 @@
   margin: 10px 0 0;
   font-size: 0.8rem;
   color: #374151;
+}
+
+.tools-tool-error {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: #b91c1c;
+}
+
+.tools-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+  font-size: 0.82rem;
+  color: #4b5563;
+}
+
+.tools-field input,
+.tools-field select {
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: #fff;
 }
 
 .tools-freq-progress {

@@ -19,6 +19,8 @@ export interface WordDefinition {
 export interface WordForm {
   label: string
   value: string
+  /** 为 false 时仅作形态说明，不可点击跳转 */
+  clickable?: boolean
 }
 
 export interface WordFrequencyInfo {

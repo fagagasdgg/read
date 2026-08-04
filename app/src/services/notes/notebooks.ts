@@ -9,6 +9,10 @@ export interface NotebookMeta {
   title: string
   createdAt: number
   updatedAt: number
+  /** notes=普通笔记（默认）；frequency=全书词频统计本 */
+  kind?: 'notes' | 'frequency'
+  sourceBookId?: string
+  sourceBookTitle?: string
 }
 
 /** 笔记本正文占位结构，后续可扩展句子+解析条目 */
@@ -75,6 +79,16 @@ export function isSystemNotebook(id: string): boolean {
     isBasePhrasesNotebook(id) ||
     isNotFoundWordsNotebook(id)
   )
+}
+
+export function isFrequencyNotebookMeta(meta: Pick<NotebookMeta, 'kind'> | null | undefined): boolean {
+  return meta?.kind === 'frequency'
+}
+
+export async function isFrequencyNotebook(id: string): Promise<boolean> {
+  const notebooks = await readRegistry()
+  const meta = notebooks.find((item) => item.id === id)
+  return isFrequencyNotebookMeta(meta)
 }
 
 function systemNotebookRank(id: string): number {
@@ -374,7 +388,14 @@ export async function countNotebookEntries(options?: {
   return total
 }
 
-export async function createNotebook(title?: string): Promise<NotebookMeta> {
+export async function createNotebook(
+  title?: string,
+  options?: {
+    kind?: 'notes' | 'frequency'
+    sourceBookId?: string
+    sourceBookTitle?: string
+  },
+): Promise<NotebookMeta> {
   const notebooks = await readRegistry()
   const now = Date.now()
   const trimmed = title?.trim()
@@ -400,6 +421,9 @@ export async function createNotebook(title?: string): Promise<NotebookMeta> {
     title: resolvedTitle,
     createdAt: now,
     updatedAt: now,
+    kind: options?.kind === 'frequency' ? 'frequency' : 'notes',
+    sourceBookId: options?.sourceBookId,
+    sourceBookTitle: options?.sourceBookTitle,
   }
 
   const doc: NotebookDocument = {
@@ -453,7 +477,14 @@ export function listNotebookEntries(
   doc: NotebookDocument | null,
   page: number,
   pageSize: number,
-  options?: { query?: string },
+  options?: {
+    query?: string
+    /** 词频本：按出现次数排序；默认按创建时间 */
+    sortBy?: 'createdAt' | 'frequency'
+    sortDir?: 'asc' | 'desc'
+    /** 词频搜索时优先匹配单词本身 */
+    matchWordOnly?: boolean
+  },
 ): { items: NotebookEntry[]; total: number; totalPages: number; page: number } {
   if (!doc?.entries.length) {
     return { items: [], total: 0, totalPages: 1, page: 1 }
@@ -462,6 +493,9 @@ export function listNotebookEntries(
   const query = options?.query?.trim().toLowerCase() ?? ''
   const filtered = query
     ? doc.entries.filter((entry) => {
+        if (options?.matchWordOnly) {
+          return entry.sentence.toLowerCase().includes(query)
+        }
         const haystack = [
           entry.sentence,
           entry.analysis.translation,
@@ -475,7 +509,21 @@ export function listNotebookEntries(
       })
     : doc.entries
 
-  const sorted = [...filtered].sort((a, b) => b.createdAt - a.createdAt)
+  const sortBy = options?.sortBy ?? 'createdAt'
+  const sortDir = options?.sortDir ?? 'desc'
+  const dir = sortDir === 'asc' ? 1 : -1
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === 'frequency') {
+      const ca = parseFrequencyCount(a)
+      const cb = parseFrequencyCount(b)
+      if (ca !== cb) return (ca - cb) * dir
+      return a.sentence.localeCompare(b.sentence) * dir
+    }
+    if (a.createdAt !== b.createdAt) return (a.createdAt - b.createdAt) * dir
+    return a.sentence.localeCompare(b.sentence)
+  })
+
   const total = sorted.length
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const safePage = Math.min(totalPages, Math.max(1, page))
@@ -483,6 +531,17 @@ export function listNotebookEntries(
   const items = sorted.slice(start, start + pageSize)
 
   return { items, total, totalPages, page: safePage }
+}
+
+function parseFrequencyCount(entry: NotebookEntry): number {
+  const raw = entry.analysis.collocations
+  if (!raw?.startsWith('freq-meta:')) return 0
+  try {
+    const parsed = JSON.parse(raw.slice('freq-meta:'.length)) as { count?: unknown }
+    return typeof parsed.count === 'number' ? parsed.count : 0
+  } catch {
+    return 0
+  }
 }
 
 export function getNotebookEntryById(
@@ -649,7 +708,11 @@ export async function addNotebookEntry(
   }
 
   if (!isBaseSentenceNotebook(notebookId)) {
-    await mirrorEntryToBaseSentence(entry, notebookId, options)
+    const notebooks = await readRegistry()
+    const meta = notebooks.find((item) => item.id === notebookId)
+    if (!isFrequencyNotebookMeta(meta)) {
+      await mirrorEntryToBaseSentence(entry, notebookId, options)
+    }
   }
 
   notifyNotebookDataChanged()

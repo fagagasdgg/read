@@ -22,15 +22,14 @@ export interface EcdictRow {
 
 const VOICE_BASE = 'https://dict.youdao.com/dictvoice'
 
-const EXCHANGE_LABELS: Record<string, string> = {
+const EXCHANGE_CODE_LABELS: Record<string, string> = {
   p: '过去式',
   d: '过去分词',
   i: '现在分词',
-  3: '第三人称单数',
-  s: '复数',
+  '3': '第三人称单数',
+  s: '名词复数',
   r: '比较级',
   t: '最高级',
-  1: '变形',
 }
 
 const TAG_TO_LEVEL: Record<string, string> = {
@@ -96,9 +95,17 @@ function parseTags(tag: string): ExamLevel[] {
   return levels
 }
 
+/** CSV/库内常把换行存成字面量 \\n，需还原后再按行拆词性 */
+function normalizeTranslationNewlines(translation: string): string {
+  return translation
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+}
+
 function parseDefinitions(translation: string): WordDefinition[] {
-  const lines = translation
-    .split(/\r?\n/)
+  const lines = normalizeTranslationNewlines(translation)
+    .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
 
@@ -113,22 +120,55 @@ function parseDefinitions(translation: string): WordDefinition[] {
   })
 }
 
+/** 将 exchange 中 1:3s / 1:i 等形态码译为中文 */
+function decodeFormCodes(raw: string): string {
+  const labels: string[] = []
+  for (const ch of raw) {
+    const label = EXCHANGE_CODE_LABELS[ch]
+    if (label && !labels.includes(label)) labels.push(label)
+  }
+  return labels.length ? labels.join('、') : raw
+}
+
 function parseForms(exchange: string): WordForm[] {
   if (!exchange.trim()) return []
+
+  let lemmaRef = ''
   const forms: WordForm[] = []
+
   for (const part of exchange.split('/')) {
     const item = part.trim()
-    if (!item || item.startsWith('0:')) continue
+    if (!item) continue
     const colon = item.indexOf(':')
     if (colon <= 0) continue
     const code = item.slice(0, colon)
     const value = item.slice(colon + 1).trim()
     if (!value) continue
+
+    if (code === '0') {
+      lemmaRef = value
+      continue
+    }
+
+    // 1: 表示「本词相对原型的形态」，值是 s/i/3 等码，不是可跳转单词
+    if (code === '1') {
+      const kind = decodeFormCodes(value)
+      forms.push({
+        label: kind,
+        value: lemmaRef ? `原型 ${lemmaRef}` : '',
+        clickable: false,
+      })
+      continue
+    }
+
+    const label = EXCHANGE_CODE_LABELS[code] ?? code
     forms.push({
-      label: EXCHANGE_LABELS[code] ?? code,
+      label,
       value,
+      clickable: true,
     })
   }
+
   return forms
 }
 
