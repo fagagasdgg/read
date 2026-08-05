@@ -85,6 +85,26 @@ export function isFrequencyNotebookMeta(meta: Pick<NotebookMeta, 'kind'> | null 
   return meta?.kind === 'frequency'
 }
 
+function looksLikeFrequencyDocument(doc: NotebookDocument | null | undefined): boolean {
+  if (!doc?.entries.length) return false
+  const sample = doc.entries.slice(0, 12)
+  if (sample.length < 3) return false
+  let hits = 0
+  for (const entry of sample) {
+    if (entry.analysis?.collocations?.startsWith('freq-meta:')) hits += 1
+  }
+  return hits / sample.length >= 0.8
+}
+
+function isBackupFrequencyNotebook(
+  meta: Pick<NotebookMeta, 'kind' | 'sourceBookId'> | null | undefined,
+  doc?: NotebookDocument | null,
+): boolean {
+  if (isFrequencyNotebookMeta(meta)) return true
+  if (meta?.sourceBookId) return true
+  return looksLikeFrequencyDocument(doc ?? null)
+}
+
 export async function isFrequencyNotebook(id: string): Promise<boolean> {
   const notebooks = await readRegistry()
   const meta = notebooks.find((item) => item.id === id)
@@ -376,11 +396,45 @@ export async function ensureAllSystemNotebooks(): Promise<void> {
   await ensureNotFoundWordsNotebook()
 }
 
+let frequencyKindRepairPromise: Promise<void> | null = null
+
+export function resetFrequencyNotebookRepair(): void {
+  frequencyKindRepairPromise = null
+}
+
 export async function listNotebooks(): Promise<NotebookMeta[]> {
   // 仅确保系统笔记本存在；禁止在此全量同步内容（会与统计页 NOTEBOOK 监听形成死循环并卡死导入/切 Tab）
   await ensureAllSystemNotebooks()
+  await repairMisclassifiedFrequencyNotebooksOnce()
   const notebooks = await readRegistry()
   return sortNotebookRegistry(notebooks)
+}
+
+/** 纠正旧备份误导入后丢失 kind 的词频本（只修本地，启动后跑一次） */
+async function repairMisclassifiedFrequencyNotebooksOnce(): Promise<void> {
+  if (!frequencyKindRepairPromise) {
+    frequencyKindRepairPromise = repairMisclassifiedFrequencyNotebooks().catch(() => {
+      frequencyKindRepairPromise = null
+    })
+  }
+  await frequencyKindRepairPromise
+}
+
+async function repairMisclassifiedFrequencyNotebooks(): Promise<void> {
+  const notebooks = await readRegistry()
+  let changed = false
+
+  for (const meta of notebooks) {
+    if (isSystemNotebook(meta.id) || isFrequencyNotebookMeta(meta)) continue
+    const doc = await readDocument(meta.id)
+    if (!looksLikeFrequencyDocument(doc)) continue
+    meta.kind = 'frequency'
+    changed = true
+  }
+
+  if (changed) {
+    await writeRegistry(sortNotebookRegistry(notebooks))
+  }
 }
 
 /** 一次遍历同时得到全部条数与可选时间窗内条数（排除系统本 / 词频本） */
@@ -867,7 +921,7 @@ export async function exportNotebooksBackup(): Promise<{
   registry: NotebookMeta[]
   documents: NotebookDocument[]
 }> {
-  const registry = await listNotebooks()
+  const registry = (await listNotebooks()).filter((meta) => !isFrequencyNotebookMeta(meta))
   const documents: NotebookDocument[] = []
 
   for (const meta of registry) {
@@ -904,15 +958,24 @@ export async function importNotebooksBackup(payload: {
       continue
     }
 
+    const rawDoc = payload.documents.find((doc) => doc?.id === rawMeta.id)
+    const normalizedDoc = normalizeDocument(rawDoc ?? null, rawMeta.id)
+    if (isBackupFrequencyNotebook(rawMeta, normalizedDoc)) {
+      warnings.push(`跳过词频笔记本「${rawMeta.title || rawMeta.id}」（不随学习数据导入）`)
+      continue
+    }
+
     const meta: NotebookMeta = {
       id: rawMeta.id,
       title: resolveSystemNotebookTitle(rawMeta.id, rawMeta.title),
       createdAt: typeof rawMeta.createdAt === 'number' ? rawMeta.createdAt : Date.now(),
       updatedAt: typeof rawMeta.updatedAt === 'number' ? rawMeta.updatedAt : Date.now(),
+      kind: rawMeta.kind === 'frequency' ? 'frequency' : 'notes',
+      sourceBookId: typeof rawMeta.sourceBookId === 'string' ? rawMeta.sourceBookId : undefined,
+      sourceBookTitle:
+        typeof rawMeta.sourceBookTitle === 'string' ? rawMeta.sourceBookTitle : undefined,
     }
 
-    const rawDoc = payload.documents.find((doc) => doc?.id === meta.id)
-    const normalizedDoc = normalizeDocument(rawDoc ?? null, meta.id)
     const safeDoc: NotebookDocument = normalizedDoc ?? {
       id: meta.id,
       title: meta.title,
@@ -956,12 +1019,17 @@ export async function importNotebooksBackup(payload: {
       warnings.push(`跳过无效的笔记本文档：${rawDoc.id}`)
       continue
     }
+    if (isBackupFrequencyNotebook(null, normalizedDoc)) {
+      warnings.push(`跳过词频笔记本文档「${normalizedDoc.title || normalizedDoc.id}」`)
+      continue
+    }
 
     const meta: NotebookMeta = {
       id: normalizedDoc.id,
       title: normalizedDoc.title,
       createdAt: Date.now(),
       updatedAt: normalizedDoc.updatedAt,
+      kind: 'notes',
     }
     registryMap.set(meta.id, meta)
     await writeDocument(normalizedDoc)
@@ -970,6 +1038,7 @@ export async function importNotebooksBackup(payload: {
 
   const mergedRegistry = sortNotebookRegistry([...registryMap.values()])
   await writeRegistry(mergedRegistry)
+  resetFrequencyNotebookRepair()
   await ensureAllSystemNotebooks()
 
   return {

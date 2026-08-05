@@ -4,7 +4,7 @@ import { ScopedStorage } from '@daniele-rolli/capacitor-scoped-storage'
 import { FilePicker } from '@capawesome/capacitor-file-picker'
 import { getDictionaryCacheStats, importDictionaryRecords } from '../dictionary/cache'
 import { importBookNotebookMap } from '../notes/bookNotebook'
-import { importNotebooksBackup } from '../notes/notebooks'
+import { importNotebooksBackup, resetFrequencyNotebookRepair } from '../notes/notebooks'
 import { getReadingTimeStats, importReadingTimeBackup } from '../reading/readingTime'
 import {
   formatBackupDirectoryLabel,
@@ -140,6 +140,7 @@ export async function importUserDataBackup(file?: File): Promise<ImportUserDataR
   await importMasteredWordsList(payload.masteredWords)
   const notebookResult = await importNotebooksBackup(payload.notebooks)
   warnings.push(...notebookResult.warnings)
+  resetFrequencyNotebookRepair()
 
   const bookNotebookAdded = await importBookNotebookMap(payload.bookNotebooks)
 

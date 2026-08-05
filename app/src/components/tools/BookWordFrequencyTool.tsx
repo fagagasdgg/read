@@ -116,7 +116,7 @@ export function BookWordFrequencyTool() {
     <CollapsibleSettingsSection
       title="全书词频统计"
       summary="离线统计 · 写入词频笔记本"
-      defaultExpanded
+      defaultExpanded={false}
     >
       <div className="tools-freq-panel">
         <div className="tools-tool-desc-row">
