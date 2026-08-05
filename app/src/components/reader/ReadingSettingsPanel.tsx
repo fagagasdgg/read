@@ -4,7 +4,7 @@ import {
   getBookDefaultNotebookId,
   setBookDefaultNotebookId,
 } from '../../services/notes/bookNotebook'
-import { listNotebooks, type NotebookMeta } from '../../services/notes/notebooks'
+import { listNotebooks, isFrequencyNotebookMeta, type NotebookMeta } from '../../services/notes/notebooks'
 import { getMasteredWordCount, subscribeMasteredWords } from '../../services/words/mastered'
 import { getLemmaPhraseWordCount } from '../../services/words/phrases'
 import { SettingStepper } from './SettingStepper'
@@ -55,7 +55,7 @@ export function ReadingSettingsPanel({
     setCacheStats(cache)
     setMasteredCount(mastered)
     setPhraseWordCount(phraseWords)
-    setNotebooks(nbList)
+    setNotebooks(nbList.filter((nb) => !isFrequencyNotebookMeta(nb)))
     setDefaultNotebookId(bookNb ?? '')
   }, [bookId])
 

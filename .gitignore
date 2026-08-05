@@ -22,3 +22,7 @@ app/android/local.properties
 
 # Cursor (optional local state)
 .cursor/projects/
+
+# 本地临时解压（需求反馈 docx 等）
+.tmp-docx/
+.tmp_docx_media/

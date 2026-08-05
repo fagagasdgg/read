@@ -897,6 +897,15 @@
   margin: 0 2px;
 }
 
+.popup-book-occurrence {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
 .popup-freq-label {
   font-size: 0.72rem;
   font-weight: 500;
@@ -1815,8 +1824,7 @@
   display: flex;
   width: 500%;
   height: 100%;
-  transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
+  transition: transform 0.22s ease-out;
 }
 
 .home-shell[data-tab='notes'] .home-panels-track {
@@ -1841,6 +1849,11 @@
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  contain: layout style paint;
+}
+
+.home-panel[aria-hidden='true'] {
+  pointer-events: none;
 }
 
 .home-tab-bar {
@@ -1892,33 +1905,58 @@
   background-color: var(--shell-screen-base);
 }
 
-.notes-header-with-tabs {
+.notes-header {
+  display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 14px 16px 12px;
 }
 
 .notes-pane-tabs {
-  display: flex;
-  align-items: center;
-  gap: 4px;
   flex: 1;
+  display: flex;
+  align-items: stretch;
   min-width: 0;
+  padding: 3px;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--shell-title-color) 12%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .notes-pane-tab {
+  flex: 1 1 0;
   border: none;
   background: transparent;
-  color: #6b7280;
-  font-size: 1.05rem;
+  color: color-mix(in srgb, var(--shell-title-color) 72%, transparent);
+  font-size: 0.92rem;
   font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 8px;
+  line-height: 1.2;
+  padding: 10px 8px;
+  border-radius: 19px;
   cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .notes-pane-tab.active {
-  color: #1f2937;
-  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: var(--shell-chip-active-text, #2d1f12);
+  background: var(--shell-chip-active-bg, #fff8eb);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.notes-header-actions {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notes-header-add:disabled {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .notes-shelf {
@@ -2121,21 +2159,80 @@
   cursor: not-allowed;
 }
 
+.notebook-entry-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.notebook-entry-edit-btn,
+.notebook-entry-save-btn,
+.notebook-entry-cancel-btn,
 .notebook-entry-delete-btn {
-  margin-top: 16px;
   width: 100%;
   padding: 12px;
-  border: 1px solid #fecaca;
   border-radius: 10px;
-  background: #fff5f5;
-  color: #b91c1c;
   font-size: 0.9rem;
   cursor: pointer;
 }
 
+.notebook-entry-edit-btn {
+  border: 1px solid color-mix(in srgb, var(--shell-accent, #8f6238) 35%, #e5e7eb);
+  background: color-mix(in srgb, var(--shell-chip-active-bg, #fff8eb) 70%, #fff);
+  color: var(--shell-title-color, #1f2937);
+  font-weight: 600;
+}
+
+.notebook-entry-save-btn {
+  border: 1px solid color-mix(in srgb, var(--shell-accent, #1e4d7b) 45%, transparent);
+  background: var(--shell-accent, #1e4d7b);
+  color: #fff;
+  font-weight: 600;
+}
+
+.notebook-entry-cancel-btn {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #4b5563;
+}
+
+.notebook-entry-delete-btn {
+  margin-top: 0;
+  border: 1px solid #fecaca;
+  background: #fff5f5;
+  color: #b91c1c;
+}
+
+.notebook-entry-edit-btn:disabled,
+.notebook-entry-save-btn:disabled,
+.notebook-entry-cancel-btn:disabled,
 .notebook-entry-delete-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.notebook-entry-edit-field textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fafafa;
+  color: #1f2937;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  resize: vertical;
+  min-height: 72px;
+  font-family: inherit;
+}
+
+.notebook-entry-edit-field textarea:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--shell-accent, #8f6238) 55%, #e5e7eb);
+  background: #fff;
 }
 
 .notebook-entry-item {
@@ -2241,6 +2338,42 @@
 .notebook-pager-meta {
   font-size: 0.8rem;
   color: #6b7280;
+}
+
+.notebook-entry-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 4px;
+}
+
+.notebook-entry-nav-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--shell-accent, #8f6238) 28%, #e5e7eb);
+  background: color-mix(in srgb, var(--shell-chip-active-bg, #fff8eb) 65%, #fff);
+  color: var(--shell-title-color, #1f2937);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.notebook-entry-nav-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.notebook-entry-nav-meta {
+  flex-shrink: 0;
+  min-width: 64px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
 }
 
 .notebook-entry-detail {
@@ -3966,8 +4099,102 @@
 .tools-tool-desc {
   margin: 0 0 12px;
   font-size: 0.82rem;
-  color: #6b7280;
+  color: var(--shell-muted-text, #6b7280);
+  line-height: 1.55;
+}
+
+.tools-freq-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.tools-freq-steps {
+  margin: 0 0 16px;
+  padding: 12px 14px 12px 30px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--shell-title-color, #2d1f12) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--shell-title-color, #2d1f12) 10%, transparent);
+  color: var(--shell-muted-text, #4b5563);
+  font-size: 0.82rem;
   line-height: 1.5;
+}
+
+.tools-freq-steps li + li {
+  margin-top: 8px;
+}
+
+.tools-freq-actions {
+  margin-top: 4px;
+}
+
+.tools-freq-start-btn {
+  min-width: 120px;
+  padding: 10px 18px;
+}
+
+.tools-freq-warn {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #b45309 10%, transparent);
+  border: 1px solid color-mix(in srgb, #b45309 22%, transparent);
+  color: #92400e;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.tools-freq-progress-card {
+  margin-top: 18px;
+  padding: 14px 14px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--shell-chip-active-bg, #fff8eb) 70%, #fff);
+  border: 1px solid color-mix(in srgb, var(--shell-title-color, #2d1f12) 12%, transparent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.tools-freq-progress-card.is-done {
+  background: color-mix(in srgb, #166534 8%, #fff);
+  border-color: color-mix(in srgb, #166534 22%, transparent);
+}
+
+.tools-freq-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tools-freq-progress-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--shell-title-color, #1f2937);
+}
+
+.tools-freq-progress-pct {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--shell-muted-text, #6b7280);
+  font-variant-numeric: tabular-nums;
+}
+
+.tools-freq-message {
+  margin-top: 14px !important;
+  padding: 12px 14px;
+  border-radius: 10px;
+  line-height: 1.55;
+}
+
+.tools-tool-result.tools-freq-message {
+  background: color-mix(in srgb, #166534 8%, #fff);
+  border: 1px solid color-mix(in srgb, #166534 18%, transparent);
+  color: #14532d;
+}
+
+.tools-tool-error.tools-freq-message {
+  background: color-mix(in srgb, #b91c1c 8%, #fff);
+  border: 1px solid color-mix(in srgb, #b91c1c 18%, transparent);
 }
 
 .tools-tool-desc-row {
@@ -4149,27 +4376,41 @@
   background: #fff;
 }
 
-.tools-freq-progress {
-  margin-bottom: 10px;
+.tools-field-hint {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.tools-freq-notebook-name {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--shell-title-color, #2d1f12) 12%, transparent);
+  background: color-mix(in srgb, var(--shell-chip-active-bg, #fff8eb) 55%, #fff);
+  color: var(--shell-title-color, #1f2937);
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .tools-freq-progress-bar {
-  height: 6px;
-  background: #e5e7eb;
+  height: 8px;
   border-radius: 999px;
+  background: color-mix(in srgb, var(--shell-title-color, #2d1f12) 12%, transparent);
   overflow: hidden;
 }
 
 .tools-freq-progress-fill {
   height: 100%;
-  background: #1e4d7b;
-  transition: width 0.2s ease;
+  border-radius: inherit;
+  background: var(--shell-accent, #1e4d7b);
+  transition: width 0.2s ease-out;
 }
 
 .tools-freq-progress-text {
-  margin: 6px 0 0;
+  margin: 10px 0 0;
   font-size: 0.78rem;
-  color: #6b7280;
+  color: var(--shell-muted-text, #6b7280);
+  line-height: 1.45;
 }
 
 .notfound-word-editor {

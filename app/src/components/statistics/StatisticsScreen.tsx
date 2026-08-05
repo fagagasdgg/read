@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { BACKUP_DATA_CHANGED } from '../../services/backup/events'
 import { getBookCoverDataUrl } from '../../services/epub/library'
 import { getDictionaryCacheStats } from '../../services/dictionary'
-import { countNotebookEntries, listNotebooks } from '../../services/notes/notebooks'
+import { isFrequencyNotebookMeta, listNotebooks, summarizeNotebookEntries } from '../../services/notes/notebooks'
 import { NOTEBOOK_DATA_CHANGED } from '../../services/notes/events'
 import {
   currentPeriodResetLabel,
   formatCompareText,
   formatReadingDuration,
   getReadingHistoryStats,
+  getReadingNoteCountRange,
   isCurrentReadingPeriod,
   shiftReadingPeriod,
   type PeriodMode,
@@ -17,6 +18,10 @@ import {
 } from '../../services/reading/readingTime'
 import { getMasteredWordCount, subscribeMasteredWords } from '../../services/words/mastered'
 import { getLemmaPhraseWordCount } from '../../services/words/phrases'
+
+/** 与 .home-panels-track 过渡时长对齐，避免切 Tab 动画与重计算抢主线程 */
+const TAB_REFRESH_DEFER_MS = 240
+const JUST_ACTIVATED_MS = 80
 
 const PERIOD_TABS: Array<{ id: PeriodMode; label: string }> = [
   { id: 'week', label: '周' },
@@ -232,15 +237,20 @@ export function StatisticsScreen({ isActive = true }: StatisticsScreenProps) {
   const [noteEntryCount, setNoteEntryCount] = useState(0)
   const [activeBar, setActiveBar] = useState<number | null>(null)
 
+  const isActiveRef = useRef(isActive)
+  const activatedAtRef = useRef(0)
+  const refreshGenRef = useRef(0)
+  isActiveRef.current = isActive
+
   const resetToCurrentPeriod = useCallback(() => {
     setAnchor(new Date())
     setActiveBar(null)
   }, [])
 
   useEffect(() => {
-    if (isActive) {
-      resetToCurrentPeriod()
-    }
+    if (!isActive) return
+    activatedAtRef.current = performance.now()
+    resetToCurrentPeriod()
   }, [isActive, resetToCurrentPeriod])
 
   useEffect(() => {
@@ -248,40 +258,55 @@ export function StatisticsScreen({ isActive = true }: StatisticsScreenProps) {
   }, [periodMode, resetToCurrentPeriod])
 
   const refresh = useCallback(async () => {
-    const [hist, cache, mastered, phraseWords, notebooks, entryCount] = await Promise.all([
-      getReadingHistoryStats(periodMode, anchor),
+    if (!isActiveRef.current) return
+
+    const gen = ++refreshGenRef.current
+    const noteRange = getReadingNoteCountRange(periodMode, anchor)
+    const [hist, noteSummary, cache, mastered, phraseWords, notebooks] = await Promise.all([
+      getReadingHistoryStats(periodMode, anchor, { noteCount: 0 }),
+      summarizeNotebookEntries(noteRange),
       getDictionaryCacheStats(),
       getMasteredWordCount(),
       getLemmaPhraseWordCount(),
       listNotebooks(),
-      countNotebookEntries(),
     ])
-    setHistory(hist)
+    if (gen !== refreshGenRef.current || !isActiveRef.current) return
+
+    setHistory({ ...hist, noteCount: noteSummary.inRange })
     setCacheStats(cache)
     setMasteredCount(mastered)
     setPhraseWordCount(phraseWords)
-    setNotebookCount(notebooks.length)
-    setNoteEntryCount(entryCount)
+    setNotebookCount(notebooks.filter((n) => !isFrequencyNotebookMeta(n)).length)
+    setNoteEntryCount(noteSummary.total)
     setActiveBar(null)
   }, [anchor, periodMode])
 
   useEffect(() => {
-    void refresh()
+    if (!isActive) return
+
+    const justActivated = performance.now() - activatedAtRef.current < JUST_ACTIVATED_MS
+    const delay = justActivated ? TAB_REFRESH_DEFER_MS : 0
+    const timer = window.setTimeout(() => {
+      void refresh()
+    }, delay)
+    return () => window.clearTimeout(timer)
+  }, [isActive, refresh])
+
+  useEffect(() => {
     const unsub = subscribeMasteredWords(() => {
+      if (!isActiveRef.current) return
       void getMasteredWordCount().then(setMasteredCount)
     })
-    const onBackup = () => {
+    const onDataChanged = () => {
+      if (!isActiveRef.current) return
       void refresh()
     }
-    const onNotebookChanged = () => {
-      void refresh()
-    }
-    window.addEventListener(BACKUP_DATA_CHANGED, onBackup)
-    window.addEventListener(NOTEBOOK_DATA_CHANGED, onNotebookChanged)
+    window.addEventListener(BACKUP_DATA_CHANGED, onDataChanged)
+    window.addEventListener(NOTEBOOK_DATA_CHANGED, onDataChanged)
     return () => {
       unsub()
-      window.removeEventListener(BACKUP_DATA_CHANGED, onBackup)
-      window.removeEventListener(NOTEBOOK_DATA_CHANGED, onNotebookChanged)
+      window.removeEventListener(BACKUP_DATA_CHANGED, onDataChanged)
+      window.removeEventListener(NOTEBOOK_DATA_CHANGED, onDataChanged)
     }
   }, [refresh])
 

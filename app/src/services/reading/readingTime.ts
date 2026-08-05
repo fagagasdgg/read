@@ -2,7 +2,6 @@ import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
 import { loadAllProgress } from '../epub/progress'
 import { listSavedBooks } from '../epub/library'
-import { countNotebookEntries } from '../notes/notebooks'
 
 const STORAGE_KEY = 'read-reading-time-v2'
 const LEGACY_KEY = 'read-reading-time'
@@ -398,17 +397,16 @@ async function countFinishedBooks(): Promise<number> {
   return count
 }
 
-export async function addBookReadingSession(
+function addMsToDay(
+  store: ReadingStore,
   bookId: string,
   title: string,
   ms: number,
-  at = Date.now(),
-): Promise<void> {
-  if (!Number.isFinite(ms) || ms < 5000) return
-
+  at: number,
+): void {
+  if (ms <= 0) return
   const rounded = Math.round(ms)
   const key = dateKey(new Date(at))
-  const store = await readStore()
   const day = store.days[key] ?? { date: key, totalMs: 0, byBook: {} }
   day.totalMs += rounded
   day.byBook[bookId] = (day.byBook[bookId] ?? 0) + rounded
@@ -424,6 +422,48 @@ export async function addBookReadingSession(
   book.totalMs += rounded
   book.updatedAt = at
   store.books[bookId] = book
+}
+
+/** 将会话按本地自然日切开，避免跨午夜整段记到结束那天 */
+function splitReadingSessionByLocalDay(
+  startedAt: number,
+  endedAt: number,
+): Array<{ at: number; ms: number }> {
+  if (!Number.isFinite(startedAt) || !Number.isFinite(endedAt) || endedAt <= startedAt) {
+    return []
+  }
+
+  const chunks: Array<{ at: number; ms: number }> = []
+  let cursor = startedAt
+  while (cursor < endedAt) {
+    const nextMidnight = startOfDay(addDays(new Date(cursor), 1)).getTime()
+    const sliceEnd = Math.min(endedAt, nextMidnight)
+    chunks.push({ at: cursor, ms: sliceEnd - cursor })
+    cursor = sliceEnd
+  }
+  return chunks
+}
+
+export async function addBookReadingSession(
+  bookId: string,
+  title: string,
+  ms: number,
+  atOrRange: number | { startedAt: number; endedAt?: number } = Date.now(),
+): Promise<void> {
+  if (!Number.isFinite(ms) || ms < 5000) return
+
+  const endedAt =
+    typeof atOrRange === 'number' ? atOrRange : (atOrRange.endedAt ?? Date.now())
+  const startedAt =
+    typeof atOrRange === 'number' ? endedAt - Math.round(ms) : atOrRange.startedAt
+
+  const store = await readStore()
+  const chunks = splitReadingSessionByLocalDay(startedAt, startedAt + Math.round(ms))
+  const usableChunks = chunks.length > 0 ? chunks : [{ at: endedAt, ms: Math.round(ms) }]
+
+  for (const chunk of usableChunks) {
+    addMsToDay(store, bookId, title, chunk.ms, chunk.at)
+  }
 
   await writeStore(store)
 }
@@ -454,9 +494,22 @@ export async function getReadingTimeStats(): Promise<ReadingTimeStats> {
   return { todayMs, weekMs, totalMs, recentDays: records.slice(0, 14) }
 }
 
+/** 阅历「本周期笔记条数」的时间窗（与 getReadingHistoryStats 一致） */
+export function getReadingNoteCountRange(
+  mode: PeriodMode,
+  anchor: Date,
+): { from: number; to: number } {
+  const { start, end } = getPeriodRange(mode, anchor)
+  return {
+    from: start.getTime(),
+    to: end.getTime() + 86_400_000 - 1,
+  }
+}
+
 export async function getReadingHistoryStats(
   mode: PeriodMode,
   anchor: Date,
+  options?: { noteCount?: number },
 ): Promise<ReadingHistoryStats> {
   const store = await readStore()
   const savedBooks = await listSavedBooks()
@@ -494,9 +547,7 @@ export async function getReadingHistoryStats(
   const booksRead = Object.values(bookTotals).filter((ms) => ms >= 5000).length
   const booksFinished = await countFinishedBooks()
 
-  const noteFrom = start.getTime()
-  const noteTo = end.getTime() + 86_400_000 - 1
-  const noteCount = await countNotebookEntries({ from: noteFrom, to: noteTo })
+  const noteCount = options?.noteCount ?? 0
 
   const distribution = buildDistribution(mode, anchor, store)
   const distributionMaxMs = Math.max(...distribution.map((d) => d.ms), 1)

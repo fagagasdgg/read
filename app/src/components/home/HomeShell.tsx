@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { startTransition, useState } from 'react'
 import { BookshelfScreen } from '../bookshelf/BookshelfScreen'
 import { NotesScreen } from '../notes/NotesScreen'
 import { AppSettingsScreen } from '../settings/AppSettingsScreen'
@@ -13,6 +13,14 @@ interface HomeShellProps {
 
 export function HomeShell({ onOpenBook }: HomeShellProps) {
   const [tab, setTab] = useState<HomeTab>('bookshelf')
+  const [visited, setVisited] = useState<Partial<Record<HomeTab, boolean>>>({
+    bookshelf: true,
+  })
+
+  function go(next: HomeTab) {
+    setVisited((prev) => (prev[next] ? prev : { ...prev, [next]: true }))
+    startTransition(() => setTab(next))
+  }
 
   return (
     <div className="home-shell" data-tab={tab}>
@@ -22,16 +30,16 @@ export function HomeShell({ onOpenBook }: HomeShellProps) {
             <BookshelfScreen onOpenBook={onOpenBook} />
           </section>
           <section className="home-panel" aria-hidden={tab !== 'notes'}>
-            <NotesScreen />
+            {visited.notes ? <NotesScreen isActive={tab === 'notes'} /> : null}
           </section>
           <section className="home-panel" aria-hidden={tab !== 'statistics'}>
-            <StatisticsScreen isActive={tab === 'statistics'} />
+            {visited.statistics ? <StatisticsScreen isActive={tab === 'statistics'} /> : null}
           </section>
           <section className="home-panel" aria-hidden={tab !== 'tools'}>
-            <ToolsScreen />
+            {visited.tools ? <ToolsScreen /> : null}
           </section>
           <section className="home-panel" aria-hidden={tab !== 'settings'}>
-            <AppSettingsScreen />
+            {visited.settings ? <AppSettingsScreen /> : null}
           </section>
         </div>
       </div>
@@ -40,7 +48,7 @@ export function HomeShell({ onOpenBook }: HomeShellProps) {
         <button
           type="button"
           className={`home-tab-btn${tab === 'bookshelf' ? ' active' : ''}`}
-          onClick={() => setTab('bookshelf')}
+          onClick={() => go('bookshelf')}
         >
           <span className="home-tab-icon" aria-hidden>
             📚
@@ -50,7 +58,7 @@ export function HomeShell({ onOpenBook }: HomeShellProps) {
         <button
           type="button"
           className={`home-tab-btn${tab === 'notes' ? ' active' : ''}`}
-          onClick={() => setTab('notes')}
+          onClick={() => go('notes')}
         >
           <span className="home-tab-icon" aria-hidden>
             📝
@@ -60,7 +68,7 @@ export function HomeShell({ onOpenBook }: HomeShellProps) {
         <button
           type="button"
           className={`home-tab-btn${tab === 'statistics' ? ' active' : ''}`}
-          onClick={() => setTab('statistics')}
+          onClick={() => go('statistics')}
         >
           <span className="home-tab-icon" aria-hidden>
             📊
@@ -70,7 +78,7 @@ export function HomeShell({ onOpenBook }: HomeShellProps) {
         <button
           type="button"
           className={`home-tab-btn${tab === 'tools' ? ' active' : ''}`}
-          onClick={() => setTab('tools')}
+          onClick={() => go('tools')}
         >
           <span className="home-tab-icon" aria-hidden>
             🧰
@@ -80,7 +88,7 @@ export function HomeShell({ onOpenBook }: HomeShellProps) {
         <button
           type="button"
           className={`home-tab-btn${tab === 'settings' ? ' active' : ''}`}
-          onClick={() => setTab('settings')}
+          onClick={() => go('settings')}
         >
           <span className="home-tab-icon" aria-hidden>
             ⚙️

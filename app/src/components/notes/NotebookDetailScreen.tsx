@@ -10,7 +10,9 @@ import {
   isSystemNotebook,
   listNotebookEntries,
   removeNotebookEntry,
+  updateNotebookEntryAnalysis,
   type NotebookDocument,
+  type NotebookEntryAnalysis,
 } from '../../services/notes/notebooks'
 import { parseFrequencyMeta } from '../../services/tools/bookWordFrequency'
 import { WordPhraseSection } from '../reader/WordPhraseSection'
@@ -21,6 +23,13 @@ import {
   saveNotebookPageSize,
   type NotebookPageSize,
 } from '../../services/notes/notebookUiSettings'
+
+const EMPTY_ANALYSIS: NotebookEntryAnalysis = {
+  translation: '',
+  collocations: '',
+  slangs: '',
+  sentencePattern: '',
+}
 
 interface NotebookDetailScreenProps {
   notebookId: string
@@ -42,6 +51,9 @@ export function NotebookDetailScreen({
   const [pageSize, setPageSize] = useState<NotebookPageSize>(20)
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [editDraft, setEditDraft] = useState<NotebookEntryAnalysis>(EMPTY_ANALYSIS)
+  const [savingEdit, setSavingEdit] = useState(false)
   const [searchDraft, setSearchDraft] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [freqSortDir, setFreqSortDir] = useState<'asc' | 'desc'>('desc')
@@ -104,17 +116,102 @@ export function NotebookDetailScreen({
     return () => window.clearTimeout(timer)
   }, [searchDraft])
 
-  const pageData = listNotebookEntries(doc, page, pageSize, {
+  const listOptions = {
     query: showSearch ? searchQuery : undefined,
-    sortBy: isFrequency ? 'frequency' : 'createdAt',
-    sortDir: isFrequency ? freqSortDir : 'desc',
+    sortBy: isFrequency ? ('frequency' as const) : ('createdAt' as const),
+    sortDir: isFrequency ? freqSortDir : ('desc' as const),
     matchWordOnly: isFrequency,
-  })
+  }
+  const pageData = listNotebookEntries(doc, page, pageSize, listOptions)
   const selectedEntry = selectedEntryId ? getNotebookEntryById(doc, selectedEntryId) : null
   const totalEntries = doc?.entries.length ?? 0
+  const canEditAnalysis =
+    !isFrequency &&
+    !isBasePhrasesNotebook(notebookId) &&
+    !isNotFoundWordsNotebook(notebookId)
 
-  function openEntry(entryId: string) {
+  const selectedIndexOnPage = selectedEntry
+    ? pageData.items.findIndex((item) => item.id === selectedEntry.id)
+    : -1
+  const selectedOrderIndex =
+    selectedIndexOnPage >= 0 ? (pageData.page - 1) * pageSize + selectedIndexOnPage : -1
+  const prevOnPage = selectedIndexOnPage > 0 ? pageData.items[selectedIndexOnPage - 1] : null
+  const nextOnPage =
+    selectedIndexOnPage >= 0 && selectedIndexOnPage < pageData.items.length - 1
+      ? pageData.items[selectedIndexOnPage + 1]
+      : null
+
+  function openEntry(entryId: string, nextPage?: number) {
+    setEditing(false)
+    setEditDraft(EMPTY_ANALYSIS)
+    if (typeof nextPage === 'number') {
+      setPage(nextPage)
+    } else {
+      const indexOnCurrentPage = pageData.items.findIndex((item) => item.id === entryId)
+      if (indexOnCurrentPage < 0) {
+        for (let p = 1; p <= pageData.totalPages; p += 1) {
+          const probe = listNotebookEntries(doc, p, pageSize, listOptions)
+          if (probe.items.some((item) => item.id === entryId)) {
+            setPage(p)
+            break
+          }
+        }
+      }
+    }
     setSelectedEntryId(entryId)
+  }
+
+  function goAdjacentEntry(direction: -1 | 1) {
+    if (!selectedEntry) return
+    if (direction < 0) {
+      if (prevOnPage) {
+        openEntry(prevOnPage.id)
+        return
+      }
+      if (pageData.page <= 1) return
+      const prevPage = pageData.page - 1
+      const prevPageData = listNotebookEntries(doc, prevPage, pageSize, listOptions)
+      const last = prevPageData.items[prevPageData.items.length - 1]
+      if (last) openEntry(last.id, prevPage)
+      return
+    }
+
+    if (nextOnPage) {
+      openEntry(nextOnPage.id)
+      return
+    }
+    if (pageData.page >= pageData.totalPages) return
+    const nextPage = pageData.page + 1
+    const nextPageData = listNotebookEntries(doc, nextPage, pageSize, listOptions)
+    const first = nextPageData.items[0]
+    if (first) openEntry(first.id, nextPage)
+  }
+
+  function startEdit() {
+    if (!selectedEntry) return
+    setEditDraft({ ...selectedEntry.analysis })
+    setEditing(true)
+  }
+
+  function cancelEdit() {
+    setEditing(false)
+    setEditDraft(EMPTY_ANALYSIS)
+  }
+
+  async function handleSaveEdit() {
+    if (!selectedEntry) return
+    setSavingEdit(true)
+    try {
+      await updateNotebookEntryAnalysis(notebookId, selectedEntry.id, editDraft)
+      const nextDoc = await getNotebookDocument(notebookId)
+      setDoc(nextDoc)
+      setEditing(false)
+      setEditDraft(EMPTY_ANALYSIS)
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : '保存失败')
+    } finally {
+      setSavingEdit(false)
+    }
   }
 
   async function handlePageSizeChange(nextSize: NotebookPageSize) {
@@ -163,6 +260,7 @@ export function NotebookDetailScreen({
           className="notebook-detail-back"
           onClick={() => {
             if (selectedEntry) {
+              if (editing) cancelEdit()
               setSelectedEntryId(null)
               return
             }
@@ -442,36 +540,127 @@ export function NotebookDetailScreen({
               </section>
             ) : (
               <>
-                <section className="notebook-entry-block">
-                  <h3>原句翻译</h3>
-                  <p>{selectedEntry.analysis.translation || '暂无内容'}</p>
-                </section>
-                <section className="notebook-entry-block">
-                  <h3>固定搭配</h3>
-                  <p>
-                    {normalizeAnalysisListField(
-                      selectedEntry.analysis.collocations || '暂无内容',
-                      'collocations',
-                    ) || '暂无内容'}
-                  </p>
-                </section>
-                <section className="notebook-entry-block">
-                  <h3>俚语讲解</h3>
-                  <p>
-                    {normalizeAnalysisListField(
-                      selectedEntry.analysis.slangs || '暂无内容',
-                      'slangs',
-                    ) || '暂无内容'}
-                  </p>
-                </section>
-                <section className="notebook-entry-block">
-                  <h3>句型分析</h3>
-                  <p>{selectedEntry.analysis.sentencePattern || '暂无内容'}</p>
-                </section>
+                {editing ? (
+                  <>
+                    <label className="notebook-entry-block notebook-entry-edit-field">
+                      <h3>原句翻译</h3>
+                      <textarea
+                        value={editDraft.translation}
+                        onChange={(e) =>
+                          setEditDraft((prev) => ({ ...prev, translation: e.target.value }))
+                        }
+                        rows={4}
+                        placeholder="填写或补充原句翻译"
+                      />
+                    </label>
+                    <label className="notebook-entry-block notebook-entry-edit-field">
+                      <h3>固定搭配</h3>
+                      <textarea
+                        value={editDraft.collocations}
+                        onChange={(e) =>
+                          setEditDraft((prev) => ({ ...prev, collocations: e.target.value }))
+                        }
+                        rows={3}
+                        placeholder="填写或补充固定搭配"
+                      />
+                    </label>
+                    <label className="notebook-entry-block notebook-entry-edit-field">
+                      <h3>俚语讲解</h3>
+                      <textarea
+                        value={editDraft.slangs}
+                        onChange={(e) =>
+                          setEditDraft((prev) => ({ ...prev, slangs: e.target.value }))
+                        }
+                        rows={3}
+                        placeholder="填写或补充俚语讲解"
+                      />
+                    </label>
+                    <label className="notebook-entry-block notebook-entry-edit-field">
+                      <h3>句型分析</h3>
+                      <textarea
+                        value={editDraft.sentencePattern}
+                        onChange={(e) =>
+                          setEditDraft((prev) => ({ ...prev, sentencePattern: e.target.value }))
+                        }
+                        rows={5}
+                        placeholder="填写或补充句型分析"
+                      />
+                    </label>
+                    <div className="notebook-entry-actions">
+                      <button
+                        type="button"
+                        className="notebook-entry-save-btn"
+                        disabled={savingEdit}
+                        onClick={() => void handleSaveEdit()}
+                      >
+                        {savingEdit ? '保存中…' : '保存修改'}
+                      </button>
+                      <button
+                        type="button"
+                        className="notebook-entry-cancel-btn"
+                        disabled={savingEdit}
+                        onClick={cancelEdit}
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <section className="notebook-entry-block">
+                      <h3>原句翻译</h3>
+                      <p>{selectedEntry.analysis.translation || '暂无内容'}</p>
+                    </section>
+                    <section className="notebook-entry-block">
+                      <h3>固定搭配</h3>
+                      <p>
+                        {normalizeAnalysisListField(
+                          selectedEntry.analysis.collocations || '暂无内容',
+                          'collocations',
+                        ) || '暂无内容'}
+                      </p>
+                    </section>
+                    <section className="notebook-entry-block">
+                      <h3>俚语讲解</h3>
+                      <p>
+                        {normalizeAnalysisListField(
+                          selectedEntry.analysis.slangs || '暂无内容',
+                          'slangs',
+                        ) || '暂无内容'}
+                      </p>
+                    </section>
+                    <section className="notebook-entry-block">
+                      <h3>句型分析</h3>
+                      <p>{selectedEntry.analysis.sentencePattern || '暂无内容'}</p>
+                    </section>
+                  </>
+                )}
               </>
             )}
 
-            {!isSystemNotebook(notebookId) && (
+            {!editing && canEditAnalysis && (
+              <div className="notebook-entry-actions">
+                <button
+                  type="button"
+                  className="notebook-entry-edit-btn"
+                  onClick={startEdit}
+                >
+                  编辑这条笔记
+                </button>
+                {!isSystemNotebook(notebookId) && (
+                  <button
+                    type="button"
+                    className="notebook-entry-delete-btn"
+                    disabled={deletingId === selectedEntry.id}
+                    onClick={() => void handleDeleteEntry(selectedEntry.id)}
+                  >
+                    {deletingId === selectedEntry.id ? '删除中…' : '删除这条笔记'}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {!editing && !canEditAnalysis && !isSystemNotebook(notebookId) && (
               <button
                 type="button"
                 className="notebook-entry-delete-btn"
@@ -480,6 +669,30 @@ export function NotebookDetailScreen({
               >
                 {deletingId === selectedEntry.id ? '删除中…' : '删除这条笔记'}
               </button>
+            )}
+
+            {!editing && pageData.total > 1 && (
+              <div className="notebook-entry-nav">
+                <button
+                  type="button"
+                  className="notebook-entry-nav-btn"
+                  disabled={selectedOrderIndex <= 0}
+                  onClick={() => goAdjacentEntry(-1)}
+                >
+                  上一页
+                </button>
+                <span className="notebook-entry-nav-meta">
+                  {selectedOrderIndex >= 0 ? selectedOrderIndex + 1 : '-'} / {pageData.total}
+                </span>
+                <button
+                  type="button"
+                  className="notebook-entry-nav-btn"
+                  disabled={selectedOrderIndex < 0 || selectedOrderIndex >= pageData.total - 1}
+                  onClick={() => goAdjacentEntry(1)}
+                >
+                  下一页
+                </button>
+              </div>
             )}
           </div>
         )}

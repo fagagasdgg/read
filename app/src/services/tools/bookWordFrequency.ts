@@ -5,8 +5,14 @@ import { resolveLemma } from '../dictionary/resolveLemma'
 import { loadEpubFromDevice } from '../epub/import'
 import { loadChapterHtml } from '../epub/parser'
 import type { SavedBookMeta } from '../epub/library'
+import { getBookDefaultNotebookId } from '../notes/bookNotebook'
 import {
   createNotebook,
+  findFrequencyNotebookByBookId,
+  getNotebookDocument,
+  getNotebookMeta,
+  isFrequencyNotebookMeta,
+  renameNotebook,
   replaceNotebookEntries,
   touchNotebook,
   type NotebookEntry,
@@ -64,6 +70,51 @@ export function parseFrequencyMeta(raw: string | undefined): FrequencyEntryMeta 
   }
 }
 
+/** 内存缓存：bookId → lemma→count；null 表示该书无词频本。不写入备份。 */
+const bookOccurrenceCache = new Map<string, Map<string, number> | null>()
+
+export function invalidateBookOccurrenceCache(bookId?: string): void {
+  if (bookId) bookOccurrenceCache.delete(bookId)
+  else bookOccurrenceCache.clear()
+}
+
+/**
+ * 查询单词在本书词频统计中的出现次数。
+ * - 无词频本 / 词未收录 → 返回 null（弹窗不展示）
+ * - 有收录 → 返回 count
+ * 关联方式：词频本 meta.sourceBookId === bookId（创建统计时写入）
+ */
+export async function getBookLemmaOccurrenceCount(
+  bookId: string,
+  lemma: string,
+): Promise<number | null> {
+  const key = lemma.trim().toLowerCase()
+  if (!bookId || !key) return null
+
+  let map = bookOccurrenceCache.get(bookId)
+  if (map === undefined) {
+    const meta = await findFrequencyNotebookByBookId(bookId)
+    if (!meta) {
+      bookOccurrenceCache.set(bookId, null)
+      return null
+    }
+    const doc = await getNotebookDocument(meta.id)
+    const next = new Map<string, number>()
+    for (const entry of doc?.entries ?? []) {
+      const freq = parseFrequencyMeta(entry.analysis?.collocations)
+      if (!freq) continue
+      const lemmaKey = entry.sentence.trim().toLowerCase()
+      if (!lemmaKey) continue
+      next.set(lemmaKey, freq.count)
+    }
+    bookOccurrenceCache.set(bookId, next)
+    map = next
+  }
+
+  if (map === null) return null
+  return map.has(key) ? (map.get(key) ?? null) : null
+}
+
 function htmlToPlainText(html: string): string {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   return doc.body?.textContent ?? ''
@@ -88,7 +139,6 @@ function report(
 
 export interface RunBookFrequencyOptions {
   book: SavedBookMeta
-  notebookTitle: string
   onProgress?: (progress: BookFrequencyProgress) => void
 }
 
@@ -101,13 +151,25 @@ export interface RunBookFrequencyResult {
 /**
  * 全书词频统计（纯离线 ECDICT）：
  * 停用词过滤 → 词形还原 → 仅保留有释义词 → 写入词频笔记本
+ * 笔记本名称取自本书「默认保存笔记本」；未设置则拒绝执行。
  */
 export async function runBookWordFrequencyAnalysis(
   options: RunBookFrequencyOptions,
 ): Promise<RunBookFrequencyResult> {
-  const { book, notebookTitle, onProgress } = options
-  const title = notebookTitle.trim()
-  if (!title) throw new Error('请填写笔记本名称')
+  const { book, onProgress } = options
+
+  const defaultNotebookId = await getBookDefaultNotebookId(book.id)
+  if (!defaultNotebookId) {
+    throw new Error('请先在阅读设置中为本书指定「默认保存笔记本」')
+  }
+  const defaultNotebook = await getNotebookMeta(defaultNotebookId)
+  if (!defaultNotebook || isFrequencyNotebookMeta(defaultNotebook)) {
+    throw new Error('本书默认笔记本无效或不存在，请在阅读设置中重新指定')
+  }
+  const title = defaultNotebook.title.trim()
+  if (!title) {
+    throw new Error('默认笔记本名称为空，请先为其命名')
+  }
 
   report(onProgress, {
     phase: 'load',
@@ -232,11 +294,22 @@ export async function runBookWordFrequencyAnalysis(
     percent: 92,
   })
 
-  const notebook = await createNotebook(title, {
-    kind: 'frequency',
-    sourceBookId: book.id,
-    sourceBookTitle: book.title || book.fileName,
-  })
+  let notebook = await findFrequencyNotebookByBookId(book.id)
+  if (notebook) {
+    if (notebook.title !== title) {
+      try {
+        notebook = await renameNotebook(notebook.id, title)
+      } catch {
+        // 标题冲突时保留原名，仍覆盖词频内容
+      }
+    }
+  } else {
+    notebook = await createNotebook(title, {
+      kind: 'frequency',
+      sourceBookId: book.id,
+      sourceBookTitle: book.title || book.fileName,
+    })
+  }
 
   const now = Date.now()
   const entries: NotebookEntry[] = kept.map((item, index) => ({
@@ -259,6 +332,7 @@ export async function runBookWordFrequencyAnalysis(
 
   await replaceNotebookEntries(notebook.id, entries)
   await touchNotebook(notebook.id)
+  invalidateBookOccurrenceCache(book.id)
 
   report(onProgress, {
     phase: 'done',

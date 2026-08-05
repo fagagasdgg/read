@@ -11,6 +11,7 @@ import {
   resolveLemma,
 } from '../../services/dictionary'
 import type { WordEntry } from '../../services/dictionary'
+import { getBookLemmaOccurrenceCount } from '../../services/tools/bookWordFrequency'
 import { isMasteredLemma, setMasteredLemma } from '../../services/words/mastered'
 import { WordPhraseSection } from './WordPhraseSection'
 
@@ -28,6 +29,7 @@ export interface WordLookupRequest {
 
 interface WordDetailPopupProps {
   lookup: WordLookupRequest | null
+  bookId?: string
   onClose: () => void
   onLookupVariant?: (word: string) => void
   onCompoundNavigate?: (next: WordLookupRequest) => void
@@ -37,6 +39,7 @@ type PanelMode = 'local' | 'online'
 
 export function WordDetailPopup({
   lookup,
+  bookId,
   onClose,
   onLookupVariant,
   onCompoundNavigate,
@@ -51,6 +54,7 @@ export function WordDetailPopup({
   const [onlineError, setOnlineError] = useState('')
   const [mastered, setMastered] = useState(false)
   const [masteredSaving, setMasteredSaving] = useState(false)
+  const [bookOccurrence, setBookOccurrence] = useState<number | null>(null)
 
   useEffect(() => {
     if (!lookup) {
@@ -60,6 +64,7 @@ export function WordDetailPopup({
       setError('')
       setOnlineError('')
       setMastered(false)
+      setBookOccurrence(null)
       setMode('local')
       return
     }
@@ -71,6 +76,7 @@ export function WordDetailPopup({
     setLocalEntry(null)
     setOnlineEntry(null)
     setMastered(false)
+    setBookOccurrence(null)
     setMode('local')
 
     const opts = { exactToken: lookup.exactToken }
@@ -107,6 +113,11 @@ export function WordDetailPopup({
         const markKey = local?.lemma || lemma || normalizeWordToken(lookup.word)
         const marked = markKey ? await isMasteredLemma(markKey) : false
         if (!cancelled) setMastered(marked)
+
+        if (bookId && markKey) {
+          const count = await getBookLemmaOccurrenceCount(bookId, markKey)
+          if (!cancelled) setBookOccurrence(count)
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : '查询失败')
@@ -119,7 +130,7 @@ export function WordDetailPopup({
     return () => {
       cancelled = true
     }
-  }, [lookup])
+  }, [lookup, bookId])
 
   const entry = mode === 'local' ? localEntry : onlineEntry
   const showLoading = loading || (mode === 'online' && onlineLoading && !onlineEntry)
@@ -410,6 +421,14 @@ export function WordDetailPopup({
                     <span className="popup-freq-unit">次</span>
                   </span>
                 )}
+              </div>
+            )}
+
+            {bookOccurrence != null && (
+              <div className="popup-book-occurrence" aria-label={`本书出现 ${bookOccurrence} 次`}>
+                <span className="popup-freq-label">本书</span>
+                <strong className="popup-freq-num">{bookOccurrence}</strong>
+                <span className="popup-freq-unit">次</span>
               </div>
             )}
 

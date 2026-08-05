@@ -1,7 +1,7 @@
 # 项目结构
 
 > 按 `xq/需求.md` §98.1 维护。每次新增/删除/重命名文件后更新本文档。
-> Last updated: 2026-08-04
+> Last updated: 2026-08-05
 
 ```
 read/
@@ -47,7 +47,7 @@ read/
 │   │   ├── components/statistics/
 │   │   │   └── StatisticsScreen.tsx # 阅读时长 + 词汇统计（可展开收起）
 │   │   ├── components/notes/
-│   │   │   ├── NotesScreen.tsx      # 笔记 / 词频统计 双页签
+│   │   │   ├── NotesScreen.tsx      # 阅读笔记 / 词频统计 双页签
 │   │   │   ├── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页；词频本专用列表）
 │   │   │   ├── NotFoundWordEditor.tsx   # 待补全词条手动/豆包录入
 │   │   │   └── NotebookPickerSheet.tsx  # 保存笔记时选择笔记本
@@ -146,7 +146,8 @@ read/
         ├── PROGRESS.md
         ├── PROJECT_STRUCTURE.md     # 本文件
         ├── ARCHITECTURE.md
-        └── KNOWN_ISSUES.md
+        ├── KNOWN_ISSUES.md
+        └── TEST_PLAN_2026-08-05.md  # 本轮反馈修复综合测试表
 ```
 
 ## 文件说明（按模块）
@@ -159,7 +160,7 @@ read/
 | 目录 | `components/reader/TocPanel.tsx` | 章节列表跳转 |
 | 阅读设置 | `components/reader/ReadingSettingsPanel.tsx` | 字号、行距、字体、背景、信源状态 |
 | 行间翻译 | `components/reader/useInlineGlosses.ts` | 当前页可见词查词并生成释义 |
-| 点词弹窗 | `components/reader/WordDetailPopup.tsx` | 释义、发音、变体、已掌握 |
+| 点词弹窗 | `components/reader/WordDetailPopup.tsx` | 释义、发音、变体、已掌握、本书出现次数 |
 | 逐词渲染 | `components/reader/ChapterContent.tsx` | 不用 iframe，单词可点击，支持行间释义 |
 | 已掌握词 | `services/words/mastered.ts` | 隐藏行间翻译的单词列表 |
 | EPUB 解析 | `services/epub/parser.ts` | jszip + OPF/spine + 插图 |

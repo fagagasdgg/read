@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppToast, type AppToastVariant } from '../common/AppToast'
 import { BACKUP_DATA_CHANGED } from '../../services/backup/events'
 import {
@@ -13,6 +13,11 @@ import {
   touchNotebook,
   type NotebookMeta,
 } from '../../services/notes/notebooks'
+import {
+  NOTEBOOK_DATA_CHANGED,
+  NOTES_OPEN_FREQUENCY_PANE,
+  consumeOpenFrequencyNotesPane,
+} from '../../services/notes/events'
 import { NotebookDetailScreen } from './NotebookDetailScreen'
 
 const NOTEBOOK_COLORS = ['#e8dcc8', '#d4e4d9', '#dce4f0', '#f0e0d0', '#e6dce8', '#e0ebe5']
@@ -25,27 +30,48 @@ function notebookColor(id: string): string {
   return NOTEBOOK_COLORS[hash]
 }
 
-export function NotesScreen() {
+export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
   const [notebooks, setNotebooks] = useState<NotebookMeta[]>([])
-  const [pane, setPane] = useState<NotesPane>('notes')
+  const [pane, setPane] = useState<NotesPane>(() =>
+    consumeOpenFrequencyNotesPane() ? 'frequency' : 'notes',
+  )
   const [openNotebookId, setOpenNotebookId] = useState<string | null>(null)
   const [statusText, setStatusText] = useState('')
   const [statusVariant, setStatusVariant] = useState<AppToastVariant>('ok')
+
+  const isActiveRef = useRef(isActive)
+  isActiveRef.current = isActive
 
   const refresh = useCallback(async () => {
     setNotebooks(await listNotebooks())
   }, [])
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    if (isActive) {
+      void refresh()
+      return
+    }
+    setOpenNotebookId(null)
+  }, [isActive, refresh])
 
   useEffect(() => {
-    const onBackupChanged = () => {
-      void refresh()
+    const onDataChanged = () => {
+      if (isActiveRef.current) void refresh()
     }
-    window.addEventListener(BACKUP_DATA_CHANGED, onBackupChanged)
-    return () => window.removeEventListener(BACKUP_DATA_CHANGED, onBackupChanged)
+    const onOpenFrequency = () => {
+      consumeOpenFrequencyNotesPane()
+      setPane('frequency')
+      setOpenNotebookId(null)
+      if (isActiveRef.current) void refresh()
+    }
+    window.addEventListener(NOTEBOOK_DATA_CHANGED, onDataChanged)
+    window.addEventListener(BACKUP_DATA_CHANGED, onDataChanged)
+    window.addEventListener(NOTES_OPEN_FREQUENCY_PANE, onOpenFrequency)
+    return () => {
+      window.removeEventListener(NOTEBOOK_DATA_CHANGED, onDataChanged)
+      window.removeEventListener(BACKUP_DATA_CHANGED, onDataChanged)
+      window.removeEventListener(NOTES_OPEN_FREQUENCY_PANE, onOpenFrequency)
+    }
   }, [refresh])
 
   function showToast(message: string, variant: AppToastVariant = 'ok') {
@@ -118,7 +144,7 @@ export function NotesScreen() {
 
   return (
     <div className="notes-screen">
-      <header className="bookshelf-header notes-header-with-tabs">
+      <header className="notes-header">
         <div className="notes-pane-tabs" role="tablist" aria-label="笔记分类">
           <button
             type="button"
@@ -127,7 +153,7 @@ export function NotesScreen() {
             className={`notes-pane-tab${pane === 'notes' ? ' active' : ''}`}
             onClick={() => setPane('notes')}
           >
-            笔记
+            阅读笔记
           </button>
           <button
             type="button"
@@ -139,16 +165,19 @@ export function NotesScreen() {
             词频统计
           </button>
         </div>
-        {pane === 'notes' && (
+        <div className="notes-header-actions">
           <button
             type="button"
-            className="bookshelf-import-btn"
+            className="bookshelf-import-btn notes-header-add"
             onClick={() => void handleCreate()}
             aria-label="新建笔记本"
+            tabIndex={pane === 'notes' ? 0 : -1}
+            aria-hidden={pane !== 'notes'}
+            disabled={pane !== 'notes'}
           >
             +
           </button>
-        )}
+        </div>
       </header>
 
       <div className="bookshelf-shelf notes-shelf">

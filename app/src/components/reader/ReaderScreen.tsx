@@ -112,9 +112,13 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     }
 
     const flushSession = () => {
+      const endedAt = Date.now()
       pause()
       if (accumulated >= 5000) {
-        void addBookReadingSession(book.id, book.title, accumulated)
+        void addBookReadingSession(book.id, book.title, accumulated, {
+          startedAt: endedAt - accumulated,
+          endedAt,
+        })
       }
       accumulated = 0
       resume()
@@ -519,6 +523,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
 
       <WordDetailPopup
         lookup={wordLookup}
+        bookId={bookId}
         onClose={() => setWordLookup(null)}
         onLookupVariant={(word) =>
           setWordLookup({ word, exactToken: true, seq: Date.now() })

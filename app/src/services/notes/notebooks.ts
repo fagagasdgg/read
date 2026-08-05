@@ -143,12 +143,36 @@ function normalizeTitleKey(title: string): string {
 export async function isNotebookTitleTaken(
   title: string,
   excludeId?: string,
+  options?: { kind?: 'notes' | 'frequency' },
 ): Promise<boolean> {
   const key = normalizeTitleKey(title)
   if (!key) return false
   const notebooks = await readRegistry()
-  return notebooks.some(
-    (item) => item.id !== excludeId && normalizeTitleKey(item.title) === key,
+  const wantKind = options?.kind === 'frequency' ? 'frequency' : 'notes'
+  return notebooks.some((item) => {
+    if (item.id === excludeId) return false
+    if (normalizeTitleKey(item.title) !== key) return false
+    const itemKind = isFrequencyNotebookMeta(item) ? 'frequency' : 'notes'
+    return itemKind === wantKind
+  })
+}
+
+export async function getNotebookMeta(id: string): Promise<NotebookMeta | null> {
+  if (!id) return null
+  const notebooks = await readRegistry()
+  return notebooks.find((item) => item.id === id) ?? null
+}
+
+/** 按来源书籍查找词频统计本（一书一本） */
+export async function findFrequencyNotebookByBookId(
+  bookId: string,
+): Promise<NotebookMeta | null> {
+  if (!bookId) return null
+  const notebooks = await readRegistry()
+  return (
+    notebooks.find(
+      (item) => isFrequencyNotebookMeta(item) && item.sourceBookId === bookId,
+    ) ?? null
   )
 }
 
@@ -359,33 +383,43 @@ export async function listNotebooks(): Promise<NotebookMeta[]> {
   return sortNotebookRegistry(notebooks)
 }
 
-export async function countNotebookEntries(options?: {
+/** 一次遍历同时得到全部条数与可选时间窗内条数（排除系统本 / 词频本） */
+export async function summarizeNotebookEntries(options?: {
   from?: number
   to?: number
-}): Promise<number> {
+}): Promise<{ total: number; inRange: number }> {
   const notebooks = await readRegistry()
   let total = 0
+  let inRange = 0
+  const hasRange = options?.from != null || options?.to != null
+  const from = options?.from ?? 0
+  const to = options?.to ?? Number.MAX_SAFE_INTEGER
 
   for (const meta of notebooks) {
-    if (isSystemNotebook(meta.id)) continue
+    // 系统本 + 词频统计本不计入「阅读笔记」条数
+    if (isSystemNotebook(meta.id) || isFrequencyNotebookMeta(meta)) continue
     const doc = await readDocument(meta.id)
     if (!doc?.entries.length) continue
 
-    if (!options?.from && !options?.to) {
-      total += doc.entries.length
-      continue
-    }
+    total += doc.entries.length
+    if (!hasRange) continue
 
-    const from = options.from ?? 0
-    const to = options.to ?? Number.MAX_SAFE_INTEGER
     for (const entry of doc.entries) {
       if (entry.createdAt >= from && entry.createdAt <= to) {
-        total += 1
+        inRange += 1
       }
     }
   }
 
-  return total
+  return { total, inRange: hasRange ? inRange : total }
+}
+
+export async function countNotebookEntries(options?: {
+  from?: number
+  to?: number
+}): Promise<number> {
+  const summary = await summarizeNotebookEntries(options)
+  return options?.from != null || options?.to != null ? summary.inRange : summary.total
 }
 
 export async function createNotebook(
@@ -401,7 +435,7 @@ export async function createNotebook(
   const trimmed = title?.trim()
   const resolvedTitle = trimmed || pickUniqueDefaultTitle(notebooks)
 
-  if (trimmed && (await isNotebookTitleTaken(resolvedTitle))) {
+  if (trimmed && (await isNotebookTitleTaken(resolvedTitle, undefined, { kind: options?.kind === 'frequency' ? 'frequency' : 'notes' }))) {
     throw new Error(`笔记本「${resolvedTitle}」已存在，请使用其他名称`)
   }
 
@@ -572,9 +606,14 @@ export async function removeNotebook(id: string): Promise<void> {
   if (isSystemNotebook(id)) {
     throw new Error('系统笔记本不可删除')
   }
-  const notebooks = (await readRegistry()).filter((item) => item.id !== id)
-  await writeRegistry(notebooks)
+  const notebooks = await readRegistry()
+  const removed = notebooks.find((item) => item.id === id)
+  await writeRegistry(notebooks.filter((item) => item.id !== id))
   await deleteDocument(id)
+  if (removed && isFrequencyNotebookMeta(removed)) {
+    const { invalidateBookOccurrenceCache } = await import('../tools/bookWordFrequency')
+    invalidateBookOccurrenceCache(removed.sourceBookId)
+  }
   notifyNotebookDataChanged()
 }
 
@@ -584,6 +623,42 @@ export async function touchNotebook(id: string): Promise<void> {
   if (!item) return
   item.updatedAt = Date.now()
   await writeRegistry(sortNotebookRegistry(notebooks))
+}
+
+/** 重命名笔记本（同 kind 内标题仍需唯一） */
+export async function renameNotebook(id: string, title: string): Promise<NotebookMeta> {
+  const trimmed = title.trim()
+  if (!trimmed) throw new Error('笔记本名称不能为空')
+  const notebooks = await readRegistry()
+  const item = notebooks.find((nb) => nb.id === id)
+  if (!item) throw new Error('笔记本不存在')
+  const kind = isFrequencyNotebookMeta(item) ? 'frequency' : 'notes'
+  if (await isNotebookTitleTaken(trimmed, id, { kind })) {
+    throw new Error(`笔记本「${trimmed}」已存在，请使用其他名称`)
+  }
+  if (normalizeTitleKey(trimmed) === normalizeTitleKey(BASE_SENTENCE_NOTEBOOK_TITLE)) {
+    throw new Error(`「${BASE_SENTENCE_NOTEBOOK_TITLE}」为系统总笔记本，请使用其他名称`)
+  }
+  if (
+    [BASE_PHRASES_NOTEBOOK_TITLE, NOT_FOUND_WORDS_NOTEBOOK_TITLE].some(
+      (name) => normalizeTitleKey(trimmed) === normalizeTitleKey(name),
+    )
+  ) {
+    throw new Error('该名称为系统笔记本保留名称，请使用其他名称')
+  }
+
+  item.title = trimmed
+  item.updatedAt = Date.now()
+  await writeRegistry(sortNotebookRegistry(notebooks))
+
+  const doc = await readDocument(id)
+  if (doc) {
+    doc.title = trimmed
+    doc.updatedAt = item.updatedAt
+    await writeDocument(doc)
+  }
+  notifyNotebookDataChanged()
+  return item
 }
 
 function sourceMirrorKey(entry: NotebookEntry, sourceNotebookId: string): string {
@@ -633,6 +708,75 @@ export async function removeNotebookEntry(
 
   notifyNotebookDataChanged()
   return { totalAfter: doc.entries.length }
+}
+
+async function syncAnalysisToMirror(
+  entry: NotebookEntry,
+  sourceNotebookId: string,
+): Promise<void> {
+  const baseDoc = await readDocument(BASE_SENTENCE_NOTEBOOK_ID)
+  if (!baseDoc) return
+  const key = sourceMirrorKey(entry, sourceNotebookId)
+  const mirror = baseDoc.entries.find((item) => mirrorEntryKey(item) === key)
+  if (!mirror) return
+  mirror.analysis = { ...entry.analysis }
+  baseDoc.updatedAt = Date.now()
+  await writeDocument(baseDoc)
+  await touchNotebook(BASE_SENTENCE_NOTEBOOK_ID)
+}
+
+async function syncAnalysisToSourceNotebook(entry: NotebookEntry): Promise<void> {
+  const sourceId = entry.source?.notebookId
+  if (!sourceId || isBaseSentenceNotebook(sourceId)) return
+  const sourceDoc = await readDocument(sourceId)
+  if (!sourceDoc) return
+  const sourceEntry = sourceDoc.entries.find(
+    (item) =>
+      item.createdAt === entry.createdAt &&
+      item.sentence.trim().replace(/\s+/g, ' ') === entry.sentence.trim().replace(/\s+/g, ' '),
+  )
+  if (!sourceEntry) return
+  sourceEntry.analysis = { ...entry.analysis }
+  sourceDoc.updatedAt = Date.now()
+  await writeDocument(sourceDoc)
+  await touchNotebook(sourceId)
+}
+
+/** 更新阅读笔记四项解析字段（不同步词频/词组/待补全） */
+export async function updateNotebookEntryAnalysis(
+  notebookId: string,
+  entryId: string,
+  analysis: NotebookEntryAnalysis,
+): Promise<NotebookEntry> {
+  if (isBasePhrasesNotebook(notebookId) || isNotFoundWordsNotebook(notebookId)) {
+    throw new Error('该笔记本不支持编辑条目内容')
+  }
+  if (await isFrequencyNotebook(notebookId)) {
+    throw new Error('词频统计本不支持此编辑')
+  }
+
+  const doc = await ensureNotebookDocument(notebookId)
+  const entry = doc.entries.find((item) => item.id === entryId)
+  if (!entry) throw new Error('笔记条目不存在')
+
+  entry.analysis = {
+    translation: analysis.translation.trim(),
+    collocations: analysis.collocations.trim(),
+    slangs: analysis.slangs.trim(),
+    sentencePattern: analysis.sentencePattern.trim(),
+  }
+  doc.updatedAt = Date.now()
+  await writeDocument(doc)
+  await touchNotebook(notebookId)
+
+  if (isBaseSentenceNotebook(notebookId)) {
+    await syncAnalysisToSourceNotebook(entry)
+  } else {
+    await syncAnalysisToMirror(entry, notebookId)
+  }
+
+  notifyNotebookDataChanged()
+  return entry
 }
 
 function mirrorEntryKey(entry: NotebookEntry): string {
