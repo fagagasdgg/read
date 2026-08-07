@@ -96,7 +96,9 @@ UserSettings { englishLevel, inlineFontSize, inlineColor, maxMeanings, offsetX, 
 | IndexedDB 缓存 | 仅有道/词霸联网结果 | 是 |
 | 有道 / 词霸 | 「网络」面板与缺本地词时的回退 | 是 |
 
-**弹窗**：默认展示 ECDICT（音标、词性释义、考试标签、COCA=`frq`/BNC/柯林斯、exchange 变体）；发音与词组仍联网；标题旁「网络」⇄「本地」切换。联网面板逻辑与旧版一致（美/英音标、柯林斯+真题频次等）。
+**弹窗**：默认展示 ECDICT（词性释义、考试标签、COCA=`frq`/BNC/柯林斯、exchange 变体）；**美/英音标与喇叭优先用联网缓存（有道/词霸）**，无联网音标再退回 ECDICT；发音与词组仍联网；标题旁「网络」⇄「本地」仅切换释义来源。联网面板逻辑与旧版一致（美/英音标、柯林斯+真题频次等）。
+
+**行间预取**：`useInlineGlosses` 对当前屏 + 邻页批量查词。ECDICT 可提供行间释义时仍会补拉「尚无 IndexedDB 联网缓存」的词条（写入有道/词霸结果），供弹窗音标复用；联网失败不把已有 ECDICT 的词标成 notFound。
 
 **键统一**：`resolveLemma()`（ECDICT lemma_map → compromise）得到原型；已掌握、词组、弹窗标题共用该原型。旧表面形词组会在读取时迁移到原型 key。
 

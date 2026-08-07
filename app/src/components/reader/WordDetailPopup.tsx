@@ -87,33 +87,52 @@ export function WordDetailPopup({
         const local = await lookupLocalWord(lookup.word, opts)
         if (cancelled) return
 
+        const markKey = local?.lemma || lemma || normalizeWordToken(lookup.word)
         setCanonicalLemma(lemma || normalizeWordToken(lookup.word))
         setLocalEntry(local)
 
         if (local) {
           setMode('local')
-        } else {
-          // 无本地词条时自动拉联网（与旧版行为衔接）
-          setMode('online')
+          setLoading(false)
+
+          const marked = markKey ? await isMasteredLemma(markKey) : false
+          if (!cancelled) setMastered(marked)
+          if (bookId && markKey) {
+            const count = await getBookLemmaOccurrenceCount(bookId, markKey)
+            if (!cancelled) setBookOccurrence(count)
+          }
+
+          // 本地释义先出；联网音标后台补齐（缓存优先）
           setOnlineLoading(true)
           try {
             const online = await lookupOnlineWord(lookup.word, opts)
-            if (cancelled) return
-            setOnlineEntry(online)
-            if (!online) setError('未找到该词的释义')
-          } catch (err) {
-            if (!cancelled) {
-              setError(err instanceof Error ? err.message : '查询失败')
-            }
+            if (!cancelled) setOnlineEntry(online)
+          } catch {
+            // 音标失败不影响 ECDICT 释义
           } finally {
             if (!cancelled) setOnlineLoading(false)
           }
+          return
         }
 
-        const markKey = local?.lemma || lemma || normalizeWordToken(lookup.word)
+        // 无本地词条时自动拉联网（与旧版行为衔接）
+        setMode('online')
+        setOnlineLoading(true)
+        try {
+          const online = await lookupOnlineWord(lookup.word, opts)
+          if (cancelled) return
+          setOnlineEntry(online)
+          if (!online) setError('未找到该词的释义')
+        } catch (err) {
+          if (!cancelled) {
+            setError(err instanceof Error ? err.message : '查询失败')
+          }
+        } finally {
+          if (!cancelled) setOnlineLoading(false)
+        }
+
         const marked = markKey ? await isMasteredLemma(markKey) : false
         if (!cancelled) setMastered(marked)
-
         if (bookId && markKey) {
           const count = await getBookLemmaOccurrenceCount(bookId, markKey)
           if (!cancelled) setBookOccurrence(count)
@@ -201,6 +220,7 @@ export function WordDetailPopup({
   }
 
   const displayLemma = entry?.lemma || canonicalLemma
+  const speechLemma = onlineEntry?.lemma || displayLemma
   const hasLocalFreq =
     entry?.frequency &&
     (entry.frequency.collinsStar !== undefined ||
@@ -209,6 +229,29 @@ export function WordDetailPopup({
   const hasOnlineFreq =
     entry?.frequency &&
     (entry.frequency.collinsStar !== undefined || entry.frequency.examFrequency !== undefined)
+
+  const onlineHasUs = Boolean(onlineEntry && (onlineEntry.phoneticUs || onlineEntry.usSpeechUrl))
+  const onlineHasUk = Boolean(onlineEntry && (onlineEntry.phoneticUk || onlineEntry.ukSpeechUrl))
+  const useOnlinePhonetics = Boolean(onlineEntry && (onlineHasUs || onlineHasUk))
+  const localPhonetic = entry?.phoneticUk || entry?.phoneticUs || ''
+
+  function playUs() {
+    const src = onlineEntry
+    if (src?.source === 'iciba' && src.usSpeechUrl) {
+      playSpeechWithFallback(src.usSpeechUrl, src.lemma || speechLemma, 2)
+      return
+    }
+    playSpeechWord(src?.lemma || speechLemma, 2)
+  }
+
+  function playUk() {
+    const src = onlineEntry
+    if (src?.source === 'iciba' && src.ukSpeechUrl) {
+      playSpeechWithFallback(src.ukSpeechUrl, src.lemma || speechLemma, 1)
+      return
+    }
+    playSpeechWord(src?.lemma || speechLemma, 1)
+  }
 
   return (
     <div className="popup-mask" onClick={onClose}>
@@ -253,66 +296,55 @@ export function WordDetailPopup({
             )}
 
             <div className="popup-phonetics">
-              {mode === 'local' ? (
-                (entry.phoneticUs || entry.phoneticUk) && (
-                  <div className="popup-phonetic-row">
-                    <span className="popup-phonetic-label">音标</span>
-                    <span className="popup-phonetic">
-                      /{entry.phoneticUk || entry.phoneticUs}/
-                    </span>
-                    <button
-                      type="button"
-                      className="popup-audio-btn"
-                      aria-label="播放发音"
-                      onClick={() => playSpeechWord(displayLemma, 2)}
-                    >
-                      🔊
-                    </button>
-                  </div>
-                )
-              ) : (
+              {useOnlinePhonetics ? (
                 <>
-                  {(entry.phoneticUs || entry.usSpeechUrl) && (
+                  {onlineHasUs && (
                     <div className="popup-phonetic-row">
                       <span className="popup-phonetic-label">美</span>
-                      <span className="popup-phonetic">/{entry.phoneticUs}/</span>
+                      <span className="popup-phonetic">
+                        {onlineEntry?.phoneticUs ? `/${onlineEntry.phoneticUs}/` : ''}
+                      </span>
                       <button
                         type="button"
                         className="popup-audio-btn"
                         aria-label="播放美音"
-                        onClick={() => {
-                          if (entry.source === 'iciba' && entry.usSpeechUrl) {
-                            playSpeechWithFallback(entry.usSpeechUrl, entry.lemma, 2)
-                          } else {
-                            playSpeechWord(entry.lemma, 2)
-                          }
-                        }}
+                        onClick={playUs}
                       >
                         🔊
                       </button>
                     </div>
                   )}
-                  <div className="popup-phonetic-row">
-                    <span className="popup-phonetic-label">英</span>
-                    <span className="popup-phonetic">/{entry.phoneticUk}/</span>
-                    <button
-                      type="button"
-                      className="popup-audio-btn"
-                      aria-label="播放英音"
-                      onClick={() => {
-                        if (entry.source === 'iciba' && entry.ukSpeechUrl) {
-                          playSpeechWithFallback(entry.ukSpeechUrl, entry.lemma, 1)
-                        } else {
-                          playSpeechWord(entry.lemma, 1)
-                        }
-                      }}
-                    >
-                      🔊
-                    </button>
-                  </div>
+                  {(onlineHasUk || !onlineHasUs) && (
+                    <div className="popup-phonetic-row">
+                      <span className="popup-phonetic-label">英</span>
+                      <span className="popup-phonetic">
+                        {onlineEntry?.phoneticUk ? `/${onlineEntry.phoneticUk}/` : ''}
+                      </span>
+                      <button
+                        type="button"
+                        className="popup-audio-btn"
+                        aria-label="播放英音"
+                        onClick={playUk}
+                      >
+                        🔊
+                      </button>
+                    </div>
+                  )}
                 </>
-              )}
-              {mode === 'local' && !(entry.phoneticUs || entry.phoneticUk) && (
+              ) : localPhonetic ? (
+                <div className="popup-phonetic-row">
+                  <span className="popup-phonetic-label">音标</span>
+                  <span className="popup-phonetic">/{localPhonetic}/</span>
+                  <button
+                    type="button"
+                    className="popup-audio-btn"
+                    aria-label="播放发音"
+                    onClick={() => playSpeechWord(displayLemma, 2)}
+                  >
+                    🔊
+                  </button>
+                </div>
+              ) : (
                 <div className="popup-phonetic-row">
                   <span className="popup-phonetic-label">发音</span>
                   <button

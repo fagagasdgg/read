@@ -218,6 +218,7 @@ export async function lookupWord(
 /**
  * 批量补全：先 ECDICT（不写缓存）再联网（写缓存）。
  * 供行间翻译使用。
+ * ECDICT 已命中时仍会补拉无联网缓存的词条，便于弹窗展示美/英音标。
  */
 export async function lookupLemmasBatch(
   lemmas: string[],
@@ -241,55 +242,66 @@ export async function lookupLemmasBatch(
   ]
   const records = await getCachedRecords([...unique, ...altUnique])
 
-  const missing: string[] = []
+  /** 无 ECDICT、也无联网缓存 → 联网；失败可标 notFound */
+  const missingForGloss: string[] = []
+  /** 已有 ECDICT 释义，但无联网缓存 → 仅补音标；失败不标 notFound */
+  const missingOnlinePhonetics: string[] = []
 
   for (const key of unique) {
+    const direct = records.get(key)
+    const lemma = resolved.get(key) || toLemma(key)
+    const viaLemma =
+      lemma && lemma !== key ? records.get(lemma) : undefined
+    const hasOnline =
+      isOnlineCacheEntry(direct) || isOnlineCacheEntry(viaLemma)
+
+    const surfaceBlocked =
+      direct && isWordNotFoundMarker(direct) && !shouldRetryNotFound(direct)
+    const lemmaBlocked =
+      viaLemma && isWordNotFoundMarker(viaLemma) && !shouldRetryNotFound(viaLemma)
+    const blocked =
+      surfaceBlocked && (lemmaBlocked || !lemma || lemma === key)
+
+    let hasLocal = false
     try {
       const local = await lookupFromEcdict(key)
       if (local) {
         found.set(key, local)
-        continue
+        hasLocal = true
       }
     } catch {
       // continue
     }
 
-    const direct = records.get(key)
-    if (isOnlineCacheEntry(direct)) {
-      found.set(key, direct)
-      continue
-    }
-
-    const lemma = resolved.get(key) || toLemma(key)
-    if (lemma && lemma !== key) {
-      const viaLemma = records.get(lemma)
-      if (isOnlineCacheEntry(viaLemma)) {
-        found.set(key, viaLemma)
-        continue
+    if (hasOnline) {
+      if (!hasLocal) {
+        const online = isOnlineCacheEntry(direct) ? direct : viaLemma
+        if (online && isOnlineCacheEntry(online)) found.set(key, online)
       }
-    }
-
-    const surfaceBlocked =
-      direct && isWordNotFoundMarker(direct) && !shouldRetryNotFound(direct)
-    const lemmaRecord = lemma && lemma !== key ? records.get(lemma) : undefined
-    const lemmaBlocked =
-      lemmaRecord && isWordNotFoundMarker(lemmaRecord) && !shouldRetryNotFound(lemmaRecord)
-
-    if (surfaceBlocked && (lemmaBlocked || !lemma || lemma === key)) {
       continue
     }
 
-    missing.push(key)
+    if (blocked) continue
+
+    if (hasLocal) {
+      missingOnlinePhonetics.push(key)
+      continue
+    }
+
+    missingForGloss.push(key)
   }
 
-  if (!missing.length) return found
+  const toFetch = [...missingForGloss, ...missingOnlinePhonetics]
+  if (!toFetch.length) return found
 
+  const phoneticOnly = new Set(missingOnlinePhonetics)
   const concurrency = 6
   let index = 0
 
   async function processKey(key: string): Promise<void> {
     const lemma = resolved.get(key) || key
     const candidates = lemma !== key ? [lemma, key] : [key]
+    const onlyPhonetics = phoneticOnly.has(key)
 
     for (const candidate of candidates) {
       const prior = records.get(candidate)
@@ -305,7 +317,10 @@ export async function lookupLemmasBatch(
         if (candidate !== key) {
           await setCachedWordAlias(key, entry)
         }
-        found.set(key, entry)
+        // 行间释义优先保留 ECDICT；仅在无本地释义时用联网结果
+        if (!found.has(key)) {
+          found.set(key, entry)
+        }
         if (options.prefetchVariants) {
           void cacheOnlineVariantForms(entry)
         }
@@ -314,18 +329,21 @@ export async function lookupLemmasBatch(
         // try next
       }
     }
-    await setNotFoundLemma(key)
+    // 仅「释义也缺」时标记；已有 ECDICT 的词联网失败不写 notFound
+    if (!onlyPhonetics) {
+      await setNotFoundLemma(key)
+    }
   }
 
   async function worker(): Promise<void> {
-    while (index < missing.length) {
-      const key = missing[index++]
+    while (index < toFetch.length) {
+      const key = toFetch[index++]
       await processKey(key)
     }
   }
 
   await Promise.all(
-    Array.from({ length: Math.min(concurrency, missing.length) }, () => worker()),
+    Array.from({ length: Math.min(concurrency, toFetch.length) }, () => worker()),
   )
 
   return found
