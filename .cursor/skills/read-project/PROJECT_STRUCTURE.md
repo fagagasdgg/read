@@ -1,7 +1,7 @@
 # 项目结构
 
 > 按 `xq/需求.md` §98.1 维护。每次新增/删除/重命名文件后更新本文档。
-> Last updated: 2026-08-05
+> Last updated: 2026-11-11
 
 ```
 read/
@@ -65,11 +65,15 @@ read/
 │   │   │   ├── useInlineGlosses.ts    # 视口可见词惰性查词、行间释义
 │   │   │   ├── ChapterContent.tsx   # 逐词渲染 + 行间释义 + 插图
 │   │   │   ├── WordDetailPopup.tsx  # 点击单词弹出的释义浮窗
+│   │   │   ├── NoteDetailPopup.tsx  # 点击书中笔记下划线弹出的笔记详情
+│   │   │   ├── InBookNoteUnderlineLayer.tsx # 正文笔记下划线热区层
+│   │   │   ├── useInBookNoteMarks.ts # 按章匹配绑定笔记本原文并生成下划线
+│   │   │   ├── matchNoteText.ts     # 章节 DOM 原文折叠空白匹配
 │   │   │   ├── WordPhraseSection.tsx # 词组获取/展示/补充/清空
 │   │   │   ├── ReaderControlPanel.tsx # 底部房子唤出的控制面板
 │   │   │   ├── SettingStepper.tsx   # 设置项步进器（防滚动误触）
 │   │   │   ├── TocPanel.tsx         # 目录/笔记侧栏
-│   │   │   ├── ReadingSettingsPanel.tsx # 排版、行间翻译、本书默认笔记本
+│   │   │   ├── ReadingSettingsPanel.tsx # 排版、行间翻译、本书默认笔记本、书中笔记显示
 │   │   │   ├── SelectionToolbar.tsx   # 选段：复制、深度解析、存笔记
 │   │   │   ├── useTextSelection.ts    # 阅读区文本选区检测
 │   │   │   └── tokenize.ts          # 英文单词切分
@@ -161,6 +165,7 @@ read/
 | 阅读设置 | `components/reader/ReadingSettingsPanel.tsx` | 字号、行距、字体、背景、信源状态 |
 | 行间翻译 | `components/reader/useInlineGlosses.ts` | 当前页可见词查词并生成释义 |
 | 点词弹窗 | `components/reader/WordDetailPopup.tsx` | 释义、发音、变体、已掌握、本书出现次数 |
+| 书中笔记 | `components/reader/useInBookNoteMarks.ts` 等 | 绑定笔记本原文下划线；点线出笔记弹窗 |
 | 逐词渲染 | `components/reader/ChapterContent.tsx` | 不用 iframe，单词可点击，支持行间释义 |
 | 已掌握词 | `services/words/mastered.ts` | 隐藏行间翻译的单词列表 |
 | EPUB 解析 | `services/epub/parser.ts` | jszip + OPF/spine + 插图 |

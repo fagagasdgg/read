@@ -37,6 +37,13 @@ export interface NotebookEntrySource {
   notebookTitle: string
 }
 
+/** 书中定位提示（可选；旧备份无此字段仍可按原文匹配） */
+export interface NotebookEntryLocation {
+  chapterIndex?: number
+  bookId?: string
+  bookTitle?: string
+}
+
 export interface NotebookEntry {
   id: string
   sentence: string
@@ -44,6 +51,8 @@ export interface NotebookEntry {
   analysis: NotebookEntryAnalysis
   /** 仅 base_sentence 总笔记本中的镜像条目带有来源信息 */
   source?: NotebookEntrySource
+  /** 新笔记写入；仅加速匹配，不作为唯一身份 */
+  location?: NotebookEntryLocation
 }
 
 export const BASE_SENTENCE_NOTEBOOK_ID = 'base_sentence'
@@ -135,6 +144,7 @@ function resolveSystemNotebookTitle(id: string, fallback?: string): string {
 export interface AddNotebookEntryOptions {
   bookId?: string
   bookTitle?: string
+  chapterIndex?: number
 }
 
 const REGISTRY_KEY = 'read-notebook-registry'
@@ -269,6 +279,20 @@ function normalizeSource(raw: unknown): NotebookEntrySource | undefined {
   }
 }
 
+function normalizeLocation(raw: unknown): NotebookEntryLocation | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const item = raw as Record<string, unknown>
+  const location: NotebookEntryLocation = {}
+  if (typeof item.chapterIndex === 'number' && Number.isFinite(item.chapterIndex)) {
+    location.chapterIndex = Math.max(0, Math.round(item.chapterIndex))
+  }
+  if (typeof item.bookId === 'string' && item.bookId) location.bookId = item.bookId
+  if (typeof item.bookTitle === 'string' && item.bookTitle) location.bookTitle = item.bookTitle
+  return location.chapterIndex != null || location.bookId || location.bookTitle
+    ? location
+    : undefined
+}
+
 function normalizeEntry(raw: unknown): NotebookEntry | null {
   if (!raw || typeof raw !== 'object') return null
   const item = raw as Record<string, unknown>
@@ -291,6 +315,7 @@ function normalizeEntry(raw: unknown): NotebookEntry | null {
         typeof analysisRaw.sentencePattern === 'string' ? analysisRaw.sentencePattern : '',
     },
     source: normalizeSource(item.source),
+    location: normalizeLocation(item.location),
   }
 }
 
@@ -883,6 +908,17 @@ export async function addNotebookEntry(
   await ensureBaseSentenceNotebook()
   const doc = await ensureNotebookDocument(notebookId)
 
+  const location =
+    options?.chapterIndex != null || options?.bookId || options?.bookTitle
+      ? {
+          ...(options.chapterIndex != null
+            ? { chapterIndex: Math.max(0, Math.round(options.chapterIndex)) }
+            : {}),
+          ...(options.bookId ? { bookId: options.bookId } : {}),
+          ...(options.bookTitle ? { bookTitle: options.bookTitle } : {}),
+        }
+      : undefined
+
   const entry: NotebookEntry = {
     id: createEntryId(),
     sentence: sentence.trim(),
@@ -893,6 +929,7 @@ export async function addNotebookEntry(
       slangs: analysis.slangs?.trim() ?? '',
       sentencePattern: analysis.sentencePattern?.trim() ?? '',
     },
+    location,
   }
 
   doc.entries.unshift(entry)

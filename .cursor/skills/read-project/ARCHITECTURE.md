@@ -100,6 +100,16 @@ UserSettings { englishLevel, inlineFontSize, inlineColor, maxMeanings, offsetX, 
 
 **行间预取**：`useInlineGlosses` 对当前屏 + 邻页批量查词。ECDICT 可提供行间释义时仍会补拉「尚无 IndexedDB 联网缓存」的词条（写入有道/词霸结果），供弹窗音标复用；联网失败不把已有 ECDICT 的词标成 notFound。
 
+## 书中笔记下划线（2026-11-11）
+
+- **关联**：阅读设置「本书默认笔记本」；仅对该绑定本的条目在正文做原文匹配。
+- **旧笔记**：只按折叠空白后的原文匹配；多处命中多处画线；未命中不显示。
+- **新笔记**：`NotebookEntry.location`（含 `chapterIndex` 等）为可选字段，用于优先匹配本章以提速；书删再建仍可靠原文匹配，不依赖 bookId 身份。
+- **交互**：单词点击仍查词；下划线为正文下方独立热区，点击打开可滚动笔记弹窗（限高，关闭钮固定）。
+- **设置**：阅读设置内「在书中显示笔记」开关 + 下划线颜色预设。
+- **备份**：仅新增可选字段，旧 zip 缺字段仍可导入；导出逻辑不剔除普通笔记既有字段。
+- **性能**：按章异步分片匹配，ResizeObserver 重测矩形；翻页不重扫文本。
+
 **键统一**：`resolveLemma()`（ECDICT lemma_map → compromise）得到原型；已掌握、词组、弹窗标题共用该原型。旧表面形词组会在读取时迁移到原型 key。
 
 ### ECDICT 本地全量

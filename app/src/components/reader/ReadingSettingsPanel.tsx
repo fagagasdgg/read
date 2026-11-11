@@ -15,6 +15,7 @@ import {
   saveUserSettings,
 } from '../../services/settings/userSettings'
 import {
+  NOTE_UNDERLINE_COLORS,
   READING_FONTS,
   READING_THEMES,
   type ReadingSettings,
@@ -267,6 +268,39 @@ export function ReadingSettingsPanel({
           <p className="reader-settings-note">
             深度解析后存笔记时，将优先保存到此笔记本；未设置则每次弹出选择。
           </p>
+
+          <label className="reader-setting-toggle">
+            <span>在书中显示笔记</span>
+            <input
+              type="checkbox"
+              checked={settings.showInBookNotes}
+              onChange={(e) => updateReading({ showInBookNotes: e.target.checked })}
+            />
+          </label>
+          <p className="reader-settings-note">
+            开启且已绑定默认笔记本时，正文中匹配到的笔记原文会以下划线标出；点击下划线查看笔记，点击单词仍为查词。
+          </p>
+
+          <div className="reader-setting-row">
+            <span>笔记下划线颜色</span>
+            <div className="reader-gloss-color-grid">
+              {NOTE_UNDERLINE_COLORS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`reader-gloss-color-chip${settings.noteUnderlineColor === item.color ? ' active' : ''}`}
+                  style={{ color: item.color }}
+                  onClick={() => updateReading({ noteUnderlineColor: item.color })}
+                  aria-label={item.label}
+                  title={item.label}
+                  disabled={!settings.showInBookNotes}
+                >
+                  <span className="reader-gloss-color-dot" style={{ background: item.color }} />
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="reader-settings-divider" />
 

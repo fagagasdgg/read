@@ -19,11 +19,18 @@ import {
   type UserSettings,
 } from '../../services/settings/userSettings'
 import { addBookReadingSession } from '../../services/reading/readingTime'
+import type { NotebookEntry } from '../../services/notes/notebooks'
+import {
+  DEFAULT_NOTE_UNDERLINE_COLOR,
+} from '../../services/settings/readingSettings'
 import { ChapterContent } from './ChapterContent'
+import { InBookNoteUnderlineLayer } from './InBookNoteUnderlineLayer'
+import { NoteDetailPopup } from './NoteDetailPopup'
 import { ReaderControlPanel } from './ReaderControlPanel'
 import { ReadingSettingsPanel } from './ReadingSettingsPanel'
 import { SelectionToolbar } from './SelectionToolbar'
 import { TocPanel } from './TocPanel'
+import { useInBookNoteMarks } from './useInBookNoteMarks'
 import { useInlineGlosses } from './useInlineGlosses'
 import { useTextSelection } from './useTextSelection'
 import { useViewportPagination, shouldWaitForMultiPageLand } from './useViewportPagination'
@@ -52,6 +59,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [wordLookup, setWordLookup] = useState<WordLookupRequest | null>(null)
+  const [activeNote, setActiveNote] = useState<NotebookEntry | null>(null)
   const [now, setNow] = useState(() => formatTime(new Date()))
   const [overlay, setOverlay] = useState<ReaderOverlay>(null)
   const [readingSettings, setReadingSettings] = useState<ReadingSettings | null>(null)
@@ -78,6 +86,15 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     layoutStable,
     userSettings,
   )
+
+  const noteMarks = useInBookNoteMarks({
+    bookId,
+    chapterIndex,
+    contentEl,
+    layoutStable,
+    enabled: Boolean(readingSettings?.showInBookNotes),
+    layoutKey: remeasureKey,
+  })
 
   const { selection, clearSelection } = useTextSelection(
     contentEl,
@@ -342,6 +359,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
       : { full: rawWord, parts: rawWord.split('-').filter(Boolean) }
     const full = resolved.full || rawWord
     const parts = resolved.parts.length > 1 ? resolved.parts : []
+    setActiveNote(null)
     setWordLookup({
       word: full,
       exactToken: false,
@@ -353,6 +371,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
   function goPrev() {
     if (!book || !canGoPrev) return
     setWordLookup(null)
+    setActiveNote(null)
 
     if (pageIndex > 0) {
       const next = pageIndex - 1
@@ -369,6 +388,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
   function goNext() {
     if (!book || !canGoNext) return
     setWordLookup(null)
+    setActiveNote(null)
 
     if (pageCount > 0 && pageIndex < pageCount - 1) {
       const next = pageIndex + 1
@@ -390,6 +410,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     void flushProgress()
     setOverlay(null)
     setWordLookup(null)
+    setActiveNote(null)
     onExit()
   }
 
@@ -400,6 +421,7 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
     chapterLandAppliedRef.current = false
     setChapterIndex(index)
     setWordLookup(null)
+    setActiveNote(null)
   }
 
   if (!book && loading) {
@@ -447,6 +469,14 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
                 html={chapterHtml}
                 onWordTap={handleWordTap}
                 glosses={glosses}
+              />
+              <InBookNoteUnderlineLayer
+                marks={noteMarks}
+                color={readingSettings?.noteUnderlineColor ?? DEFAULT_NOTE_UNDERLINE_COLOR}
+                onNoteTap={(entry) => {
+                  setWordLookup(null)
+                  setActiveNote(entry)
+                }}
               />
             </div>
           )}
@@ -507,10 +537,11 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
         />
       )}
 
-      {sessionText && selectionPanelOpen && !overlay && !wordLookup && (
+      {sessionText && selectionPanelOpen && !overlay && !wordLookup && !activeNote && (
         <SelectionToolbar
           bookId={book.id}
           bookTitle={book.title}
+          chapterIndex={chapterIndex}
           text={sessionText}
           onClose={() => setSelectionPanelOpen(false)}
           onClear={() => {
@@ -530,6 +561,8 @@ export function ReaderScreen({ bookId, onExit }: ReaderScreenProps) {
         }
         onCompoundNavigate={(next) => setWordLookup(next)}
       />
+
+      <NoteDetailPopup entry={activeNote} onClose={() => setActiveNote(null)} />
     </div>
   )
 }

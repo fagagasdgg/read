@@ -38,11 +38,31 @@ export const READING_FONTS: ReadingFont[] = [
   },
 ]
 
+export interface NoteUnderlineColor {
+  id: string
+  label: string
+  color: string
+}
+
+/** 参考掌阅划线风格的下划线色 */
+export const NOTE_UNDERLINE_COLORS: NoteUnderlineColor[] = [
+  { id: 'orange', label: '暖橙', color: '#e8913a' },
+  { id: 'blue', label: '雾蓝', color: '#5b8def' },
+  { id: 'green', label: '芽绿', color: '#5aaa6a' },
+  { id: 'purple', label: '暮紫', color: '#9b7bb8' },
+  { id: 'gray', label: '石墨', color: '#8a8580' },
+]
+
+export const DEFAULT_NOTE_UNDERLINE_COLOR = NOTE_UNDERLINE_COLORS[0].color
+
 export interface ReadingSettings {
   fontSize: number
   lineHeight: number
   themeId: string
   fontFamilyId: string
+  /** 在正文用下划线显示本书绑定笔记本中的笔记 */
+  showInBookNotes: boolean
+  noteUnderlineColor: string
 }
 
 export const READING_THEMES: ReadingTheme[] = [
@@ -59,6 +79,25 @@ const DEFAULT_SETTINGS: ReadingSettings = {
   lineHeight: 1.75,
   themeId: 'parchment',
   fontFamilyId: 'serif',
+  showInBookNotes: true,
+  noteUnderlineColor: DEFAULT_NOTE_UNDERLINE_COLOR,
+}
+
+function normalizeNoteUnderlineColor(color: string | undefined): string {
+  const trimmed = (color ?? '').trim().toLowerCase()
+  if (!trimmed) return DEFAULT_NOTE_UNDERLINE_COLOR
+  const preset = NOTE_UNDERLINE_COLORS.find((item) => item.color === trimmed)
+  return preset?.color ?? DEFAULT_NOTE_UNDERLINE_COLOR
+}
+
+function normalizeReadingSettings(partial: Partial<ReadingSettings>): ReadingSettings {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...partial,
+    showInBookNotes:
+      partial.showInBookNotes == null ? DEFAULT_SETTINGS.showInBookNotes : Boolean(partial.showInBookNotes),
+    noteUnderlineColor: normalizeNoteUnderlineColor(partial.noteUnderlineColor),
+  }
 }
 
 export function getFontById(fontFamilyId: string): ReadingFont {
@@ -74,18 +113,18 @@ export async function loadReadingSettings(): Promise<ReadingSettings> {
     if (Capacitor.isNativePlatform()) {
       const { value } = await Preferences.get({ key: STORAGE_KEY })
       if (!value) return { ...DEFAULT_SETTINGS }
-      return { ...DEFAULT_SETTINGS, ...(JSON.parse(value) as Partial<ReadingSettings>) }
+      return normalizeReadingSettings(JSON.parse(value) as Partial<ReadingSettings>)
     }
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...DEFAULT_SETTINGS }
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<ReadingSettings>) }
+    return normalizeReadingSettings(JSON.parse(raw) as Partial<ReadingSettings>)
   } catch {
     return { ...DEFAULT_SETTINGS }
   }
 }
 
 export async function saveReadingSettings(settings: ReadingSettings): Promise<void> {
-  const payload = JSON.stringify(settings)
+  const payload = JSON.stringify(normalizeReadingSettings(settings))
   if (Capacitor.isNativePlatform()) {
     await Preferences.set({ key: STORAGE_KEY, value: payload })
     return

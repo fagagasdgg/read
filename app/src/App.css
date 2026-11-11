@@ -212,7 +212,119 @@
 }
 
 .reader-page-content {
+  position: relative;
   will-change: transform;
+}
+
+.reader-note-underline-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.reader-note-underline {
+  position: absolute;
+  pointer-events: auto;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border-bottom: 2.5px solid #e8913a;
+  border-radius: 0;
+  cursor: pointer;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.reader-note-underline:active {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: inherit;
+}
+
+.note-popup-mask {
+  z-index: 110;
+  align-items: flex-end;
+  padding: 12px;
+}
+
+.note-popup {
+  background: #fff;
+  color: #1f2937;
+  border-radius: 14px 14px 10px 10px;
+  width: min(420px, 100%);
+  max-height: min(78vh, 640px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.note-popup-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 44px 10px 16px;
+  border-bottom: 1px solid #eceff3;
+  position: relative;
+}
+
+.note-popup-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.note-popup-header .popup-close {
+  top: 10px;
+  right: 10px;
+}
+
+.note-popup-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 16px 18px;
+}
+
+.note-popup-block {
+  margin-bottom: 14px;
+}
+
+.note-popup-block:last-child {
+  margin-bottom: 0;
+}
+
+.note-popup-label {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.02em;
+}
+
+.note-popup-sentence {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: #111827;
+}
+
+.note-popup-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  font-size: 0.92rem;
+}
+
+.note-popup-empty {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 0.9rem;
 }
 
 .chapter-content {
