@@ -58,7 +58,7 @@ export function DataBackupSheet({ onClose, onDone }: DataBackupSheetProps) {
       <div className="bookshelf-sheet data-backup-sheet" onClick={(e) => e.stopPropagation()}>
         <h3 className="bookshelf-sheet-title">学习数据备份</h3>
         <p className="bookshelf-sheet-hint data-backup-sheet-hint">
-          一键导出/导入：词典缓存（含查不到的标记）、用户词组、笔记本、已掌握单词、阅历阅读时长。格式为 zip 压缩包，不含 EPUB 书籍文件。
+          一键导出/导入：词典缓存（含查不到的标记）、用户词组、笔记本、笔记标签、已掌握单词、阅历阅读时长。格式为 zip 压缩包，不含 EPUB 书籍文件。旧备份无标签文件也可导入。
         </p>
 
         <div className="bookshelf-sheet-actions">

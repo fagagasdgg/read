@@ -100,6 +100,14 @@ UserSettings { englishLevel, inlineFontSize, inlineColor, maxMeanings, offsetX, 
 
 **行间预取**：`useInlineGlosses` 对当前屏 + 邻页批量查词。ECDICT 可提供行间释义时仍会补拉「尚无 IndexedDB 联网缓存」的词条（写入有道/词霸结果），供弹窗音标复用；联网失败不把已有 ECDICT 的词标成 notFound。
 
+## 笔记标签（2026-11-18）
+
+- **范围**：仅普通阅读本可打标；系统本不可直接打；`base_sentence` 镜像同步 `tagIds`，查询时一并扫到。
+- **标签库**：`services/notes/tags.ts`（Preferences）；工具页增删改查；打标只能选已有标签。
+- **条目字段**：可选 `tagIds: string[]`；旧数据缺失不影响导入。
+- **备份**：zip 增加可选 `note-tags.json`；版本仍为 1；旧 zip 无该文件视为空标签库。
+- **查询**：笔记 Tab 按标签筛选；工具页可查看某标签下笔记。
+
 ## 书中笔记下划线（2026-11-11）
 
 - **关联**：阅读设置「本书默认笔记本」；仅对该绑定本的条目在正文做原文匹配。

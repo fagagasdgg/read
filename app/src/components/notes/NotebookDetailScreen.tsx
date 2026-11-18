@@ -11,11 +11,14 @@ import {
   listNotebookEntries,
   removeNotebookEntry,
   updateNotebookEntryAnalysis,
+  updateNotebookEntryTags,
   type NotebookDocument,
   type NotebookEntryAnalysis,
 } from '../../services/notes/notebooks'
+import { listNoteTags, type NoteTag } from '../../services/notes/tags'
 import { parseFrequencyMeta } from '../../services/tools/bookWordFrequency'
 import { WordPhraseSection } from '../reader/WordPhraseSection'
+import { NoteTagChips, NoteTagPicker } from './NoteTagPicker'
 import { NotFoundWordEditor } from './NotFoundWordEditor'
 import {
   loadNotebookPageSize,
@@ -37,6 +40,8 @@ interface NotebookDetailScreenProps {
   onBack: () => void
   /** 全书词频统计本：列表显示排名/单词/词频 */
   isFrequency?: boolean
+  /** 打开时直接进入某条详情（标签筛选跳转） */
+  initialEntryId?: string | null
 }
 
 export function NotebookDetailScreen({
@@ -44,6 +49,7 @@ export function NotebookDetailScreen({
   title,
   onBack,
   isFrequency = false,
+  initialEntryId = null,
 }: NotebookDetailScreenProps) {
   const [doc, setDoc] = useState<NotebookDocument | null>(null)
   const [loading, setLoading] = useState(true)
@@ -53,6 +59,8 @@ export function NotebookDetailScreen({
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [editDraft, setEditDraft] = useState<NotebookEntryAnalysis>(EMPTY_ANALYSIS)
+  const [editTagIds, setEditTagIds] = useState<string[]>([])
+  const [allTags, setAllTags] = useState<NoteTag[]>([])
   const [savingEdit, setSavingEdit] = useState(false)
   const [searchDraft, setSearchDraft] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -87,8 +95,17 @@ export function NotebookDetailScreen({
   }, [])
 
   useEffect(() => {
-    void loadDoc()
-  }, [loadDoc])
+    void listNoteTags().then(setAllTags)
+  }, [])
+
+  useEffect(() => {
+    void loadDoc().then((next) => {
+      if (!initialEntryId || !next) return
+      if (next.entries.some((entry) => entry.id === initialEntryId)) {
+        setSelectedEntryId(initialEntryId)
+      }
+    })
+  }, [loadDoc, initialEntryId])
 
   useEffect(() => {
     function onVisible() {
@@ -102,11 +119,11 @@ export function NotebookDetailScreen({
 
   useEffect(() => {
     setPage(1)
-    setSelectedEntryId(null)
+    setSelectedEntryId(initialEntryId ?? null)
     setSearchDraft('')
     setSearchQuery('')
     setFreqSortDir('desc')
-  }, [notebookId])
+  }, [notebookId, initialEntryId])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -129,6 +146,7 @@ export function NotebookDetailScreen({
     !isFrequency &&
     !isBasePhrasesNotebook(notebookId) &&
     !isNotFoundWordsNotebook(notebookId)
+  const canTagEntry = canEditAnalysis && !isSystemNotebook(notebookId)
 
   const selectedIndexOnPage = selectedEntry
     ? pageData.items.findIndex((item) => item.id === selectedEntry.id)
@@ -190,12 +208,15 @@ export function NotebookDetailScreen({
   function startEdit() {
     if (!selectedEntry) return
     setEditDraft({ ...selectedEntry.analysis })
+    setEditTagIds([...(selectedEntry.tagIds ?? [])])
     setEditing(true)
+    void listNoteTags().then(setAllTags)
   }
 
   function cancelEdit() {
     setEditing(false)
     setEditDraft(EMPTY_ANALYSIS)
+    setEditTagIds([])
   }
 
   async function handleSaveEdit() {
@@ -203,10 +224,14 @@ export function NotebookDetailScreen({
     setSavingEdit(true)
     try {
       await updateNotebookEntryAnalysis(notebookId, selectedEntry.id, editDraft)
+      if (canTagEntry) {
+        await updateNotebookEntryTags(notebookId, selectedEntry.id, editTagIds)
+      }
       const nextDoc = await getNotebookDocument(notebookId)
       setDoc(nextDoc)
       setEditing(false)
       setEditDraft(EMPTY_ANALYSIS)
+      setEditTagIds([])
     } catch (err) {
       window.alert(err instanceof Error ? err.message : '保存失败')
     } finally {
@@ -480,6 +505,9 @@ export function NotebookDetailScreen({
               </p>
             )}
             <h2 className="notebook-entry-detail-title">{selectedEntry.sentence}</h2>
+            {!editing && (canTagEntry || isBaseSentenceNotebook(notebookId)) ? (
+              <NoteTagChips tags={allTags} tagIds={selectedEntry.tagIds} />
+            ) : null}
 
             {isFrequency ? (
               <>
@@ -586,6 +614,17 @@ export function NotebookDetailScreen({
                         placeholder="填写或补充句型分析"
                       />
                     </label>
+                    {canTagEntry ? (
+                      <section className="notebook-entry-block">
+                        <h3>标签</h3>
+                        <NoteTagPicker
+                          tags={allTags}
+                          selectedIds={editTagIds}
+                          onChange={setEditTagIds}
+                          disabled={savingEdit}
+                        />
+                      </section>
+                    ) : null}
                     <div className="notebook-entry-actions">
                       <button
                         type="button"

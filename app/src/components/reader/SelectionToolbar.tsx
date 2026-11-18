@@ -10,7 +10,13 @@ import {
 } from '../../services/llm/doubaoWorkflow'
 import { normalizeAnalysisListField } from '../../services/llm/analysisParse'
 import { getBookDefaultNotebookId } from '../../services/notes/bookNotebook'
-import { addNotebookEntry, type NotebookEntryAnalysis } from '../../services/notes/notebooks'
+import {
+  addNotebookEntry,
+  updateNotebookEntryTags,
+  type NotebookEntryAnalysis,
+} from '../../services/notes/notebooks'
+import { listNoteTags, type NoteTag } from '../../services/notes/tags'
+import { NoteTagPicker } from '../notes/NoteTagPicker'
 import { NotebookPickerSheet } from '../notes/NotebookPickerSheet'
 import { DoubaoPasteSheet } from './DoubaoPasteSheet'
 
@@ -23,7 +29,7 @@ interface SelectionToolbarProps {
   onClear: () => void
 }
 
-type ToolbarMode = 'actions' | 'preview'
+type ToolbarMode = 'actions' | 'preview' | 'tag'
 
 function suspendDomSelection() {
   const sel = window.getSelection()
@@ -56,6 +62,10 @@ export function SelectionToolbar({
   const [lengthWarning, setLengthWarning] = useState('')
   const [toast, setToast] = useState('')
   const [importSuccess, setImportSuccess] = useState(false)
+  const [allTags, setAllTags] = useState<NoteTag[]>([])
+  const [postSaveTagIds, setPostSaveTagIds] = useState<string[]>([])
+  const [savedRef, setSavedRef] = useState<{ notebookId: string; entryId: string } | null>(null)
+  const [savingTags, setSavingTags] = useState(false)
 
   const applyImportedAnalysis = useCallback((result: NotebookEntryAnalysis) => {
     suspendDomSelection()
@@ -153,18 +163,46 @@ export function SelectionToolbar({
     setError('')
     setMessage('')
     try {
-      await addNotebookEntry(notebookId, text, analysis, {
+      const entry = await addNotebookEntry(notebookId, text, analysis, {
         bookId,
         bookTitle,
         chapterIndex,
       })
-      setMessage('已保存到笔记')
       setShowPicker(false)
-      setTimeout(onClear, 800)
+      const tags = await listNoteTags()
+      setAllTags(tags)
+      setSavedRef({ notebookId, entryId: entry.id })
+      setPostSaveTagIds([])
+      if (tags.length) {
+        setMode('tag')
+        setMessage('已保存。可选择标签，或点「完成」跳过')
+      } else {
+        setMessage('已保存到笔记（可到工具页创建标签后再打标）')
+        setTimeout(onClear, 900)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function finishPostSaveTags(apply: boolean) {
+    if (!savedRef) {
+      onClear()
+      return
+    }
+    setSavingTags(true)
+    setError('')
+    try {
+      if (apply && postSaveTagIds.length) {
+        await updateNotebookEntryTags(savedRef.notebookId, savedRef.entryId, postSaveTagIds)
+      }
+      onClear()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存标签失败')
+    } finally {
+      setSavingTags(false)
     }
   }
 
@@ -181,7 +219,9 @@ export function SelectionToolbar({
     setShowPicker(true)
   }
 
-  const expanded = mode === 'preview'
+  const expanded = mode === 'preview' || mode === 'tag'
+  const panelTitle =
+    mode === 'tag' ? '添加标签' : mode === 'preview' ? '深度解析' : '选段工具'
 
   return createPortal(
     <>
@@ -190,7 +230,7 @@ export function SelectionToolbar({
           type="button"
           className="selection-action-backdrop"
           aria-label="关闭解析结果"
-          onClick={onClose}
+          onClick={mode === 'tag' ? () => void finishPostSaveTags(false) : onClose}
         />
       )}
 
@@ -199,8 +239,13 @@ export function SelectionToolbar({
         onMouseDown={(e) => e.preventDefault()}
       >
         <header className="selection-panel-header">
-          <span className="selection-panel-title">{expanded ? '深度解析' : '选段工具'}</span>
-          <button type="button" className="selection-panel-close" onClick={onClose} aria-label="关闭">
+          <span className="selection-panel-title">{panelTitle}</span>
+          <button
+            type="button"
+            className="selection-panel-close"
+            onClick={mode === 'tag' ? () => void finishPostSaveTags(false) : onClose}
+            aria-label="关闭"
+          >
             ×
           </button>
         </header>
@@ -262,6 +307,34 @@ export function SelectionToolbar({
             )}
             {lengthWarning && <p className="selection-panel-warn">{lengthWarning}</p>}
           </>
+        ) : mode === 'tag' ? (
+          <div className="selection-analysis-preview">
+            <p className="selection-panel-hint">为刚保存的笔记选择标签（可多选）</p>
+            <NoteTagPicker
+              tags={allTags}
+              selectedIds={postSaveTagIds}
+              onChange={setPostSaveTagIds}
+              disabled={savingTags}
+            />
+            <div className="selection-action-grid selection-action-grid-preview">
+              <button
+                type="button"
+                className="selection-action-btn selection-action-btn-secondary"
+                disabled={savingTags}
+                onClick={() => void finishPostSaveTags(false)}
+              >
+                跳过
+              </button>
+              <button
+                type="button"
+                className="selection-action-btn selection-action-btn-primary"
+                disabled={savingTags}
+                onClick={() => void finishPostSaveTags(true)}
+              >
+                {savingTags ? '保存中…' : '完成'}
+              </button>
+            </div>
+          </div>
         ) : (
           analysis && (
             <div className="selection-analysis-preview">

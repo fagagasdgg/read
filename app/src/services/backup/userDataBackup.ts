@@ -5,6 +5,11 @@ import { FilePicker } from '@capawesome/capacitor-file-picker'
 import { getDictionaryCacheStats, importDictionaryRecords } from '../dictionary/cache'
 import { importBookNotebookMap } from '../notes/bookNotebook'
 import { importNotebooksBackup, resetFrequencyNotebookRepair } from '../notes/notebooks'
+import {
+  importNoteTagsBackup,
+  remapTagIds,
+  sanitizeAllEntryTagIds,
+} from '../notes/tags'
 import { getReadingTimeStats, importReadingTimeBackup } from '../reading/readingTime'
 import {
   formatBackupDirectoryLabel,
@@ -138,9 +143,24 @@ export async function importUserDataBackup(file?: File): Promise<ImportUserDataR
 
   await importPhraseStore(payload.wordPhrases)
   await importMasteredWordsList(payload.masteredWords)
+
+  const tagImport = await importNoteTagsBackup(payload.noteTags ?? [])
+  if (tagImport.added > 0) {
+    warnings.push(`合并 ${tagImport.added} 个笔记标签`)
+  }
+
+  for (const doc of payload.notebooks.documents) {
+    for (const entry of doc.entries) {
+      const next = remapTagIds(entry.tagIds, tagImport.remapped)
+      if (next.length) entry.tagIds = next
+      else delete entry.tagIds
+    }
+  }
+
   const notebookResult = await importNotebooksBackup(payload.notebooks)
   warnings.push(...notebookResult.warnings)
   resetFrequencyNotebookRepair()
+  await sanitizeAllEntryTagIds()
 
   const bookNotebookAdded = await importBookNotebookMap(payload.bookNotebooks)
 

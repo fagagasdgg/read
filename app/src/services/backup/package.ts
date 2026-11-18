@@ -10,6 +10,7 @@ const NOTEBOOKS_REGISTRY_FILE = 'notebooks/registry.json'
 const NOTEBOOKS_DIR = 'notebooks/documents'
 const BOOK_NOTEBOOKS_FILE = 'book-notebooks.json'
 const READING_TIME_FILE = 'reading-time.json'
+const NOTE_TAGS_FILE = 'note-tags.json'
 
 function notebookDocFile(id: string): string {
   return `${NOTEBOOKS_DIR}/${id}.json`
@@ -24,6 +25,7 @@ export async function buildBackupZip(payload: BackupPayload): Promise<Blob> {
   zip.file(NOTEBOOKS_REGISTRY_FILE, JSON.stringify(payload.notebooks.registry, null, 2))
   zip.file(BOOK_NOTEBOOKS_FILE, JSON.stringify(payload.bookNotebooks, null, 2))
   zip.file(READING_TIME_FILE, JSON.stringify(payload.readingTime, null, 2))
+  zip.file(NOTE_TAGS_FILE, JSON.stringify(payload.noteTags ?? [], null, 2))
 
   for (const doc of payload.notebooks.documents) {
     zip.file(notebookDocFile(doc.id), JSON.stringify(doc, null, 2))
@@ -76,6 +78,7 @@ export async function parseBackupZip(buffer: ArrayBuffer): Promise<BackupPayload
     days: {},
     books: {},
   })
+  const noteTags = await readJson<NonNullable<BackupPayload['noteTags']>>(NOTE_TAGS_FILE, [])
 
   const documents: BackupPayload['notebooks']['documents'] = []
   const docPrefix = `${NOTEBOOKS_DIR}/`
@@ -113,6 +116,7 @@ export async function parseBackupZip(buffer: ArrayBuffer): Promise<BackupPayload
     notebooks: { registry, documents },
     bookNotebooks,
     readingTime,
+    noteTags,
   }
 }
 

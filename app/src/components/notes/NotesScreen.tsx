@@ -18,6 +18,12 @@ import {
   NOTES_OPEN_FREQUENCY_PANE,
   consumeOpenFrequencyNotesPane,
 } from '../../services/notes/events'
+import {
+  findEntriesByTagId,
+  listNoteTags,
+  type NoteTag,
+  type TaggedNoteHit,
+} from '../../services/notes/tags'
 import { NotebookDetailScreen } from './NotebookDetailScreen'
 
 const NOTEBOOK_COLORS = ['#e8dcc8', '#d4e4d9', '#dce4f0', '#f0e0d0', '#e6dce8', '#e0ebe5']
@@ -36,14 +42,21 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
     consumeOpenFrequencyNotesPane() ? 'frequency' : 'notes',
   )
   const [openNotebookId, setOpenNotebookId] = useState<string | null>(null)
+  const [openEntryId, setOpenEntryId] = useState<string | null>(null)
   const [statusText, setStatusText] = useState('')
   const [statusVariant, setStatusVariant] = useState<AppToastVariant>('ok')
+  const [tags, setTags] = useState<NoteTag[]>([])
+  const [tagFilterId, setTagFilterId] = useState('')
+  const [tagHits, setTagHits] = useState<TaggedNoteHit[]>([])
+  const [tagHitsLoading, setTagHitsLoading] = useState(false)
 
   const isActiveRef = useRef(isActive)
   isActiveRef.current = isActive
 
   const refresh = useCallback(async () => {
-    setNotebooks(await listNotebooks())
+    const [nbList, tagList] = await Promise.all([listNotebooks(), listNoteTags()])
+    setNotebooks(nbList)
+    setTags(tagList)
   }, [])
 
   useEffect(() => {
@@ -52,7 +65,27 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
       return
     }
     setOpenNotebookId(null)
+    setOpenEntryId(null)
   }, [isActive, refresh])
+
+  useEffect(() => {
+    if (pane !== 'notes' || !tagFilterId) {
+      setTagHits([])
+      return
+    }
+    let cancelled = false
+    setTagHitsLoading(true)
+    void findEntriesByTagId(tagFilterId)
+      .then((hits) => {
+        if (!cancelled) setTagHits(hits)
+      })
+      .finally(() => {
+        if (!cancelled) setTagHitsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [pane, tagFilterId, notebooks])
 
   useEffect(() => {
     const onDataChanged = () => {
@@ -137,10 +170,16 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
         notebookId={openNotebookId}
         title={notebook?.title ?? '笔记本'}
         isFrequency={isFrequencyNotebookMeta(notebook)}
-        onBack={() => setOpenNotebookId(null)}
+        initialEntryId={openEntryId}
+        onBack={() => {
+          setOpenNotebookId(null)
+          setOpenEntryId(null)
+        }}
       />
     )
   }
+
+  const selectedTagName = tags.find((tag) => tag.id === tagFilterId)?.name
 
   return (
     <div className="notes-screen">
@@ -160,7 +199,10 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
             role="tab"
             aria-selected={pane === 'frequency'}
             className={`notes-pane-tab${pane === 'frequency' ? ' active' : ''}`}
-            onClick={() => setPane('frequency')}
+            onClick={() => {
+              setPane('frequency')
+              setTagFilterId('')
+            }}
           >
             词频统计
           </button>
@@ -180,67 +222,118 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
         </div>
       </header>
 
-      <div className="bookshelf-shelf notes-shelf">
-        {visibleNotebooks.filter((n) => !isSystemNotebook(n.id)).length === 0 &&
-        (pane === 'frequency' || visibleNotebooks.every((n) => isSystemNotebook(n.id))) ? (
-          <div className="bookshelf-empty">
-            {pane === 'frequency' ? (
-              <>
-                <p>还没有词频统计笔记本</p>
-                <p className="bookshelf-empty-hint">请到「工具 → 全书词频统计」生成</p>
-              </>
-            ) : (
-              <>
-                <p>还没有自定义笔记本</p>
-                <p className="bookshelf-empty-hint">
-                  点击右上角 + 创建；句子会自动汇总到 base_sentence，词组汇总到「词组总集」
-                </p>
-              </>
-            )}
-          </div>
-        ) : null}
-        <ul className="bookshelf-grid">
-          {visibleNotebooks.map((notebook) => (
-            <li key={notebook.id} className="bookshelf-book">
-              <button
-                type="button"
-                className={`bookshelf-cover notes-cover${isSystemNotebook(notebook.id) ? ' notes-cover-base' : ''}${isFrequencyNotebookMeta(notebook) ? ' notes-cover-freq' : ''}`}
-                style={{ background: notebookColor(notebook.id) }}
-                onClick={() => void handleOpen(notebook.id)}
-              >
-                <span className="notes-cover-icon" aria-hidden>
-                  {isBaseSentenceNotebook(notebook.id)
-                    ? '📚'
-                    : isBasePhrasesNotebook(notebook.id)
-                      ? '🔗'
-                      : isNotFoundWordsNotebook(notebook.id)
-                        ? '✏️'
-                        : isFrequencyNotebookMeta(notebook)
-                          ? '📊'
-                          : '📒'}
-                </span>
-                <span className="notes-cover-title">{notebook.title}</span>
-                {isSystemNotebook(notebook.id) && (
-                  <span className="notes-cover-badge">系统</span>
-                )}
-                {isFrequencyNotebookMeta(notebook) && (
-                  <span className="notes-cover-badge">词频</span>
-                )}
-              </button>
-              {!isSystemNotebook(notebook.id) && (
+      {pane === 'notes' ? (
+        <div className="notes-tag-filter">
+          <label>
+            <span>按标签筛选</span>
+            <select
+              className="reader-level-select"
+              value={tagFilterId}
+              onChange={(e) => setTagFilterId(e.target.value)}
+            >
+              <option value="">全部笔记本</option>
+              {tags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!tags.length ? (
+            <p className="notes-tag-filter-hint">还没有标签，请到「工具 → 笔记标签」创建</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {pane === 'notes' && tagFilterId ? (
+        <div className="notes-tag-results">
+          <h2 className="notes-tag-results-title">
+            标签「{selectedTagName ?? '…'}」· {tagHitsLoading ? '查询中…' : `${tagHits.length} 条`}
+          </h2>
+          {!tagHitsLoading && tagHits.length === 0 ? (
+            <p className="bookshelf-empty-hint">没有找到带该标签的笔记</p>
+          ) : null}
+          <ul className="notes-tag-hit-list">
+            {tagHits.map((hit) => (
+              <li key={`${hit.notebookId}:${hit.entry.id}`}>
                 <button
                   type="button"
-                  className="bookshelf-book-delete"
-                  onClick={() => void handleRemove(notebook.id, notebook.title)}
-                  aria-label="删除笔记本"
+                  className="notes-tag-hit-btn"
+                  onClick={() => {
+                    setOpenEntryId(hit.entry.id)
+                    void handleOpen(hit.notebookId)
+                  }}
                 >
-                  ×
+                  <span className="note-tags-hit-nb">{hit.notebookTitle}</span>
+                  <p className="note-tags-hit-sentence">{hit.entry.sentence}</p>
                 </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div className="bookshelf-shelf notes-shelf">
+          {visibleNotebooks.filter((n) => !isSystemNotebook(n.id)).length === 0 &&
+          (pane === 'frequency' || visibleNotebooks.every((n) => isSystemNotebook(n.id))) ? (
+            <div className="bookshelf-empty">
+              {pane === 'frequency' ? (
+                <>
+                  <p>还没有词频统计笔记本</p>
+                  <p className="bookshelf-empty-hint">请到「工具 → 全书词频统计」生成</p>
+                </>
+              ) : (
+                <>
+                  <p>还没有自定义笔记本</p>
+                  <p className="bookshelf-empty-hint">
+                    点击右上角 + 创建；句子会自动汇总到 base_sentence，词组汇总到「词组总集」
+                  </p>
+                </>
               )}
-            </li>
-          ))}
-        </ul>
-      </div>
+            </div>
+          ) : null}
+          <ul className="bookshelf-grid">
+            {visibleNotebooks.map((notebook) => (
+              <li key={notebook.id} className="bookshelf-book">
+                <button
+                  type="button"
+                  className={`bookshelf-cover notes-cover${isSystemNotebook(notebook.id) ? ' notes-cover-base' : ''}${isFrequencyNotebookMeta(notebook) ? ' notes-cover-freq' : ''}`}
+                  style={{ background: notebookColor(notebook.id) }}
+                  onClick={() => void handleOpen(notebook.id)}
+                >
+                  <span className="notes-cover-icon" aria-hidden>
+                    {isBaseSentenceNotebook(notebook.id)
+                      ? '📚'
+                      : isBasePhrasesNotebook(notebook.id)
+                        ? '🔗'
+                        : isNotFoundWordsNotebook(notebook.id)
+                          ? '✏️'
+                          : isFrequencyNotebookMeta(notebook)
+                            ? '📊'
+                            : '📒'}
+                  </span>
+                  <span className="notes-cover-title">{notebook.title}</span>
+                  {isSystemNotebook(notebook.id) && (
+                    <span className="notes-cover-badge">系统</span>
+                  )}
+                  {isFrequencyNotebookMeta(notebook) && (
+                    <span className="notes-cover-badge">词频</span>
+                  )}
+                </button>
+                {!isSystemNotebook(notebook.id) && (
+                  <button
+                    type="button"
+                    className="bookshelf-book-delete"
+                    onClick={() => void handleRemove(notebook.id, notebook.title)}
+                    aria-label="删除笔记本"
+                  >
+                    ×
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <AppToast message={statusText} variant={statusVariant} />
     </div>

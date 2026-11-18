@@ -53,6 +53,8 @@ export interface NotebookEntry {
   source?: NotebookEntrySource
   /** 新笔记写入；仅加速匹配，不作为唯一身份 */
   location?: NotebookEntryLocation
+  /** 普通阅读笔记标签 id 列表（可选；旧备份无此字段） */
+  tagIds?: string[]
 }
 
 export const BASE_SENTENCE_NOTEBOOK_ID = 'base_sentence'
@@ -293,6 +295,20 @@ function normalizeLocation(raw: unknown): NotebookEntryLocation | undefined {
     : undefined
 }
 
+function normalizeTagIds(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const ids: string[] = []
+  const seen = new Set<string>()
+  for (const item of raw) {
+    if (typeof item !== 'string') continue
+    const id = item.trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    ids.push(id)
+  }
+  return ids.length ? ids : undefined
+}
+
 function normalizeEntry(raw: unknown): NotebookEntry | null {
   if (!raw || typeof raw !== 'object') return null
   const item = raw as Record<string, unknown>
@@ -316,6 +332,7 @@ function normalizeEntry(raw: unknown): NotebookEntry | null {
     },
     source: normalizeSource(item.source),
     location: normalizeLocation(item.location),
+    tagIds: normalizeTagIds(item.tagIds),
   }
 }
 
@@ -789,6 +806,56 @@ export async function removeNotebookEntry(
   return { totalAfter: doc.entries.length }
 }
 
+/** 供标签服务写回文档（不广播；调用方自行 notify） */
+export async function writeNotebookDocumentForTags(doc: NotebookDocument): Promise<void> {
+  await writeDocument(doc)
+  await touchNotebook(doc.id)
+}
+
+function applyTagIds(entry: NotebookEntry, tagIds: string[]): void {
+  const normalized = normalizeTagIds(tagIds)
+  if (normalized?.length) entry.tagIds = normalized
+  else delete entry.tagIds
+}
+
+async function syncTagIdsToMirror(entry: NotebookEntry, sourceNotebookId: string): Promise<void> {
+  const baseDoc = await readDocument(BASE_SENTENCE_NOTEBOOK_ID)
+  if (!baseDoc) return
+  const key = sourceMirrorKey(entry, sourceNotebookId)
+  const mirror = baseDoc.entries.find((item) => mirrorEntryKey(item) === key)
+  if (!mirror) return
+  applyTagIds(mirror, entry.tagIds ?? [])
+  baseDoc.updatedAt = Date.now()
+  await writeDocument(baseDoc)
+  await touchNotebook(BASE_SENTENCE_NOTEBOOK_ID)
+}
+
+/** 更新普通阅读笔记标签；同步到 base_sentence 镜像。系统本不可直接打标。 */
+export async function updateNotebookEntryTags(
+  notebookId: string,
+  entryId: string,
+  tagIds: string[],
+): Promise<NotebookEntry> {
+  if (isSystemNotebook(notebookId)) {
+    throw new Error('系统笔记本不支持直接打标签')
+  }
+  if (await isFrequencyNotebook(notebookId)) {
+    throw new Error('词频统计本不支持打标签')
+  }
+
+  const doc = await ensureNotebookDocument(notebookId)
+  const entry = doc.entries.find((item) => item.id === entryId)
+  if (!entry) throw new Error('笔记条目不存在')
+
+  applyTagIds(entry, tagIds)
+  doc.updatedAt = Date.now()
+  await writeDocument(doc)
+  await touchNotebook(notebookId)
+  await syncTagIdsToMirror(entry, notebookId)
+  notifyNotebookDataChanged()
+  return entry
+}
+
 async function syncAnalysisToMirror(
   entry: NotebookEntry,
   sourceNotebookId: string,
@@ -799,6 +866,7 @@ async function syncAnalysisToMirror(
   const mirror = baseDoc.entries.find((item) => mirrorEntryKey(item) === key)
   if (!mirror) return
   mirror.analysis = { ...entry.analysis }
+  applyTagIds(mirror, entry.tagIds ?? [])
   baseDoc.updatedAt = Date.now()
   await writeDocument(baseDoc)
   await touchNotebook(BASE_SENTENCE_NOTEBOOK_ID)

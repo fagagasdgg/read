@@ -1,7 +1,7 @@
 # 项目结构
 
 > 按 `xq/需求.md` §98.1 维护。每次新增/删除/重命名文件后更新本文档。
-> Last updated: 2026-11-11
+> Last updated: 2026-11-18
 
 ```
 read/
@@ -43,12 +43,14 @@ read/
 │   │   │   └── HomeShell.tsx        # 底部 Tab：书架 / 笔记 / 统计 / 工具 / 设置
 │   │   ├── components/tools/
 │   │   │   ├── ToolsScreen.tsx      # 工具页
+│   │   │   ├── NoteTagsTool.tsx     # 笔记标签增删改查与按标签查看
 │   │   │   └── BookWordFrequencyTool.tsx # 全书词频统计（离线 ECDICT）
 │   │   ├── components/statistics/
 │   │   │   └── StatisticsScreen.tsx # 阅读时长 + 词汇统计（可展开收起）
 │   │   ├── components/notes/
-│   │   │   ├── NotesScreen.tsx      # 阅读笔记 / 词频统计 双页签
-│   │   │   ├── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页；词频本专用列表）
+│   │   │   ├── NotesScreen.tsx      # 阅读笔记 / 词频统计 双页签；按标签筛选
+│   │   │   ├── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页；词频本专用列表；打标）
+│   │   │   ├── NoteTagPicker.tsx        # 标签多选组件
 │   │   │   ├── NotFoundWordEditor.tsx   # 待补全词条手动/豆包录入
 │   │   │   └── NotebookPickerSheet.tsx  # 保存笔记时选择笔记本
 │   │   ├── components/settings/
@@ -107,6 +109,7 @@ read/
 │   │       │   └── phrases.ts       # 按 lemma 存储词组（联网+手动）
 │   │       ├── notes/
 │   │       │   ├── notebooks.ts     # 笔记本与句子条目；含 base_sentence/base_phrases/not_found_words
+│   │       │   ├── tags.ts          # 笔记标签库与按标签查询
 │   │       │   ├── systemNotebooks.ts # 系统笔记本同步（词组总集、待补全词条）
 │   │       │   ├── notebookUiSettings.ts # 笔记列表分页与每页条数偏好
 │   │       │   ├── events.ts        # 笔记数据变更事件

@@ -1,6 +1,7 @@
 import { exportAllCachedRecords, getDictionaryCacheStats } from '../dictionary/cache'
 import { exportBookNotebookMap } from '../notes/bookNotebook'
 import { exportNotebooksBackup } from '../notes/notebooks'
+import { exportNoteTagsBackup } from '../notes/tags'
 import { exportReadingTimeBackup } from '../reading/readingTime'
 import { exportMasteredWordsList } from '../words/mastered'
 import { exportPhraseStore } from '../words/phrases'
@@ -12,16 +13,25 @@ import {
 } from './types'
 
 export async function collectBackupPayload(): Promise<BackupPayload> {
-  const [dictionary, wordPhrases, masteredWords, notebooks, bookNotebooks, readingTime, stats] =
-    await Promise.all([
-      exportAllCachedRecords(),
-      exportPhraseStore(),
-      exportMasteredWordsList(),
-      exportNotebooksBackup(),
-      exportBookNotebookMap(),
-      exportReadingTimeBackup(),
-      getDictionaryCacheStats(),
-    ])
+  const [
+    dictionary,
+    wordPhrases,
+    masteredWords,
+    notebooks,
+    bookNotebooks,
+    readingTime,
+    noteTags,
+    stats,
+  ] = await Promise.all([
+    exportAllCachedRecords(),
+    exportPhraseStore(),
+    exportMasteredWordsList(),
+    exportNotebooksBackup(),
+    exportBookNotebookMap(),
+    exportReadingTimeBackup(),
+    exportNoteTagsBackup(),
+    getDictionaryCacheStats(),
+  ])
 
   const notebookEntries = notebooks.documents.reduce((sum, doc) => sum + doc.entries.length, 0)
   const phraseLemmas = Object.keys(wordPhrases).length
@@ -57,6 +67,7 @@ export async function collectBackupPayload(): Promise<BackupPayload> {
     notebooks,
     bookNotebooks,
     readingTime,
+    noteTags,
   }
 }
 

@@ -1,5 +1,6 @@
 import type { DictionaryCacheValue } from '../dictionary/types'
 import type { NotebookDocument, NotebookMeta } from '../notes/notebooks'
+import type { NoteTag } from '../notes/tags'
 import type { ReadingTimeBackup } from '../reading/readingTime'
 import type { WordPhraseRecord } from '../words/phrases'
 
@@ -37,6 +38,8 @@ export interface BackupPayload {
   }
   bookNotebooks: Record<string, string>
   readingTime: ReadingTimeBackup
+  /** 可选；旧 zip 无此文件时视为空标签库 */
+  noteTags?: NoteTag[]
 }
 
 export interface ImportUserDataResult {
