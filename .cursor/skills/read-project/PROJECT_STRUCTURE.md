@@ -43,7 +43,7 @@ read/
 │   │   │   └── HomeShell.tsx        # 底部 Tab：书架 / 笔记 / 统计 / 工具 / 设置
 │   │   ├── components/common/
 │   │   │   ├── AppToast.tsx         # 全局轻提示
-│   │   │   └── ListPager.tsx        # 通用分页（首页/尾页/页码选择）
+│   │   │   └── ListPager.tsx        # 通用分页（首页/上一页/页码/下一页/尾页，每页10）
 │   │   ├── components/tools/
 │   │   │   ├── ToolsScreen.tsx      # 工具页
 │   │   │   ├── NoteTagsTool.tsx     # 笔记标签增删改；标签旁显示数量；列表分页

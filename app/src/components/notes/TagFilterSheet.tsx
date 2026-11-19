@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { NoteTag } from '../../services/notes/tags'
-import { ListPager, paginateItems } from '../common/ListPager'
-
-const PAGE_SIZE = 8
+import { ListPager, TAG_LIST_PAGE_SIZE, paginateItems } from '../common/ListPager'
 
 interface TagFilterSheetProps {
   open: boolean
@@ -13,7 +11,7 @@ interface TagFilterSheetProps {
   onSelect: (tagId: string) => void
 }
 
-/** 现代化标签选择面板（含分页），替代原生 select */
+/** 居中标签选择面板：每页固定「全部笔记本」+ 10 条标签卡片 */
 export function TagFilterSheet({ open, tags, value, onClose, onSelect }: TagFilterSheetProps) {
   const [page, setPage] = useState(1)
 
@@ -21,14 +19,14 @@ export function TagFilterSheet({ open, tags, value, onClose, onSelect }: TagFilt
     if (!open) return
     const index = tags.findIndex((tag) => tag.id === value)
     if (index >= 0) {
-      setPage(Math.floor(index / PAGE_SIZE) + 1)
+      setPage(Math.floor(index / TAG_LIST_PAGE_SIZE) + 1)
     } else {
       setPage(1)
     }
   }, [open, tags, value])
 
   const { pageItems, page: safePage, totalPages } = useMemo(
-    () => paginateItems(tags, page, PAGE_SIZE),
+    () => paginateItems(tags, page, TAG_LIST_PAGE_SIZE),
     [tags, page],
   )
 
@@ -49,33 +47,41 @@ export function TagFilterSheet({ open, tags, value, onClose, onSelect }: TagFilt
           </button>
         </header>
 
-        <button
-          type="button"
-          className={`tag-filter-option${value === '' ? ' active' : ''}`}
-          onClick={() => {
-            onSelect('')
-            onClose()
-          }}
-        >
-          <span>全部笔记本</span>
-          {value === '' ? <span className="tag-filter-check">✓</span> : null}
-        </button>
-
         <div className="tag-filter-sheet-list">
-          {pageItems.map((tag) => (
-            <button
-              key={tag.id}
-              type="button"
-              className={`tag-filter-option${value === tag.id ? ' active' : ''}`}
-              onClick={() => {
-                onSelect(tag.id)
-                onClose()
-              }}
-            >
-              <span>{tag.name}</span>
-              {value === tag.id ? <span className="tag-filter-check">✓</span> : null}
-            </button>
-          ))}
+          <button
+            type="button"
+            className={`tag-filter-option${value === '' ? ' active' : ''}`}
+            onClick={() => {
+              onSelect('')
+              onClose()
+            }}
+          >
+            <span className="tag-filter-option-index" aria-hidden>
+              ·
+            </span>
+            <span className="tag-filter-option-name">全部笔记本</span>
+            {value === '' ? <span className="tag-filter-check">✓</span> : null}
+          </button>
+
+          {pageItems.map((tag, index) => {
+            const order = (safePage - 1) * TAG_LIST_PAGE_SIZE + index + 1
+            return (
+              <button
+                key={tag.id}
+                type="button"
+                className={`tag-filter-option${value === tag.id ? ' active' : ''}`}
+                onClick={() => {
+                  onSelect(tag.id)
+                  onClose()
+                }}
+              >
+                <span className="tag-filter-option-index">{order}</span>
+                <span className="tag-filter-option-name">{tag.name}</span>
+                {value === tag.id ? <span className="tag-filter-check">✓</span> : null}
+              </button>
+            )
+          })}
+
           {!tags.length ? (
             <p className="tag-filter-empty">还没有标签，请先到「工具 → 笔记标签」创建</p>
           ) : null}
@@ -85,7 +91,7 @@ export function TagFilterSheet({ open, tags, value, onClose, onSelect }: TagFilt
           page={safePage}
           totalPages={totalPages}
           totalItems={tags.length}
-          pageSize={PAGE_SIZE}
+          pageSize={TAG_LIST_PAGE_SIZE}
           onPageChange={setPage}
           label="个标签"
         />

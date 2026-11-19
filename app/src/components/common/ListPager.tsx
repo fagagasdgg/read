@@ -7,7 +7,9 @@ interface ListPagerProps {
   label?: string
 }
 
-/** 通用分页：首页 / 上一页 / 页码选择 / 下一页 / 尾页 */
+export const TAG_LIST_PAGE_SIZE = 10
+
+/** 通用分页：首页 / 上一页 / 当前页·总页 / 下一页 / 尾页（无下拉选页） */
 export function ListPager({
   page,
   totalPages,
@@ -24,9 +26,9 @@ export function ListPager({
   return (
     <div className="list-pager">
       <span className="list-pager-meta">
-        共 {totalItems} {label} · {safePage}/{safeTotalPages} 页
+        共 {totalItems} {label}
       </span>
-      <div className="list-pager-controls">
+      <div className="list-pager-controls" role="navigation" aria-label="分页">
         <button
           type="button"
           className="list-pager-btn"
@@ -37,33 +39,22 @@ export function ListPager({
         </button>
         <button
           type="button"
-          className="list-pager-btn"
+          className="list-pager-btn list-pager-btn-nav"
           disabled={safePage <= 1}
           onClick={() => onPageChange(safePage - 1)}
         >
-          上一页
+          <span aria-hidden>‹</span> 上一页
         </button>
-        <label className="list-pager-select-wrap">
-          <span className="sr-only">页码</span>
-          <select
-            className="list-pager-select"
-            value={safePage}
-            onChange={(e) => onPageChange(Number(e.target.value))}
-          >
-            {Array.from({ length: safeTotalPages }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>
-                第 {n} 页
-              </option>
-            ))}
-          </select>
-        </label>
+        <span className="list-pager-status" aria-current="page">
+          {safePage}/{safeTotalPages}
+        </span>
         <button
           type="button"
-          className="list-pager-btn"
+          className="list-pager-btn list-pager-btn-nav"
           disabled={safePage >= safeTotalPages}
           onClick={() => onPageChange(safePage + 1)}
         >
-          下一页
+          下一页 <span aria-hidden>›</span>
         </button>
         <button
           type="button"
@@ -78,7 +69,11 @@ export function ListPager({
   )
 }
 
-export function paginateItems<T>(items: T[], page: number, pageSize: number): {
+export function paginateItems<T>(
+  items: T[],
+  page: number,
+  pageSize: number,
+): {
   pageItems: T[]
   page: number
   totalPages: number

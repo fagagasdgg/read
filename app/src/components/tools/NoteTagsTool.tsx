@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CollapsibleSettingsSection } from '../settings/CollapsibleSettingsSection'
-import { ListPager, paginateItems } from '../common/ListPager'
+import { ListPager, TAG_LIST_PAGE_SIZE, paginateItems } from '../common/ListPager'
 import { NOTEBOOK_DATA_CHANGED } from '../../services/notes/events'
 import {
   countEntriesByTagId,
@@ -10,8 +10,6 @@ import {
   renameNoteTag,
   type NoteTag,
 } from '../../services/notes/tags'
-
-const TAG_PAGE_SIZE = 8
 
 export function NoteTagsTool() {
   const [tags, setTags] = useState<NoteTag[]>([])
@@ -40,7 +38,7 @@ export function NoteTagsTool() {
   }, [refresh])
 
   const { pageItems, page: safePage, totalPages } = useMemo(
-    () => paginateItems(tags, page, TAG_PAGE_SIZE),
+    () => paginateItems(tags, page, TAG_LIST_PAGE_SIZE),
     [tags, page],
   )
 
@@ -60,7 +58,7 @@ export function NoteTagsTool() {
       // 新建后尽量跳到包含该标签的页
       const nextTags = await listNoteTags()
       const index = nextTags.findIndex((item) => item.id === tag.id)
-      if (index >= 0) setPage(Math.floor(index / TAG_PAGE_SIZE) + 1)
+      if (index >= 0) setPage(Math.floor(index / TAG_LIST_PAGE_SIZE) + 1)
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建失败')
     }
@@ -123,7 +121,7 @@ export function NoteTagsTool() {
         <>
           <ul className="note-tags-list">
             {pageItems.map((tag, index) => {
-              const order = (safePage - 1) * TAG_PAGE_SIZE + index + 1
+              const order = (safePage - 1) * TAG_LIST_PAGE_SIZE + index + 1
               const count = counts[tag.id] ?? 0
               return (
                 <li key={tag.id} className="note-tags-item">
@@ -148,7 +146,7 @@ export function NoteTagsTool() {
             page={safePage}
             totalPages={totalPages}
             totalItems={tags.length}
-            pageSize={TAG_PAGE_SIZE}
+            pageSize={TAG_LIST_PAGE_SIZE}
             onPageChange={setPage}
             label="个标签"
           />
