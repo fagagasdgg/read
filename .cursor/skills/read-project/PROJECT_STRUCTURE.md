@@ -41,14 +41,18 @@ read/
 │   │   │   └── AppShellThemeContext.tsx # 应用界面风格上下文
 │   │   ├── components/home/
 │   │   │   └── HomeShell.tsx        # 底部 Tab：书架 / 笔记 / 统计 / 工具 / 设置
+│   │   ├── components/common/
+│   │   │   ├── AppToast.tsx         # 全局轻提示
+│   │   │   └── ListPager.tsx        # 通用分页（首页/尾页/页码选择）
 │   │   ├── components/tools/
 │   │   │   ├── ToolsScreen.tsx      # 工具页
-│   │   │   ├── NoteTagsTool.tsx     # 笔记标签增删改查与按标签查看
+│   │   │   ├── NoteTagsTool.tsx     # 笔记标签增删改；标签旁显示数量；列表分页
 │   │   │   └── BookWordFrequencyTool.tsx # 全书词频统计（离线 ECDICT）
 │   │   ├── components/statistics/
 │   │   │   └── StatisticsScreen.tsx # 阅读时长 + 词汇统计（可展开收起）
 │   │   ├── components/notes/
-│   │   │   ├── NotesScreen.tsx      # 阅读笔记 / 词频统计 双页签；按标签筛选
+│   │   │   ├── NotesScreen.tsx      # 阅读笔记 / 词频统计 双页签；按标签筛选（结果带序号）
+│   │   │   ├── TagFilterSheet.tsx   # 标签筛选面板（分页选择器，替代原生 select）
 │   │   │   ├── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页；词频本专用列表；打标）
 │   │   │   ├── NoteTagPicker.tsx        # 标签多选组件
 │   │   │   ├── NotFoundWordEditor.tsx   # 待补全词条手动/豆包录入
@@ -109,7 +113,7 @@ read/
 │   │       │   └── phrases.ts       # 按 lemma 存储词组（联网+手动）
 │   │       ├── notes/
 │   │       │   ├── notebooks.ts     # 笔记本与句子条目；含 base_sentence/base_phrases/not_found_words
-│   │       │   ├── tags.ts          # 笔记标签库与按标签查询
+│   │       │   ├── tags.ts          # 笔记标签库；按标签查询/计数（排除系统本）
 │   │       │   ├── systemNotebooks.ts # 系统笔记本同步（词组总集、待补全词条）
 │   │       │   ├── notebookUiSettings.ts # 笔记列表分页与每页条数偏好
 │   │       │   ├── events.ts        # 笔记数据变更事件

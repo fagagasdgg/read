@@ -25,6 +25,7 @@ import {
   type TaggedNoteHit,
 } from '../../services/notes/tags'
 import { NotebookDetailScreen } from './NotebookDetailScreen'
+import { TagFilterSheet } from './TagFilterSheet'
 
 const NOTEBOOK_COLORS = ['#e8dcc8', '#d4e4d9', '#dce4f0', '#f0e0d0', '#e6dce8', '#e0ebe5']
 
@@ -47,6 +48,7 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
   const [statusVariant, setStatusVariant] = useState<AppToastVariant>('ok')
   const [tags, setTags] = useState<NoteTag[]>([])
   const [tagFilterId, setTagFilterId] = useState('')
+  const [tagPickerOpen, setTagPickerOpen] = useState(false)
   const [tagHits, setTagHits] = useState<TaggedNoteHit[]>([])
   const [tagHitsLoading, setTagHitsLoading] = useState(false)
 
@@ -224,26 +226,30 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
 
       {pane === 'notes' ? (
         <div className="notes-tag-filter">
-          <label>
-            <span>按标签筛选</span>
-            <select
-              className="reader-level-select"
-              value={tagFilterId}
-              onChange={(e) => setTagFilterId(e.target.value)}
-            >
-              <option value="">全部笔记本</option>
-              {tags.map((tag) => (
-                <option key={tag.id} value={tag.id}>
-                  {tag.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <span className="notes-tag-filter-label">按标签筛选</span>
+          <button
+            type="button"
+            className="notes-tag-filter-trigger"
+            onClick={() => setTagPickerOpen(true)}
+          >
+            <span>{tagFilterId ? selectedTagName ?? '已选标签' : '全部笔记本'}</span>
+            <span className="notes-tag-filter-caret" aria-hidden>
+              ▾
+            </span>
+          </button>
           {!tags.length ? (
             <p className="notes-tag-filter-hint">还没有标签，请到「工具 → 笔记标签」创建</p>
           ) : null}
         </div>
       ) : null}
+
+      <TagFilterSheet
+        open={tagPickerOpen}
+        tags={tags}
+        value={tagFilterId}
+        onClose={() => setTagPickerOpen(false)}
+        onSelect={setTagFilterId}
+      />
 
       {pane === 'notes' && tagFilterId ? (
         <div className="notes-tag-results">
@@ -254,7 +260,7 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
             <p className="bookshelf-empty-hint">没有找到带该标签的笔记</p>
           ) : null}
           <ul className="notes-tag-hit-list">
-            {tagHits.map((hit) => (
+            {tagHits.map((hit, index) => (
               <li key={`${hit.notebookId}:${hit.entry.id}`}>
                 <button
                   type="button"
@@ -264,8 +270,11 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
                     void handleOpen(hit.notebookId)
                   }}
                 >
-                  <span className="note-tags-hit-nb">{hit.notebookTitle}</span>
-                  <p className="note-tags-hit-sentence">{hit.entry.sentence}</p>
+                  <span className="notes-tag-hit-index">{index + 1}</span>
+                  <span className="notes-tag-hit-body">
+                    <span className="note-tags-hit-nb">{hit.notebookTitle}</span>
+                    <p className="note-tags-hit-sentence">{hit.entry.sentence}</p>
+                  </span>
                 </button>
               </li>
             ))}

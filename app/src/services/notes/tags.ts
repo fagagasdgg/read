@@ -1,7 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
 import {
-  BASE_SENTENCE_NOTEBOOK_ID,
   getNotebookDocument,
   isFrequencyNotebookMeta,
   isSystemNotebook,
@@ -241,16 +240,14 @@ export interface TaggedNoteHit {
   entry: NotebookEntry
 }
 
-/** 按标签查询：普通阅读本 + base_sentence（镜像可查） */
+/** 按标签查询：仅普通阅读本（不含 base_sentence / 词频 / 其它系统本） */
 export async function findEntriesByTagId(tagId: string): Promise<TaggedNoteHit[]> {
   if (!tagId) return []
   const notebooks = await listNotebooks()
   const hits: TaggedNoteHit[] = []
 
   for (const meta of notebooks) {
-    if (isFrequencyNotebookMeta(meta)) continue
-    // 系统本里只扫 base_sentence；词组/待补全不参与
-    if (isSystemNotebook(meta.id) && meta.id !== BASE_SENTENCE_NOTEBOOK_ID) continue
+    if (isFrequencyNotebookMeta(meta) || isSystemNotebook(meta.id)) continue
 
     const doc = await getNotebookDocument(meta.id)
     if (!doc?.entries.length) continue
@@ -267,4 +264,25 @@ export async function findEntriesByTagId(tagId: string): Promise<TaggedNoteHit[]
 
   hits.sort((a, b) => b.entry.createdAt - a.entry.createdAt)
   return hits
+}
+
+/** 一次扫描得到各标签在普通阅读本中的笔记条数 */
+export async function countEntriesByTagId(): Promise<Record<string, number>> {
+  const notebooks = await listNotebooks()
+  const counts: Record<string, number> = {}
+
+  for (const meta of notebooks) {
+    if (isFrequencyNotebookMeta(meta) || isSystemNotebook(meta.id)) continue
+    const doc = await getNotebookDocument(meta.id)
+    if (!doc?.entries.length) continue
+
+    for (const entry of doc.entries) {
+      if (!entry.tagIds?.length) continue
+      for (const tagId of entry.tagIds) {
+        counts[tagId] = (counts[tagId] ?? 0) + 1
+      }
+    }
+  }
+
+  return counts
 }
