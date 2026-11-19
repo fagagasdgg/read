@@ -46,6 +46,7 @@ read/
 │   │   │   └── ListPager.tsx        # 通用分页（首页/上一页/页码/下一页/尾页，每页10）
 │   │   ├── components/tools/
 │   │   │   ├── ToolsScreen.tsx      # 工具页
+│   │   │   ├── WordLookupTool.tsx   # 工具栏单词查询（复用详情弹窗与编辑）
 │   │   │   ├── NoteTagsTool.tsx     # 笔记标签增删改；标签旁显示数量；列表分页
 │   │   │   └── BookWordFrequencyTool.tsx # 全书词频统计（离线 ECDICT）
 │   │   ├── components/statistics/
@@ -70,7 +71,8 @@ read/
 │   │   │   ├── useViewportPagination.ts # 视口高度测量与页数计算
 │   │   │   ├── useInlineGlosses.ts    # 视口可见词惰性查词、行间释义
 │   │   │   ├── ChapterContent.tsx   # 逐词渲染 + 行间释义 + 插图
-│   │   │   ├── WordDetailPopup.tsx  # 点击单词弹出的释义浮窗
+│   │   │   ├── WordDetailPopup.tsx  # 点击单词弹出的释义浮窗（形近/义近/笔记展示与跳转）
+│   │   │   ├── WordEnrichmentEditor.tsx # 编辑音标等级释义 + 形近/义近/笔记
 │   │   │   ├── NoteDetailPopup.tsx  # 点击书中笔记下划线弹出的笔记详情
 │   │   │   ├── InBookNoteUnderlineLayer.tsx # 正文笔记下划线热区层
 │   │   │   ├── useInBookNoteMarks.ts # 按章匹配绑定笔记本原文并生成下划线
@@ -110,7 +112,9 @@ read/
 │   │       │   └── index.ts        # 查词编排：缓存→ECDICT→联网
 │   │       ├── words/
 │   │       │   ├── mastered.ts      # 已掌握单词列表
-│   │       │   └── phrases.ts       # 按 lemma 存储词组（联网+手动）
+│   │       │   ├── phrases.ts       # 按 lemma 存储词组（联网+手动）
+│   │       │   ├── wordCliques.ts   # 形近词/义近词整组关系
+│   │       │   └── wordNotes.ts     # 单词笔记（每 lemma 一段）
 │   │       ├── notes/
 │   │       │   ├── notebooks.ts     # 笔记本与句子条目；含 base_sentence/base_phrases/not_found_words
 │   │       │   ├── tags.ts          # 笔记标签库；按标签查询/计数（排除系统本）

@@ -13,6 +13,9 @@ import {
 import type { WordEntry } from '../../services/dictionary'
 import { getBookLemmaOccurrenceCount } from '../../services/tools/bookWordFrequency'
 import { isMasteredLemma, setMasteredLemma } from '../../services/words/mastered'
+import { listRelatedLemmas } from '../../services/words/wordCliques'
+import { getWordNote } from '../../services/words/wordNotes'
+import { WordEnrichmentEditor } from './WordEnrichmentEditor'
 import { WordPhraseSection } from './WordPhraseSection'
 
 export interface WordLookupRequest {
@@ -41,9 +44,10 @@ export function WordDetailPopup({
   lookup,
   bookId,
   onClose,
-  onLookupVariant,
+  onLookupVariant: _onLookupVariant,
   onCompoundNavigate,
 }: WordDetailPopupProps) {
+  void _onLookupVariant
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<PanelMode>('local')
   const [localEntry, setLocalEntry] = useState<WordEntry | null>(null)
@@ -55,9 +59,22 @@ export function WordDetailPopup({
   const [mastered, setMastered] = useState(false)
   const [masteredSaving, setMasteredSaving] = useState(false)
   const [bookOccurrence, setBookOccurrence] = useState<number | null>(null)
+  const [activeLookup, setActiveLookup] = useState<WordLookupRequest | null>(lookup)
+  const [history, setHistory] = useState<WordLookupRequest[]>(lookup ? [lookup] : [])
+  const [lookalikes, setLookalikes] = useState<string[]>([])
+  const [synonyms, setSynonyms] = useState<string[]>([])
+  const [wordNote, setWordNoteState] = useState('')
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [enrichTick, setEnrichTick] = useState(0)
 
   useEffect(() => {
-    if (!lookup) {
+    setActiveLookup(lookup)
+    setHistory(lookup ? [lookup] : [])
+    setEditorOpen(false)
+  }, [lookup?.seq])
+
+  useEffect(() => {
+    if (!activeLookup) {
       setLocalEntry(null)
       setOnlineEntry(null)
       setCanonicalLemma('')
@@ -66,6 +83,9 @@ export function WordDetailPopup({
       setMastered(false)
       setBookOccurrence(null)
       setMode('local')
+      setLookalikes([])
+      setSynonyms([])
+      setWordNoteState('')
       return
     }
 
@@ -79,16 +99,16 @@ export function WordDetailPopup({
     setBookOccurrence(null)
     setMode('local')
 
-    const opts = { exactToken: lookup.exactToken }
+    const opts = { exactToken: activeLookup.exactToken }
 
     ;(async () => {
       try {
-        const lemma = await resolveLemma(lookup.word, lookup.exactToken)
-        const local = await lookupLocalWord(lookup.word, opts)
+        const lemma = await resolveLemma(activeLookup.word, activeLookup.exactToken)
+        const local = await lookupLocalWord(activeLookup.word, opts)
         if (cancelled) return
 
-        const markKey = local?.lemma || lemma || normalizeWordToken(lookup.word)
-        setCanonicalLemma(lemma || normalizeWordToken(lookup.word))
+        const markKey = local?.lemma || lemma || normalizeWordToken(activeLookup.word)
+        setCanonicalLemma(lemma || normalizeWordToken(activeLookup.word))
         setLocalEntry(local)
 
         if (local) {
@@ -102,10 +122,9 @@ export function WordDetailPopup({
             if (!cancelled) setBookOccurrence(count)
           }
 
-          // 本地释义先出；联网音标后台补齐（缓存优先）
           setOnlineLoading(true)
           try {
-            const online = await lookupOnlineWord(lookup.word, opts)
+            const online = await lookupOnlineWord(activeLookup.word, opts)
             if (!cancelled) setOnlineEntry(online)
           } catch {
             // 音标失败不影响 ECDICT 释义
@@ -115,11 +134,10 @@ export function WordDetailPopup({
           return
         }
 
-        // 无本地词条时自动拉联网（与旧版行为衔接）
         setMode('online')
         setOnlineLoading(true)
         try {
-          const online = await lookupOnlineWord(lookup.word, opts)
+          const online = await lookupOnlineWord(activeLookup.word, opts)
           if (cancelled) return
           setOnlineEntry(online)
           if (!online) setError('未找到该词的释义')
@@ -149,13 +167,37 @@ export function WordDetailPopup({
     return () => {
       cancelled = true
     }
-  }, [lookup, bookId])
+  }, [activeLookup, bookId])
+
+  useEffect(() => {
+    const key = canonicalLemma
+    if (!key) {
+      setLookalikes([])
+      setSynonyms([])
+      setWordNoteState('')
+      return
+    }
+    let cancelled = false
+    void Promise.all([
+      listRelatedLemmas('lookalike', key),
+      listRelatedLemmas('synonym', key),
+      getWordNote(key),
+    ]).then(([la, sy, note]) => {
+      if (cancelled) return
+      setLookalikes(la)
+      setSynonyms(sy)
+      setWordNoteState(note?.text ?? '')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [canonicalLemma, enrichTick])
 
   const entry = mode === 'local' ? localEntry : onlineEntry
   const showLoading = loading || (mode === 'online' && onlineLoading && !onlineEntry)
 
   async function toggleNetworkMode() {
-    if (!lookup) return
+    if (!activeLookup) return
 
     if (mode === 'local') {
       setMode('online')
@@ -164,8 +206,8 @@ export function WordDetailPopup({
       setOnlineLoading(true)
       setOnlineError('')
       try {
-        const online = await lookupOnlineWord(lookup.word, {
-          exactToken: lookup.exactToken,
+        const online = await lookupOnlineWord(activeLookup.word, {
+          exactToken: activeLookup.exactToken,
         })
         setOnlineEntry(online)
         if (!online) setOnlineError('未找到网络释义')
@@ -177,13 +219,27 @@ export function WordDetailPopup({
       return
     }
 
-    // 切回本地
     if (localEntry) {
       setMode('local')
       setOnlineError('')
       return
     }
     setOnlineError('无本地词条可切换')
+  }
+
+  function navigateToRelated(word: string) {
+    const next: WordLookupRequest = { word, exactToken: true, seq: Date.now() }
+    setHistory((prev) => [...prev, next])
+    setActiveLookup(next)
+  }
+
+  function goHistoryBack() {
+    setHistory((prev) => {
+      if (prev.length <= 1) return prev
+      const next = prev.slice(0, -1)
+      setActiveLookup(next[next.length - 1] ?? null)
+      return next
+    })
   }
 
   async function toggleMastered() {
@@ -199,12 +255,14 @@ export function WordDetailPopup({
     }
   }
 
-  if (!lookup) return null
+  if (!activeLookup) return null
 
-  const compound = lookup.compound
+  const compound = activeLookup.compound
   const compoundTotal = compound ? compound.parts.length + 1 : 0
   const compoundIndex = compound?.index ?? 0
   const canToggleNetwork = Boolean(localEntry)
+  const canGoBack = history.length > 1
+  const titleLemma = entry?.lemma || canonicalLemma || normalizeWordToken(activeLookup.word)
 
   function goCompound(delta: number) {
     if (!compound || !onCompoundNavigate) return
@@ -260,32 +318,52 @@ export function WordDetailPopup({
           ×
         </button>
 
+        {canGoBack ? (
+          <button type="button" className="popup-history-back" onClick={goHistoryBack}>
+            ← 返回上一词
+          </button>
+        ) : null}
+
         {showLoading && <p className="popup-loading">查询中…</p>}
         {error && !entry && <p className="popup-error">{error}</p>}
         {onlineError && mode === 'online' && !onlineEntry && (
           <p className="popup-error">{onlineError}</p>
         )}
 
-        {entry && !showLoading && (
-          <>
-            <div className="popup-word-title">
-              <strong>{displayLemma}</strong>
-              {canToggleNetwork && (
-                <button
-                  type="button"
-                  className={`popup-source-toggle${mode === 'online' ? ' active' : ''}`}
-                  onClick={() => void toggleNetworkMode()}
-                  disabled={onlineLoading}
-                >
-                  {mode === 'local' ? '网络' : '本地'}
-                </button>
-              )}
+        {!showLoading && titleLemma ? (
+          <div className="popup-word-title">
+            <button
+              type="button"
+              className="popup-word-title-btn"
+              onClick={() => setEditorOpen(true)}
+              title="点击编辑单词信息"
+            >
+              <strong>{titleLemma}</strong>
+            </button>
+            {entry && canToggleNetwork ? (
+              <button
+                type="button"
+                className={`popup-source-toggle${mode === 'online' ? ' active' : ''}`}
+                onClick={() => void toggleNetworkMode()}
+                disabled={onlineLoading}
+              >
+                {mode === 'local' ? '网络' : '本地'}
+              </button>
+            ) : null}
+            {entry ? (
               <span className="popup-source">
                 {mode === 'local'
                   ? '来源：ECDICT 本地'
                   : `来源：${getDictionarySourceLabel(entry.source)}`}
               </span>
-            </div>
+            ) : (
+              <span className="popup-source">点击单词可补全信息</span>
+            )}
+          </div>
+        ) : null}
+
+        {entry && !showLoading && (
+          <>
 
             {compound && compoundTotal > 1 && (
               <p className="popup-compound-hint">
@@ -478,7 +556,7 @@ export function WordDetailPopup({
                 <span>变体：</span>
                 {entry.forms.map((form) => {
                   const canJump =
-                    !lookup.exactToken &&
+                    !activeLookup.exactToken &&
                     form.clickable !== false &&
                     Boolean(extractVariantLookupWord(form.value))
                   const text = form.value ? `${form.label}: ${form.value}` : form.label
@@ -499,7 +577,7 @@ export function WordDetailPopup({
                       onClick={(e) => {
                         e.stopPropagation()
                         const token = extractVariantLookupWord(form.value)
-                        if (token) onLookupVariant?.(token)
+                        if (token) navigateToRelated(token)
                       }}
                     >
                       {text}
@@ -509,53 +587,115 @@ export function WordDetailPopup({
               </div>
             )}
 
-            {/* 词组始终按原型 lemma 绑定，与本地/联网面板无关 */}
             <WordPhraseSection lemma={canonicalLemma || displayLemma} />
+          </>
+        )}
+
+        {!showLoading && titleLemma ? (
+          <>
+            {lookalikes.length > 0 ? (
+              <div className="popup-enrich-block">
+                <span className="popup-enrich-label">形近词</span>
+                <div className="popup-enrich-chips">
+                  {lookalikes.map((item) => (
+                    <button
+                      key={`la-${item}`}
+                      type="button"
+                      className="form-chip"
+                      onClick={() => navigateToRelated(item)}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {synonyms.length > 0 ? (
+              <div className="popup-enrich-block">
+                <span className="popup-enrich-label">义近词</span>
+                <div className="popup-enrich-chips">
+                  {synonyms.map((item) => (
+                    <button
+                      key={`sy-${item}`}
+                      type="button"
+                      className="form-chip"
+                      onClick={() => navigateToRelated(item)}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {wordNote ? (
+              <div className="popup-enrich-block">
+                <span className="popup-enrich-label">单词笔记</span>
+                <p className="popup-word-note">{wordNote}</p>
+              </div>
+            ) : null}
 
             <div className="popup-actions">
               <button
                 type="button"
                 className={`popup-mastered-btn${mastered ? ' active' : ''}`}
                 onClick={() => void toggleMastered()}
-                disabled={masteredSaving}
+                disabled={masteredSaving || !titleLemma}
               >
                 {mastered ? '已掌握（点击恢复行间翻译）' : '标记为已掌握'}
               </button>
-              {mastered && (
+              {mastered ? (
                 <p className="popup-mastered-note">
                   该词将不再显示行间翻译，点词弹窗仍可查看释义与词组。
                 </p>
-              )}
+              ) : null}
             </div>
-
-            {compound && compoundTotal > 1 && (
-              <div className="popup-compound-nav">
-                <button
-                  type="button"
-                  className="popup-compound-arrow"
-                  aria-label="上一段"
-                  disabled={compoundIndex <= 0}
-                  onClick={() => goCompound(-1)}
-                >
-                  ‹
-                </button>
-                <span className="popup-compound-meta">
-                  {compoundIndex + 1} / {compoundTotal}
-                </span>
-                <button
-                  type="button"
-                  className="popup-compound-arrow"
-                  aria-label="下一段"
-                  disabled={compoundIndex >= compoundTotal - 1}
-                  onClick={() => goCompound(1)}
-                >
-                  ›
-                </button>
-              </div>
-            )}
           </>
-        )}
+        ) : null}
+
+        {compound && compoundTotal > 1 && !showLoading ? (
+          <div className="popup-compound-nav">
+            <button
+              type="button"
+              className="popup-compound-arrow"
+              aria-label="上一段"
+              disabled={compoundIndex <= 0}
+              onClick={() => goCompound(-1)}
+            >
+              ‹
+            </button>
+            <span className="popup-compound-meta">
+              {compoundIndex + 1} / {compoundTotal}
+            </span>
+            <button
+              type="button"
+              className="popup-compound-arrow"
+              aria-label="下一段"
+              disabled={compoundIndex >= compoundTotal - 1}
+              onClick={() => goCompound(1)}
+            >
+              ›
+            </button>
+          </div>
+        ) : null}
       </div>
+
+      {editorOpen && titleLemma ? (
+        <WordEnrichmentEditor
+          lemma={titleLemma}
+          seedEntry={entry ?? localEntry ?? onlineEntry}
+          onClose={() => setEditorOpen(false)}
+          onSaved={() => {
+            setEditorOpen(false)
+            setEnrichTick((n) => n + 1)
+            // 重新触发查词以反映缓存释义
+            setActiveLookup((prev) =>
+              prev ? { ...prev, seq: Date.now() } : prev,
+            )
+          }}
+        />
+      ) : null}
     </div>
   )
 }

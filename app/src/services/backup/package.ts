@@ -11,6 +11,9 @@ const NOTEBOOKS_DIR = 'notebooks/documents'
 const BOOK_NOTEBOOKS_FILE = 'book-notebooks.json'
 const READING_TIME_FILE = 'reading-time.json'
 const NOTE_TAGS_FILE = 'note-tags.json'
+const WORD_LOOKALIKES_FILE = 'word-lookalikes.json'
+const WORD_SYNONYMS_FILE = 'word-synonyms.json'
+const WORD_NOTES_FILE = 'word-notes.json'
 
 function notebookDocFile(id: string): string {
   return `${NOTEBOOKS_DIR}/${id}.json`
@@ -26,6 +29,9 @@ export async function buildBackupZip(payload: BackupPayload): Promise<Blob> {
   zip.file(BOOK_NOTEBOOKS_FILE, JSON.stringify(payload.bookNotebooks, null, 2))
   zip.file(READING_TIME_FILE, JSON.stringify(payload.readingTime, null, 2))
   zip.file(NOTE_TAGS_FILE, JSON.stringify(payload.noteTags ?? [], null, 2))
+  zip.file(WORD_LOOKALIKES_FILE, JSON.stringify(payload.wordLookalikes ?? { cliques: {}, index: {} }, null, 2))
+  zip.file(WORD_SYNONYMS_FILE, JSON.stringify(payload.wordSynonyms ?? { cliques: {}, index: {} }, null, 2))
+  zip.file(WORD_NOTES_FILE, JSON.stringify(payload.wordNotes ?? {}, null, 2))
 
   for (const doc of payload.notebooks.documents) {
     zip.file(notebookDocFile(doc.id), JSON.stringify(doc, null, 2))
@@ -79,6 +85,15 @@ export async function parseBackupZip(buffer: ArrayBuffer): Promise<BackupPayload
     books: {},
   })
   const noteTags = await readJson<NonNullable<BackupPayload['noteTags']>>(NOTE_TAGS_FILE, [])
+  const wordLookalikes = await readJson<NonNullable<BackupPayload['wordLookalikes']>>(
+    WORD_LOOKALIKES_FILE,
+    { cliques: {}, index: {} },
+  )
+  const wordSynonyms = await readJson<NonNullable<BackupPayload['wordSynonyms']>>(
+    WORD_SYNONYMS_FILE,
+    { cliques: {}, index: {} },
+  )
+  const wordNotes = await readJson<NonNullable<BackupPayload['wordNotes']>>(WORD_NOTES_FILE, {})
 
   const documents: BackupPayload['notebooks']['documents'] = []
   const docPrefix = `${NOTEBOOKS_DIR}/`
@@ -117,6 +132,9 @@ export async function parseBackupZip(buffer: ArrayBuffer): Promise<BackupPayload
     bookNotebooks,
     readingTime,
     noteTags,
+    wordLookalikes,
+    wordSynonyms,
+    wordNotes,
   }
 }
 

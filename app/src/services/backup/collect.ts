@@ -5,6 +5,8 @@ import { exportNoteTagsBackup } from '../notes/tags'
 import { exportReadingTimeBackup } from '../reading/readingTime'
 import { exportMasteredWordsList } from '../words/mastered'
 import { exportPhraseStore } from '../words/phrases'
+import { exportCliqueStore } from '../words/wordCliques'
+import { exportWordNotesStore } from '../words/wordNotes'
 import {
   BACKUP_FORMAT,
   BACKUP_VERSION,
@@ -21,6 +23,9 @@ export async function collectBackupPayload(): Promise<BackupPayload> {
     bookNotebooks,
     readingTime,
     noteTags,
+    wordLookalikes,
+    wordSynonyms,
+    wordNotes,
     stats,
   ] = await Promise.all([
     exportAllCachedRecords(),
@@ -30,6 +35,9 @@ export async function collectBackupPayload(): Promise<BackupPayload> {
     exportBookNotebookMap(),
     exportReadingTimeBackup(),
     exportNoteTagsBackup(),
+    exportCliqueStore('lookalike'),
+    exportCliqueStore('synonym'),
+    exportWordNotesStore(),
     getDictionaryCacheStats(),
   ])
 
@@ -68,6 +76,9 @@ export async function collectBackupPayload(): Promise<BackupPayload> {
     bookNotebooks,
     readingTime,
     noteTags,
+    wordLookalikes,
+    wordSynonyms,
+    wordNotes,
   }
 }
 

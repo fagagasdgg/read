@@ -18,6 +18,8 @@ import {
 } from '../settings/backupDirectory'
 import { getMasteredWordCount, importMasteredWordsList } from '../words/mastered'
 import { getLemmaPhraseWordCount, importPhraseStore } from '../words/phrases'
+import { importCliqueStore } from '../words/wordCliques'
+import { importWordNotesStore } from '../words/wordNotes'
 import { collectBackupPayload, summarizeBackupCounts } from './collect'
 import { notifyBackupDataChanged } from './events'
 import {
@@ -147,6 +149,19 @@ export async function importUserDataBackup(file?: File): Promise<ImportUserDataR
   const tagImport = await importNoteTagsBackup(payload.noteTags ?? [])
   if (tagImport.added > 0) {
     warnings.push(`合并 ${tagImport.added} 个笔记标签`)
+  }
+
+  const lookalikeImport = await importCliqueStore('lookalike', payload.wordLookalikes)
+  if (lookalikeImport.merged > 0) {
+    warnings.push(`合并 ${lookalikeImport.merged} 条形近词关系`)
+  }
+  const synonymImport = await importCliqueStore('synonym', payload.wordSynonyms)
+  if (synonymImport.merged > 0) {
+    warnings.push(`合并 ${synonymImport.merged} 条义近词关系`)
+  }
+  const notesImport = await importWordNotesStore(payload.wordNotes)
+  if (notesImport.merged > 0) {
+    warnings.push(`合并 ${notesImport.merged} 条单词笔记`)
   }
 
   for (const doc of payload.notebooks.documents) {

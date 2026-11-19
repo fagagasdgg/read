@@ -1,5 +1,6 @@
 import { BookWordFrequencyTool } from './BookWordFrequencyTool'
 import { NoteTagsTool } from './NoteTagsTool'
+import { WordLookupTool } from './WordLookupTool'
 
 export function ToolsScreen() {
   return (
@@ -10,6 +11,7 @@ export function ToolsScreen() {
       </header>
 
       <div className="tools-body">
+        <WordLookupTool />
         <NoteTagsTool />
         <BookWordFrequencyTool />
       </div>
