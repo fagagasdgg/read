@@ -74,3 +74,9 @@ export interface ImportUserDataResult {
   readingTotalMinutes: number
   warnings: string[]
 }
+
+export interface ImportUserDataProgress {
+  percent: number
+  message: string
+  phase: string
+}

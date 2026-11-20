@@ -29,7 +29,23 @@ import {
   formatBackupFilename,
   parseBackupZip,
 } from './package'
-import type { ImportUserDataResult } from './types'
+import type { ImportUserDataProgress, ImportUserDataResult } from './types'
+
+function yieldUi(): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, 0)
+  })
+}
+
+async function reportImportProgress(
+  onProgress: ((p: ImportUserDataProgress) => void) | undefined,
+  percent: number,
+  message: string,
+  phase: string,
+): Promise<void> {
+  onProgress?.({ percent, message, phase })
+  await yieldUi()
+}
 
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
   const binary = atob(base64)
@@ -124,7 +140,11 @@ export async function exportUserDataBackup(): Promise<{
   return { filename, summary }
 }
 
-export async function importUserDataBackup(file?: File): Promise<ImportUserDataResult> {
+export async function importUserDataBackup(
+  file?: File,
+  onProgress?: (progress: ImportUserDataProgress) => void,
+): Promise<ImportUserDataResult> {
+  await reportImportProgress(onProgress, 2, '读取备份文件…', 'read')
   let buffer: ArrayBuffer
 
   if (file) {
@@ -135,22 +155,29 @@ export async function importUserDataBackup(file?: File): Promise<ImportUserDataR
     throw new Error('请选择备份 zip 文件')
   }
 
+  await reportImportProgress(onProgress, 8, '解析压缩包…', 'parse')
   const payload = await parseBackupZip(buffer)
   const warnings: string[] = []
 
+  await reportImportProgress(onProgress, 18, '导入词典缓存…', 'dictionary')
   const dictResult = await importDictionaryRecords(payload.dictionary)
   if (dictResult.skipped > 0) {
     warnings.push(`跳过 ${dictResult.skipped} 条无效词典记录`)
   }
 
+  await reportImportProgress(onProgress, 32, '导入词组…', 'phrases')
   await importPhraseStore(payload.wordPhrases)
+
+  await reportImportProgress(onProgress, 40, '导入已掌握单词…', 'mastered')
   await importMasteredWordsList(payload.masteredWords)
 
+  await reportImportProgress(onProgress, 48, '导入笔记标签…', 'tags')
   const tagImport = await importNoteTagsBackup(payload.noteTags ?? [])
   if (tagImport.added > 0) {
     warnings.push(`合并 ${tagImport.added} 个笔记标签`)
   }
 
+  await reportImportProgress(onProgress, 56, '导入形近词 / 义近词…', 'relations')
   const lookalikeImport = await importCliqueStore('lookalike', payload.wordLookalikes)
   if (lookalikeImport.merged > 0) {
     warnings.push(`合并 ${lookalikeImport.merged} 条形近词关系`)
@@ -159,11 +186,14 @@ export async function importUserDataBackup(file?: File): Promise<ImportUserDataR
   if (synonymImport.merged > 0) {
     warnings.push(`合并 ${synonymImport.merged} 条义近词关系`)
   }
+
+  await reportImportProgress(onProgress, 62, '导入单词笔记…', 'word-notes')
   const notesImport = await importWordNotesStore(payload.wordNotes)
   if (notesImport.merged > 0) {
     warnings.push(`合并 ${notesImport.merged} 条单词笔记`)
   }
 
+  await reportImportProgress(onProgress, 70, '整理笔记本标签…', 'remap-tags')
   for (const doc of payload.notebooks.documents) {
     for (const entry of doc.entries) {
       const next = remapTagIds(entry.tagIds, tagImport.remapped)
@@ -172,11 +202,13 @@ export async function importUserDataBackup(file?: File): Promise<ImportUserDataR
     }
   }
 
+  await reportImportProgress(onProgress, 82, '导入笔记本…', 'notebooks')
   const notebookResult = await importNotebooksBackup(payload.notebooks)
   warnings.push(...notebookResult.warnings)
   resetFrequencyNotebookRepair()
   await sanitizeAllEntryTagIds()
 
+  await reportImportProgress(onProgress, 90, '导入书籍映射与阅读时长…', 'reading')
   const bookNotebookAdded = await importBookNotebookMap(payload.bookNotebooks)
 
   if (bookNotebookAdded > 0) {
@@ -190,12 +222,15 @@ export async function importUserDataBackup(file?: File): Promise<ImportUserDataR
     )
   }
 
+  await reportImportProgress(onProgress, 96, '刷新统计…', 'finalize')
   notifyBackupDataChanged()
 
   const stats = await getDictionaryCacheStats()
   const phraseLemmas = await getLemmaPhraseWordCount()
   const masteredTotal = await getMasteredWordCount()
   const readingStats = await getReadingTimeStats()
+
+  await reportImportProgress(onProgress, 100, '导入完成', 'done')
 
   return {
     dictionaryWords: stats.wordCount,

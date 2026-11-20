@@ -9,6 +9,7 @@ export function WordLookupTool() {
   const [suggestions, setSuggestions] = useState<WordSuggestItem[]>([])
   const [suggestLoading, setSuggestLoading] = useState(false)
   const [lookup, setLookup] = useState<WordLookupRequest | null>(null)
+  const [activeLemma, setActiveLemma] = useState('')
   const [error, setError] = useState('')
   const seqRef = useRef(0)
 
@@ -47,10 +48,17 @@ export function WordLookupTool() {
   }, [input])
 
   function openWord(word: string) {
-    setInput(word)
-    setSuggestions([])
+    // 保留原查询词，仅切换下方详情
+    setActiveLemma(word)
     setLookup({ word, exactToken: false, seq: Date.now() })
   }
+
+  function closeDetail() {
+    setLookup(null)
+    setActiveLemma('')
+  }
+
+  const detailOpen = Boolean(lookup)
 
   return (
     <CollapsibleSettingsSection
@@ -59,10 +67,10 @@ export function WordLookupTool() {
       defaultExpanded={false}
     >
       <p className="settings-section-note">
-        支持英文模糊与中文释义检索（条数与匹配方式可在「设置」调整）。点选结果后在下方查看详情。
+        支持英文模糊与中文释义检索。点选结果后输入框保持原查询，方便继续浏览其它候选。
       </p>
 
-      <div className="word-lookup-tool">
+      <div className={`word-lookup-tool${detailOpen ? ' is-detail-open' : ''}`}>
         <div className="word-lookup-tool-row">
           <input
             className="word-lookup-tool-input"
@@ -86,7 +94,7 @@ export function WordLookupTool() {
               onClick={() => {
                 setInput('')
                 setSuggestions([])
-                setLookup(null)
+                closeDetail()
               }}
             >
               清空
@@ -98,10 +106,14 @@ export function WordLookupTool() {
         {error ? <p className="tools-error">{error}</p> : null}
 
         {suggestions.length > 0 ? (
-          <ul className="word-suggest-list">
+          <ul className={`word-suggest-list${detailOpen ? ' is-compact' : ''}`}>
             {suggestions.map((item) => (
               <li key={`${item.source}:${item.lemma}`}>
-                <button type="button" className="word-suggest-item" onClick={() => openWord(item.lemma)}>
+                <button
+                  type="button"
+                  className={`word-suggest-item${activeLemma === item.lemma ? ' active' : ''}`}
+                  onClick={() => openWord(item.lemma)}
+                >
                   <strong>{item.lemma}</strong>
                   {item.gloss ? <span>{item.gloss}</span> : null}
                 </button>
@@ -113,16 +125,12 @@ export function WordLookupTool() {
         {lookup ? (
           <div className="word-lookup-inline-panel">
             <div className="word-lookup-inline-head">
-              <h4>单词详情</h4>
-              <button type="button" className="word-enrich-link-btn" onClick={() => setLookup(null)}>
+              <h4>单词详情{activeLemma ? ` · ${activeLemma}` : ''}</h4>
+              <button type="button" className="word-enrich-link-btn" onClick={closeDetail}>
                 收起
               </button>
             </div>
-            <WordDetailPopup
-              lookup={lookup}
-              variant="inline"
-              onClose={() => setLookup(null)}
-            />
+            <WordDetailPopup lookup={lookup} variant="inline" onClose={closeDetail} />
           </div>
         ) : null}
       </div>

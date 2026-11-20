@@ -95,7 +95,7 @@ read/
 │   │   │
 │   │   └── services/
 │   │       ├── dictionary/          # ECDICT 本地 + 有道/词霸、缓存、信源状态
-│   │       │   ├── wordSuggest.ts   # 单词模糊联想（英/中，缓存+ECDICT）
+│   │       │   ├── wordSuggest.ts   # 单词模糊联想（英/中；精确>前缀>包含；缓存+ECDICT）
 │   │       │   ├── ecdict.ts        # sql.js 查询本地全量库
 │   │       │   ├── resolveLemma.ts  # ECDICT 优先的词形还原（供词组/已掌握共用）
 │   │       │   ├── youdao.ts
