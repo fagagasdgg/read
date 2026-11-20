@@ -42,6 +42,8 @@ interface NotebookDetailScreenProps {
   isFrequency?: boolean
   /** 打开时直接进入某条详情（标签筛选跳转） */
   initialEntryId?: string | null
+  /** 从标签详情返回/保存后直接退出笔记本（回到标签筛选结果） */
+  exitOnEntryLeave?: boolean
 }
 
 export function NotebookDetailScreen({
@@ -50,6 +52,7 @@ export function NotebookDetailScreen({
   onBack,
   isFrequency = false,
   initialEntryId = null,
+  exitOnEntryLeave = false,
 }: NotebookDetailScreenProps) {
   const [doc, setDoc] = useState<NotebookDocument | null>(null)
   const [loading, setLoading] = useState(true)
@@ -232,6 +235,7 @@ export function NotebookDetailScreen({
       setEditing(false)
       setEditDraft(EMPTY_ANALYSIS)
       setEditTagIds([])
+      if (exitOnEntryLeave) onBack()
     } catch (err) {
       window.alert(err instanceof Error ? err.message : '保存失败')
     } finally {
@@ -286,6 +290,10 @@ export function NotebookDetailScreen({
           onClick={() => {
             if (selectedEntry) {
               if (editing) cancelEdit()
+              if (exitOnEntryLeave) {
+                onBack()
+                return
+              }
               setSelectedEntryId(null)
               return
             }
@@ -488,8 +496,15 @@ export function NotebookDetailScreen({
         {!loading && selectedEntry && isNotFoundWordsNotebook(notebookId) && (
           <NotFoundWordEditor
             lemma={selectedEntry.sentence}
-            onCancel={() => setSelectedEntryId(null)}
+            onCancel={() => {
+              if (exitOnEntryLeave) onBack()
+              else setSelectedEntryId(null)
+            }}
             onSaved={() => {
+              if (exitOnEntryLeave) {
+                onBack()
+                return
+              }
               setSelectedEntryId(null)
               void loadDoc()
             }}

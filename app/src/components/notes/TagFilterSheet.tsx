@@ -6,13 +6,21 @@ import { ListPager, TAG_LIST_PAGE_SIZE, paginateItems } from '../common/ListPage
 interface TagFilterSheetProps {
   open: boolean
   tags: NoteTag[]
+  counts?: Record<string, number>
   value: string
   onClose: () => void
   onSelect: (tagId: string) => void
 }
 
 /** 居中标签选择面板：每页固定「全部笔记本」+ 10 条标签卡片 */
-export function TagFilterSheet({ open, tags, value, onClose, onSelect }: TagFilterSheetProps) {
+export function TagFilterSheet({
+  open,
+  tags,
+  counts = {},
+  value,
+  onClose,
+  onSelect,
+}: TagFilterSheetProps) {
   const [page, setPage] = useState(1)
 
   useEffect(() => {
@@ -65,6 +73,7 @@ export function TagFilterSheet({ open, tags, value, onClose, onSelect }: TagFilt
 
           {pageItems.map((tag, index) => {
             const order = (safePage - 1) * TAG_LIST_PAGE_SIZE + index + 1
+            const count = counts[tag.id] ?? 0
             return (
               <button
                 key={tag.id}
@@ -77,6 +86,7 @@ export function TagFilterSheet({ open, tags, value, onClose, onSelect }: TagFilt
               >
                 <span className="tag-filter-option-index">{order}</span>
                 <span className="tag-filter-option-name">{tag.name}</span>
+                <span className="tag-filter-option-count">{count} 条</span>
                 {value === tag.id ? <span className="tag-filter-check">✓</span> : null}
               </button>
             )

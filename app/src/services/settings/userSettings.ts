@@ -51,7 +51,13 @@ export interface UserSettings {
   inlineGlossOffsetY: number
   /** 选段工具栏弹出延迟（毫秒） */
   selectionToolbarDelayMs: number
+  /** 单词模糊联想：匹配方式 */
+  wordSuggestMatchMode: WordSuggestMatchMode
+  /** 单词模糊联想：结果条数上限 */
+  wordSuggestLimit: number
 }
+
+export type WordSuggestMatchMode = 'prefix' | 'contains' | 'both'
 
 type LegacyUserSettings = Partial<UserSettings> & {
   maxInlineMeanings?: number
@@ -70,6 +76,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   inlineGlossOffsetX: 0,
   inlineGlossOffsetY: 0,
   selectionToolbarDelayMs: 850,
+  wordSuggestMatchMode: 'both',
+  wordSuggestLimit: 20,
 }
 
 function clampCount(value: number, fallback: number): number {
@@ -139,6 +147,16 @@ function clampSelectionDelay(value: number, fallback: number): number {
   return Math.min(3000, Math.max(200, Math.round(value)))
 }
 
+function clampSuggestLimit(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return Math.min(100, Math.max(5, Math.round(value)))
+}
+
+function normalizeMatchMode(value: unknown): WordSuggestMatchMode {
+  if (value === 'prefix' || value === 'contains' || value === 'both') return value
+  return DEFAULT_SETTINGS.wordSuggestMatchMode
+}
+
 function normalizeUserSettings(partial: LegacyUserSettings): UserSettings {
   const migrated = migrateLegacySettings(partial)
   const merged = { ...DEFAULT_SETTINGS, ...migrated }
@@ -156,6 +174,8 @@ function normalizeUserSettings(partial: LegacyUserSettings): UserSettings {
       merged.selectionToolbarDelayMs,
       DEFAULT_SETTINGS.selectionToolbarDelayMs,
     ),
+    wordSuggestMatchMode: normalizeMatchMode(merged.wordSuggestMatchMode),
+    wordSuggestLimit: clampSuggestLimit(merged.wordSuggestLimit, DEFAULT_SETTINGS.wordSuggestLimit),
   }
 }
 

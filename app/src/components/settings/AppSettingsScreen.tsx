@@ -5,6 +5,7 @@ import {
   loadUserSettings,
   saveUserSettings,
   type UserSettings,
+  type WordSuggestMatchMode,
 } from '../../services/settings/userSettings'
 import type { AppShellThemeId } from '../../services/settings/appShellTheme'
 import { AppShellThemePicker } from './AppShellThemePicker'
@@ -13,12 +14,20 @@ import { CollapsibleSettingsSection } from './CollapsibleSettingsSection'
 import { DeepAnalysisSettings } from './DeepAnalysisSettings'
 import { DictionarySourcesSection } from './DictionarySourcesSection'
 
-function SelectionDelayInput({
+/** 允许清空再输入，避免默认值首位删不掉 */
+function SoftNumberInput({
   value,
+  min,
+  max,
+  unit,
   disabled,
   onChange,
 }: {
   value: number
+  min: number
+  max: number
+  step?: number
+  unit?: string
   disabled?: boolean
   onChange: (next: number) => void
 }) {
@@ -41,7 +50,7 @@ function SelectionDelayInput({
       setDraft(null)
       return
     }
-    const clamped = Math.min(3000, Math.max(200, Math.round(parsed)))
+    const clamped = Math.min(max, Math.max(min, Math.round(parsed)))
     onChange(clamped)
     setDraft(null)
   }
@@ -49,23 +58,40 @@ function SelectionDelayInput({
   return (
     <div className="settings-inline-stepper">
       <input
-        type="number"
-        min={200}
-        max={3000}
-        step={50}
+        type="text"
         inputMode="numeric"
         value={displayValue}
         disabled={disabled}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={(e) => commitDraft(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.currentTarget.blur()
-          }
+          if (e.key === 'Enter') e.currentTarget.blur()
         }}
       />
-      <span className="settings-inline-unit">毫秒</span>
+      {unit ? <span className="settings-inline-unit">{unit}</span> : null}
     </div>
+  )
+}
+
+function SelectionDelayInput({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: number
+  disabled?: boolean
+  onChange: (next: number) => void
+}) {
+  return (
+    <SoftNumberInput
+      value={value}
+      min={200}
+      max={3000}
+      step={50}
+      unit="毫秒"
+      disabled={disabled}
+      onChange={onChange}
+    />
   )
 }
 
@@ -140,6 +166,40 @@ export function AppSettingsScreen() {
           </label>
           <p className="settings-section-note">
             长按选段后，等待该时长再弹出工具栏，避免拖动手柄时被挡住。默认 850 毫秒。
+          </p>
+        </CollapsibleSettingsSection>
+
+        <CollapsibleSettingsSection title="单词查询联想" summary="模糊匹配方式与结果条数">
+          <label className="reader-setting-row">
+            <span>匹配方式</span>
+            <select
+              className="reader-level-select"
+              value={userSettings?.wordSuggestMatchMode ?? 'both'}
+              disabled={!userSettings}
+              onChange={(e) =>
+                updateUser({
+                  wordSuggestMatchMode: e.target.value as WordSuggestMatchMode,
+                })
+              }
+            >
+              <option value="prefix">仅前缀（go→good）</option>
+              <option value="contains">仅包含（oo→good）</option>
+              <option value="both">前缀 + 包含</option>
+            </select>
+          </label>
+          <label className="reader-setting-row">
+            <span>结果条数上限</span>
+            <SoftNumberInput
+              value={userSettings?.wordSuggestLimit ?? 20}
+              min={5}
+              max={100}
+              disabled={!userSettings}
+              unit="条"
+              onChange={(wordSuggestLimit) => updateUser({ wordSuggestLimit })}
+            />
+          </label>
+          <p className="settings-section-note">
+            用于「工具 → 单词查询」输入联想。中文按释义匹配；默认 20 条，可改 5–100。
           </p>
         </CollapsibleSettingsSection>
 

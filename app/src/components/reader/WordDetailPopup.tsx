@@ -36,6 +36,8 @@ interface WordDetailPopupProps {
   onClose: () => void
   onLookupVariant?: (word: string) => void
   onCompoundNavigate?: (next: WordLookupRequest) => void
+  /** modal=阅读弹窗；inline=工具页内嵌 */
+  variant?: 'modal' | 'inline'
 }
 
 type PanelMode = 'local' | 'online'
@@ -46,8 +48,10 @@ export function WordDetailPopup({
   onClose,
   onLookupVariant: _onLookupVariant,
   onCompoundNavigate,
+  variant = 'modal',
 }: WordDetailPopupProps) {
   void _onLookupVariant
+  const isInline = variant === 'inline'
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<PanelMode>('local')
   const [localEntry, setLocalEntry] = useState<WordEntry | null>(null)
@@ -311,12 +315,16 @@ export function WordDetailPopup({
     playSpeechWord(src?.lemma || speechLemma, 1)
   }
 
-  return (
-    <div className="popup-mask" onClick={onClose}>
-      <div className="word-popup" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="popup-close" onClick={onClose} aria-label="关闭">
-          ×
-        </button>
+  const body = (
+      <div
+        className={`word-popup${isInline ? ' word-popup-inline' : ''}`}
+        onClick={isInline ? undefined : (e) => e.stopPropagation()}
+      >
+        {!isInline ? (
+          <button type="button" className="popup-close" onClick={onClose} aria-label="关闭">
+            ×
+          </button>
+        ) : null}
 
         {canGoBack ? (
           <button type="button" className="popup-history-back" onClick={goHistoryBack}>
@@ -587,54 +595,53 @@ export function WordDetailPopup({
               </div>
             )}
 
-            <WordPhraseSection lemma={canonicalLemma || displayLemma} />
           </>
         )}
 
         {!showLoading && titleLemma ? (
           <>
             {lookalikes.length > 0 ? (
-              <div className="popup-enrich-block">
-                <span className="popup-enrich-label">形近词</span>
-                <div className="popup-enrich-chips">
-                  {lookalikes.map((item) => (
-                    <button
-                      key={`la-${item}`}
-                      type="button"
-                      className="form-chip"
-                      onClick={() => navigateToRelated(item)}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
+              <div className="popup-forms popup-enrich-block">
+                <span>形近词：</span>
+                {lookalikes.map((item) => (
+                  <button
+                    key={`la-${item}`}
+                    type="button"
+                    className="form-chip"
+                    onClick={() => navigateToRelated(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
               </div>
             ) : null}
 
             {synonyms.length > 0 ? (
-              <div className="popup-enrich-block">
-                <span className="popup-enrich-label">义近词</span>
-                <div className="popup-enrich-chips">
-                  {synonyms.map((item) => (
-                    <button
-                      key={`sy-${item}`}
-                      type="button"
-                      className="form-chip"
-                      onClick={() => navigateToRelated(item)}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
+              <div className="popup-forms popup-enrich-block">
+                <span>义近词：</span>
+                {synonyms.map((item) => (
+                  <button
+                    key={`sy-${item}`}
+                    type="button"
+                    className="form-chip"
+                    onClick={() => navigateToRelated(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
               </div>
             ) : null}
 
             {wordNote ? (
               <div className="popup-enrich-block">
-                <span className="popup-enrich-label">单词笔记</span>
+                <div className="popup-forms">
+                  <span>单词笔记：</span>
+                </div>
                 <p className="popup-word-note">{wordNote}</p>
               </div>
             ) : null}
+
+            <WordPhraseSection lemma={canonicalLemma || displayLemma || titleLemma} />
 
             <div className="popup-actions">
               <button
@@ -680,7 +687,17 @@ export function WordDetailPopup({
           </div>
         ) : null}
       </div>
+  )
 
+  return (
+    <>
+      {isInline ? (
+        body
+      ) : (
+        <div className="popup-mask" onClick={onClose}>
+          {body}
+        </div>
+      )}
       {editorOpen && titleLemma ? (
         <WordEnrichmentEditor
           lemma={titleLemma}
@@ -689,13 +706,10 @@ export function WordDetailPopup({
           onSaved={() => {
             setEditorOpen(false)
             setEnrichTick((n) => n + 1)
-            // 重新触发查词以反映缓存释义
-            setActiveLookup((prev) =>
-              prev ? { ...prev, seq: Date.now() } : prev,
-            )
+            setActiveLookup((prev) => (prev ? { ...prev, seq: Date.now() } : prev))
           }}
         />
       ) : null}
-    </div>
+    </>
   )
 }

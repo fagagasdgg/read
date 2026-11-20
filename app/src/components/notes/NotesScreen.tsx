@@ -19,6 +19,7 @@ import {
   consumeOpenFrequencyNotesPane,
 } from '../../services/notes/events'
 import {
+  countEntriesByTagId,
   findEntriesByTagId,
   listNoteTags,
   type NoteTag,
@@ -51,14 +52,21 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
   const [tagPickerOpen, setTagPickerOpen] = useState(false)
   const [tagHits, setTagHits] = useState<TaggedNoteHit[]>([])
   const [tagHitsLoading, setTagHitsLoading] = useState(false)
+  const [tagCounts, setTagCounts] = useState<Record<string, number>>({})
+  const [openedFromTagFilter, setOpenedFromTagFilter] = useState(false)
 
   const isActiveRef = useRef(isActive)
   isActiveRef.current = isActive
 
   const refresh = useCallback(async () => {
-    const [nbList, tagList] = await Promise.all([listNotebooks(), listNoteTags()])
+    const [nbList, tagList, counts] = await Promise.all([
+      listNotebooks(),
+      listNoteTags(),
+      countEntriesByTagId(),
+    ])
     setNotebooks(nbList)
     setTags(tagList)
+    setTagCounts(counts)
   }, [])
 
   useEffect(() => {
@@ -173,9 +181,11 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
         title={notebook?.title ?? '笔记本'}
         isFrequency={isFrequencyNotebookMeta(notebook)}
         initialEntryId={openEntryId}
+        exitOnEntryLeave={openedFromTagFilter}
         onBack={() => {
           setOpenNotebookId(null)
           setOpenEntryId(null)
+          setOpenedFromTagFilter(false)
         }}
       />
     )
@@ -246,6 +256,7 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
       <TagFilterSheet
         open={tagPickerOpen}
         tags={tags}
+        counts={tagCounts}
         value={tagFilterId}
         onClose={() => setTagPickerOpen(false)}
         onSelect={setTagFilterId}
@@ -266,6 +277,7 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
                   type="button"
                   className="notes-tag-hit-btn"
                   onClick={() => {
+                    setOpenedFromTagFilter(true)
                     setOpenEntryId(hit.entry.id)
                     void handleOpen(hit.notebookId)
                   }}
@@ -307,7 +319,10 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
                   type="button"
                   className={`bookshelf-cover notes-cover${isSystemNotebook(notebook.id) ? ' notes-cover-base' : ''}${isFrequencyNotebookMeta(notebook) ? ' notes-cover-freq' : ''}`}
                   style={{ background: notebookColor(notebook.id) }}
-                  onClick={() => void handleOpen(notebook.id)}
+                  onClick={() => {
+                    setOpenedFromTagFilter(false)
+                    void handleOpen(notebook.id)
+                  }}
                 >
                   <span className="notes-cover-icon" aria-hidden>
                     {isBaseSentenceNotebook(notebook.id)
