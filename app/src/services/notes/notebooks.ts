@@ -28,6 +28,12 @@ export interface NotebookEntryAnalysis {
   collocations: string
   slangs: string
   sentencePattern: string
+  /**
+   * 句型分析是否按 Markdown 渲染。
+   * 旧笔记 / AI 导入无此字段 → 纯文本展示；用户在笔记编辑页保存句型后为 true。
+   * 学习数据 zip 随 notebook JSON 一并导入导出。
+   */
+  sentencePatternMarkdown?: boolean
 }
 
 export interface NotebookEntrySource {
@@ -329,6 +335,9 @@ function normalizeEntry(raw: unknown): NotebookEntry | null {
       slangs: typeof analysisRaw.slangs === 'string' ? analysisRaw.slangs : '',
       sentencePattern:
         typeof analysisRaw.sentencePattern === 'string' ? analysisRaw.sentencePattern : '',
+      ...(analysisRaw.sentencePatternMarkdown === true
+        ? { sentencePatternMarkdown: true }
+        : {}),
     },
     source: normalizeSource(item.source),
     location: normalizeLocation(item.location),
@@ -911,6 +920,9 @@ export async function updateNotebookEntryAnalysis(
     collocations: analysis.collocations.trim(),
     slangs: analysis.slangs.trim(),
     sentencePattern: analysis.sentencePattern.trim(),
+    ...(analysis.sentencePatternMarkdown === true
+      ? { sentencePatternMarkdown: true }
+      : {}),
   }
   doc.updatedAt = Date.now()
   await writeDocument(doc)
@@ -996,6 +1008,9 @@ export async function addNotebookEntry(
       collocations: analysis.collocations?.trim() ?? '',
       slangs: analysis.slangs?.trim() ?? '',
       sentencePattern: analysis.sentencePattern?.trim() ?? '',
+      ...(analysis.sentencePatternMarkdown === true
+        ? { sentencePatternMarkdown: true }
+        : {}),
     },
     location,
   }

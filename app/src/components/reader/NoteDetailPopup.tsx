@@ -1,3 +1,4 @@
+import { SentencePatternView } from '../common/MarkdownContent'
 import { normalizeAnalysisListField } from '../../services/llm/analysisParse'
 import type { NotebookEntry } from '../../services/notes/notebooks'
 
@@ -63,7 +64,10 @@ export function NoteDetailPopup({ entry, onClose }: NoteDetailPopupProps) {
           {sentencePattern ? (
             <section className="note-popup-block">
               <h4 className="note-popup-label">句型</h4>
-              <p className="note-popup-pre">{sentencePattern}</p>
+              <SentencePatternView
+                text={sentencePattern}
+                asMarkdown={entry.analysis.sentencePatternMarkdown === true}
+              />
             </section>
           ) : null}
 

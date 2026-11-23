@@ -43,7 +43,9 @@ read/
 │   │   │   └── HomeShell.tsx        # 底部 Tab：书架 / 笔记 / 统计 / 工具 / 设置
 │   │   ├── components/common/
 │   │   │   ├── AppToast.tsx         # 全局轻提示
-│   │   │   └── ListPager.tsx        # 通用分页（首页/上一页/页码/下一页/尾页，每页10）
+│   │   │   ├── ListPager.tsx        # 通用分页（首页/上一页/页码/下一页/尾页，每页10）
+│   │   │   ├── MarkdownContent.tsx  # 句型分析 Markdown 安全渲染（白名单 + 旧笔记纯文本）
+│   │   │   └── MarkdownToolbar.tsx  # 句型分析编辑插入工具栏（标题/列表/强调/分割线等）
 │   │   ├── components/tools/
 │   │   │   ├── ToolsScreen.tsx      # 工具页
 │   │   │   ├── WordLookupTool.tsx   # 工具栏单词查询（复用详情弹窗与编辑）

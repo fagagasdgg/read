@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { formatExamLevelsDisplay } from '../../lib/examLevel'
 import { normalizeAnalysisListField } from '../../services/llm/analysisParse'
 import {
@@ -17,6 +17,8 @@ import {
 } from '../../services/notes/notebooks'
 import { listNoteTags, type NoteTag } from '../../services/notes/tags'
 import { parseFrequencyMeta } from '../../services/tools/bookWordFrequency'
+import { SentencePatternView } from '../common/MarkdownContent'
+import { MarkdownToolbar } from '../common/MarkdownToolbar'
 import { WordPhraseSection } from '../reader/WordPhraseSection'
 import { NoteTagChips, NoteTagPicker } from './NoteTagPicker'
 import { NotFoundWordEditor } from './NotFoundWordEditor'
@@ -68,6 +70,7 @@ export function NotebookDetailScreen({
   const [searchDraft, setSearchDraft] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [freqSortDir, setFreqSortDir] = useState<'asc' | 'desc'>('desc')
+  const sentencePatternRef = useRef<HTMLTextAreaElement>(null)
 
   const showSearch =
     isBasePhrasesNotebook(notebookId) ||
@@ -226,7 +229,11 @@ export function NotebookDetailScreen({
     if (!selectedEntry) return
     setSavingEdit(true)
     try {
-      await updateNotebookEntryAnalysis(notebookId, selectedEntry.id, editDraft)
+      // 从笔记编辑页保存后，句型分析按 Markdown 渲染；旧未编辑条目保持纯文本
+      await updateNotebookEntryAnalysis(notebookId, selectedEntry.id, {
+        ...editDraft,
+        sentencePatternMarkdown: true,
+      })
       if (canTagEntry) {
         await updateNotebookEntryTags(notebookId, selectedEntry.id, editTagIds)
       }
@@ -618,17 +625,33 @@ export function NotebookDetailScreen({
                         placeholder="填写或补充俚语讲解"
                       />
                     </label>
-                    <label className="notebook-entry-block notebook-entry-edit-field">
-                      <h3>句型分析</h3>
+                    <section className="notebook-entry-block notebook-entry-edit-field">
+                      <h3>句型分析（Markdown）</h3>
+                      <p className="notebook-md-hint">
+                        点下方按钮插入格式；也可直接手写。保存后渲染；未编辑过的旧笔记仍按纯文本显示。
+                      </p>
+                      <MarkdownToolbar
+                        textareaRef={sentencePatternRef}
+                        value={editDraft.sentencePattern}
+                        disabled={savingEdit}
+                        onChange={(next) =>
+                          setEditDraft((prev) => ({ ...prev, sentencePattern: next }))
+                        }
+                      />
                       <textarea
+                        ref={sentencePatternRef}
+                        className="notebook-md-editor"
                         value={editDraft.sentencePattern}
                         onChange={(e) =>
                           setEditDraft((prev) => ({ ...prev, sentencePattern: e.target.value }))
                         }
-                        rows={5}
-                        placeholder="填写或补充句型分析"
+                        rows={10}
+                        placeholder={
+                          '## 结构\n\n- 主句 …\n- 从句 …\n\n---\n\n### 要点\n\n1. …\n2. …'
+                        }
+                        spellCheck={false}
                       />
-                    </label>
+                    </section>
                     {canTagEntry ? (
                       <section className="notebook-entry-block">
                         <h3>标签</h3>
@@ -685,7 +708,10 @@ export function NotebookDetailScreen({
                     </section>
                     <section className="notebook-entry-block">
                       <h3>句型分析</h3>
-                      <p>{selectedEntry.analysis.sentencePattern || '暂无内容'}</p>
+                      <SentencePatternView
+                        text={selectedEntry.analysis.sentencePattern || ''}
+                        asMarkdown={selectedEntry.analysis.sentencePatternMarkdown === true}
+                      />
                     </section>
                   </>
                 )}
