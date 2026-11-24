@@ -55,7 +55,7 @@ read/
 │   │   │   └── StatisticsScreen.tsx # 阅读时长 + 词汇统计（可展开收起）
 │   │   ├── components/notes/
 │   │   │   ├── NotesScreen.tsx      # 阅读笔记 / 词频统计 双页签；按标签筛选（结果带序号）
-│   │   │   ├── TagFilterSheet.tsx   # 标签筛选面板（分页选择器，替代原生 select）
+│   │   │   ├── TagFilterSheet.tsx   # 标签筛选面板（多选切换/确认；分页）
 │   │   │   ├── NotebookDetailScreen.tsx # 笔记条目列表 + 详情（分页；词频本专用列表；打标）
 │   │   │   ├── NoteTagPicker.tsx        # 标签多选组件
 │   │   │   ├── NotFoundWordEditor.tsx   # 待补全词条手动/豆包录入

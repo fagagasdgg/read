@@ -20,7 +20,7 @@ import {
 } from '../../services/notes/events'
 import {
   countEntriesByTagId,
-  findEntriesByTagId,
+  findEntriesByTagIds,
   listNoteTags,
   type NoteTag,
   type TaggedNoteHit,
@@ -48,7 +48,7 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
   const [statusText, setStatusText] = useState('')
   const [statusVariant, setStatusVariant] = useState<AppToastVariant>('ok')
   const [tags, setTags] = useState<NoteTag[]>([])
-  const [tagFilterId, setTagFilterId] = useState('')
+  const [tagFilterIds, setTagFilterIds] = useState<string[]>([])
   const [tagPickerOpen, setTagPickerOpen] = useState(false)
   const [tagHits, setTagHits] = useState<TaggedNoteHit[]>([])
   const [tagHitsLoading, setTagHitsLoading] = useState(false)
@@ -67,6 +67,11 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
     setNotebooks(nbList)
     setTags(tagList)
     setTagCounts(counts)
+    const validIds = new Set(tagList.map((tag) => tag.id))
+    setTagFilterIds((prev) => {
+      const next = prev.filter((id) => validIds.has(id))
+      return next.length === prev.length ? prev : next
+    })
   }, [])
 
   useEffect(() => {
@@ -79,13 +84,14 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
   }, [isActive, refresh])
 
   useEffect(() => {
-    if (pane !== 'notes' || !tagFilterId) {
+    if (pane !== 'notes' || !tagFilterIds.length) {
       setTagHits([])
       return
     }
     let cancelled = false
     setTagHitsLoading(true)
-    void findEntriesByTagId(tagFilterId)
+    const selected = [...tagFilterIds]
+    void findEntriesByTagIds(selected)
       .then((hits) => {
         if (!cancelled) setTagHits(hits)
       })
@@ -95,7 +101,7 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
     return () => {
       cancelled = true
     }
-  }, [pane, tagFilterId, notebooks])
+  }, [pane, tagFilterIds, notebooks])
 
   useEffect(() => {
     const onDataChanged = () => {
@@ -191,7 +197,14 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
     )
   }
 
-  const selectedTagName = tags.find((tag) => tag.id === tagFilterId)?.name
+  const selectedTagNames = tagFilterIds
+    .map((id) => tags.find((tag) => tag.id === id)?.name)
+    .filter(Boolean) as string[]
+  const tagFilterSummary = !tagFilterIds.length
+    ? '全部笔记本'
+    : selectedTagNames.length <= 2
+      ? selectedTagNames.join(' + ')
+      : `${selectedTagNames.slice(0, 2).join(' + ')} 等 ${selectedTagNames.length} 个`
 
   return (
     <div className="notes-screen">
@@ -213,7 +226,7 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
             className={`notes-pane-tab${pane === 'frequency' ? ' active' : ''}`}
             onClick={() => {
               setPane('frequency')
-              setTagFilterId('')
+              setTagFilterIds([])
             }}
           >
             词频统计
@@ -239,10 +252,10 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
           <span className="notes-tag-filter-label">按标签筛选</span>
           <button
             type="button"
-            className="notes-tag-filter-trigger"
+            className={`notes-tag-filter-trigger${tagFilterIds.length ? ' has-filter' : ''}`}
             onClick={() => setTagPickerOpen(true)}
           >
-            <span>{tagFilterId ? selectedTagName ?? '已选标签' : '全部笔记本'}</span>
+            <span>{tagFilterSummary}</span>
             <span className="notes-tag-filter-caret" aria-hidden>
               ▾
             </span>
@@ -257,18 +270,19 @@ export function NotesScreen({ isActive = true }: { isActive?: boolean }) {
         open={tagPickerOpen}
         tags={tags}
         counts={tagCounts}
-        value={tagFilterId}
+        value={tagFilterIds}
         onClose={() => setTagPickerOpen(false)}
-        onSelect={setTagFilterId}
+        onConfirm={setTagFilterIds}
       />
 
-      {pane === 'notes' && tagFilterId ? (
+      {pane === 'notes' && tagFilterIds.length ? (
         <div className="notes-tag-results">
           <h2 className="notes-tag-results-title">
-            标签「{selectedTagName ?? '…'}」· {tagHitsLoading ? '查询中…' : `${tagHits.length} 条`}
+            同时含「{selectedTagNames.join('」「') || '…'}」·{' '}
+            {tagHitsLoading ? '查询中…' : `${tagHits.length} 条`}
           </h2>
           {!tagHitsLoading && tagHits.length === 0 ? (
-            <p className="bookshelf-empty-hint">没有找到带该标签的笔记</p>
+            <p className="bookshelf-empty-hint">没有找到同时包含所选标签的笔记</p>
           ) : null}
           <ul className="notes-tag-hit-list">
             {tagHits.map((hit, index) => (

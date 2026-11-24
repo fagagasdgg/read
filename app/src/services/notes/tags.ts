@@ -240,9 +240,19 @@ export interface TaggedNoteHit {
   entry: NotebookEntry
 }
 
-/** 按标签查询：仅普通阅读本（不含 base_sentence / 词频 / 其它系统本） */
+/** 按单个标签查询（兼容旧调用） */
 export async function findEntriesByTagId(tagId: string): Promise<TaggedNoteHit[]> {
-  if (!tagId) return []
+  return findEntriesByTagIds(tagId ? [tagId] : [])
+}
+
+/**
+ * 按多个标签筛选：笔记需同时包含全部所选标签（AND）。
+ * 仅普通阅读本（不含 base_sentence / 词频 / 其它系统本）。
+ */
+export async function findEntriesByTagIds(tagIds: string[]): Promise<TaggedNoteHit[]> {
+  const required = [...new Set(tagIds.map((id) => id.trim()).filter(Boolean))]
+  if (!required.length) return []
+
   const notebooks = await listNotebooks()
   const hits: TaggedNoteHit[] = []
 
@@ -253,7 +263,9 @@ export async function findEntriesByTagId(tagId: string): Promise<TaggedNoteHit[]
     if (!doc?.entries.length) continue
 
     for (const entry of doc.entries) {
-      if (!entry.tagIds?.includes(tagId)) continue
+      const entryTags = entry.tagIds
+      if (!entryTags?.length) continue
+      if (!required.every((id) => entryTags.includes(id))) continue
       hits.push({
         notebookId: meta.id,
         notebookTitle: meta.title,
